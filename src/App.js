@@ -86,6 +86,14 @@ function App() {
   const [patientQuery, setPatientQuery] = useState('');
   const t = mode === 'dark' ? dark : light;
   const showFull = !collapsed || sidebarHover;
+  const suppressHoverRef = useRef(false);
+
+  function toggleCollapsed() {
+    setCollapsed(c => !c);
+    setSidebarHover(false);
+    suppressHoverRef.current = true;
+    window.setTimeout(() => { suppressHoverRef.current = false; }, 400);
+  }
 
   const notifRef = useRef(null);
   const searchRef = useRef(null);
@@ -142,7 +150,7 @@ function App() {
 
       {/* SIDEBAR */}
       <div
-        onMouseEnter={() => setSidebarHover(true)}
+        onMouseEnter={() => { if (!suppressHoverRef.current) setSidebarHover(true); }}
         onMouseLeave={() => setSidebarHover(false)}
         style={{
           width: showFull ? '240px' : '72px', background: t.bgSidebar, borderRight: `1px solid ${t.border}`,
@@ -159,14 +167,14 @@ function App() {
               {showFull && <span style={{ fontSize: '19px', fontWeight: '700', color: t.ink, whiteSpace: 'nowrap' }}>PraxisMD</span>}
             </div>
             {showFull && (
-              <button onClick={() => setCollapsed(c => !c)} title="Collapse sidebar" style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+              <button onClick={toggleCollapsed} title="Collapse sidebar" style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
                 <Menu size={17} />
               </button>
             )}
           </div>
           {showFull && <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '6px' }}>Bright Smiles Dental</div>}
           {!showFull && (
-            <button onClick={() => setCollapsed(c => !c)} title="Expand sidebar" style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '12px', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', padding: '4px 0' }}>
+            <button onClick={toggleCollapsed} title="Expand sidebar" style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '12px', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', padding: '4px 0' }}>
               <Menu size={16} />
             </button>
           )}
