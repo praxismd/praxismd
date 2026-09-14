@@ -82,9 +82,12 @@ function NavBar() {
           <a href="#compare" style={{ color: 'inherit', textDecoration: 'none' }}>Compare</a>
           <Link to="/dashboard" style={{ color: 'inherit', textDecoration: 'none' }}>View dashboard demo</Link>
         </div>
-        <a href="#demo" className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '10px', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-          Book a Demo
-        </a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Link to="/login" style={{ color: t.mid, textDecoration: 'none', fontSize: '13.5px', fontWeight: '500', whiteSpace: 'nowrap' }}>Sign in</Link>
+          <a href="#demo" className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '10px', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+            Book a Demo
+          </a>
+        </div>
       </div>
     </div>
   );
