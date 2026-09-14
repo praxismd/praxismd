@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { signOut } from 'firebase/auth';
 import { light, dark, withAlpha } from './theme';
+import { auth, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, sendMessage, isGhlConfigured } from './api/ghl';
 import {
   LayoutDashboard, Inbox as InboxIcon, Megaphone, RotateCcw, Calendar as CalendarIcon,
   ClipboardList, Users, Contact, Shield, Star, Smile, Bot, Receipt, CreditCard,
   TrendingUp, Settings as SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
-  ChevronRight, Phone, Hand, Zap, CalendarPlus, Sparkles,
+  ChevronRight, Phone, Hand, Zap, CalendarPlus, Sparkles, LogOut,
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
 } from 'lucide-react';
 
@@ -118,6 +121,7 @@ function useGhlFetch(fetchFn) {
 }
 
 function App() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [mode, setMode] = useState(getInitialMode);
   const [collapsed, setCollapsed] = useState(false);
@@ -134,6 +138,13 @@ function App() {
     setSidebarHover(false);
     suppressHoverRef.current = true;
     window.setTimeout(() => { suppressHoverRef.current = false; }, 400);
+  }
+
+  async function handleLogout() {
+    if (isFirebaseConfigured) {
+      try { await signOut(auth); } catch { /* fall through to redirect regardless */ }
+    }
+    navigate('/login');
   }
 
   const notifRef = useRef(null);
@@ -249,13 +260,20 @@ function App() {
           <NavItem label="Settings" Icon={SettingsIcon} tab="settings" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
         </nav>
 
-        <div style={{ padding: showFull ? '12px 16px' : '12px 0', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: showFull ? 'flex-start' : 'center', gap: '10px' }}>
-          <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>DR</div>
+        <div style={{ padding: showFull ? '12px 16px' : '12px 0', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: showFull ? 'space-between' : 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>DR</div>
+            {showFull && (
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Dr. Rivera</div>
+                <div style={{ fontSize: '11px', color: t.muted }}>Practice owner</div>
+              </div>
+            )}
+          </div>
           {showFull && (
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Dr. Rivera</div>
-              <div style={{ fontSize: '11px', color: t.muted }}>Practice owner</div>
-            </div>
+            <button onClick={handleLogout} title="Log out" style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px', flexShrink: 0 }}>
+              <LogOut size={15} />
+            </button>
           )}
         </div>
       </div>
