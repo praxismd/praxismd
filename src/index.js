@@ -5,6 +5,7 @@ import './index.css';
 import App from './App';
 import Landing from './Landing';
 import Auth from './Auth';
+import Onboarding from './Onboarding';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -14,6 +15,7 @@ root.render(
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Auth />} />
+        <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/dashboard" element={<App />} />
       </Routes>
     </BrowserRouter>

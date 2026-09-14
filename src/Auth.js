@@ -101,6 +101,8 @@ function Auth() {
     setInfo('');
   }
 
+  // Returns true when a new practice doc was created (i.e. this is the
+  // person's first login), so the caller can route them to onboarding.
   async function ensurePracticeDoc(user, extra = {}) {
     const ref = doc(db, 'practices', user.uid);
     const snap = await getDoc(ref);
@@ -111,9 +113,12 @@ function Auth() {
         phone: extra.phone || '',
         address: extra.address || '',
         pmSoftware: extra.pmSoftware || '',
+        onboardingComplete: false,
         createdAt: serverTimestamp(),
       });
+      return true;
     }
+    return false;
   }
 
   async function handleLogin(e) {
@@ -121,8 +126,10 @@ function Auth() {
     setError('');
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate('/dashboard');
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      const snap = await getDoc(doc(db, 'practices', cred.user.uid));
+      const onboardingComplete = snap.exists() && snap.data().onboardingComplete;
+      navigate(onboardingComplete ? '/dashboard' : '/onboarding');
     } catch (err) {
       setError(friendlyError(err.code));
     } finally {
@@ -145,7 +152,7 @@ function Auth() {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await ensurePracticeDoc(cred.user, { practiceName, phone, address, pmSoftware });
-      navigate('/dashboard');
+      navigate('/onboarding');
     } catch (err) {
       setError(friendlyError(err.code));
     } finally {
@@ -158,8 +165,8 @@ function Auth() {
     setLoading(true);
     try {
       const cred = await signInWithPopup(auth, googleProvider);
-      await ensurePracticeDoc(cred.user);
-      navigate('/dashboard');
+      const isNew = await ensurePracticeDoc(cred.user);
+      navigate(isNew ? '/onboarding' : '/dashboard');
     } catch (err) {
       setError(friendlyError(err.code));
     } finally {
