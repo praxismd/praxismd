@@ -1,5 +1,8 @@
-import { useState } from 'react';
+import { useState, createContext, useContext } from 'react';
+import { light, dark } from './theme';
 
+export const ThemeContext = createContext(light);
+export const useTheme = () => useContext(ThemeContext);
 function App() {
   const [activeTab, setActiveTab] = useState('overview');
 
