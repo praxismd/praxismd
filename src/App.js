@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { light, dark, withAlpha } from './theme';
+import { getContacts, getConversations, sendMessage, isGhlConfigured } from './api/ghl';
 import {
   LayoutDashboard, Inbox as InboxIcon, Megaphone, RotateCcw, Calendar as CalendarIcon,
   ClipboardList, Users, Contact, Shield, Star, Smile, Bot, Receipt, CreditCard,
   TrendingUp, Settings as SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
-  ChevronRight, Phone, Hand, Zap, Reply as ReplyIcon, CalendarPlus, Sparkles,
-  Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare,
+  ChevronRight, Phone, Hand, Zap, CalendarPlus, Sparkles,
+  Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -53,27 +54,67 @@ function useCountUp(value, duration = 700) {
   return display;
 }
 
-// Demo patient dataset shared between the topbar search and the Patients page
-const PATIENTS = [
-  { name: 'Sarah Martinez', email: 'sarah.m@email.com', visit: 'Sep 13, 2026', insurance: 'Delta Dental', status: 'Active' },
-  { name: 'James Lee', email: 'jlee@gmail.com', visit: 'Aug 20, 2026', insurance: 'Aetna', status: 'Upcoming' },
-  { name: 'Maria Chen', email: 'mchen@email.com', visit: 'Mar 5, 2026', insurance: 'Cigna', status: 'Reactivating' },
-  { name: 'Robert Park', email: 'rpark@gmail.com', visit: 'Jan 12, 2026', insurance: 'UnitedHealth', status: 'Overdue' },
-  { name: 'Tina Nguyen', email: 'tnguyen@email.com', visit: 'Sep 12, 2026', insurance: 'Blue Cross', status: 'Active' },
-];
-
-function statusColor(status, t) {
-  switch (status) {
-    case 'Active': return [t.green, t.greenL];
-    case 'Upcoming': return [t.amber, t.amberL];
-    case 'Reactivating': return [t.brand, t.brandL];
-    case 'Overdue': return [t.red, t.redL];
-    default: return [t.mid, t.bgRow];
-  }
-}
-
 function initialsOf(name) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
+// Cycles a fixed theme palette for avatars, since real GHL records don't
+// carry a color the way the old demo data did.
+function avatarStyle(t, i) {
+  const palette = [
+    [t.brand, t.brandL], [t.green, t.greenL], [t.amber, t.amberL],
+    [t.purple, t.purpleL], [t.teal, t.tealL], [t.pink, t.pinkL],
+  ];
+  return palette[i % palette.length];
+}
+
+function mapContact(c) {
+  const name = [c.firstName, c.lastName].filter(Boolean).join(' ') || c.contactName || c.name || 'Unknown';
+  return {
+    id: c.id,
+    name,
+    email: c.email || '—',
+    phone: c.phone || '—',
+    tag: Array.isArray(c.tags) && c.tags.length ? c.tags[0] : null,
+    dateAdded: c.dateAdded ? new Date(c.dateAdded).toLocaleDateString() : '—',
+  };
+}
+
+function mapConversation(c) {
+  const name = c.contactName || c.fullName || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown';
+  return {
+    id: c.id,
+    contactId: c.contactId,
+    name,
+    lastMessage: c.lastMessageBody || '(no message preview)',
+    time: c.dateUpdated ? new Date(c.dateUpdated).toLocaleString() : '',
+    unread: Boolean(c.unreadCount),
+  };
+}
+
+// Fetches once on mount (and whenever refetch() is called). Skips the call
+// entirely — no spinner, no error — when GHL isn't configured, since that's
+// an expected, common state here, not a failure.
+function useGhlFetch(fetchFn) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(isGhlConfigured);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (!isGhlConfigured) { setLoading(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    setError('');
+    fetchFn()
+      .then(result => { if (!cancelled) setData(result); })
+      .catch(err => { if (!cancelled) setError(err.message || 'Something went wrong.'); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey]);
+
+  return { data, loading, error, refetch: () => setReloadKey(k => k + 1) };
 }
 
 function App() {
@@ -113,8 +154,11 @@ function App() {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
+  const { data: contactsData, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useGhlFetch(getContacts);
+  const contacts = (contactsData || []).map(mapContact);
+
   const searchMatches = patientQuery.trim()
-    ? PATIENTS.filter(p => p.name.toLowerCase().includes(patientQuery.trim().toLowerCase()))
+    ? contacts.filter(p => p.name.toLowerCase().includes(patientQuery.trim().toLowerCase()))
     : [];
 
   const notifications = [
@@ -145,6 +189,8 @@ function App() {
       }
       .px-tooltip-wrap:hover .px-tooltip-bubble { opacity: 1; }
       input:focus, select:focus { outline: 2px solid ${withAlpha(t.brand, .3)}; }
+      @keyframes pxSpin { to { transform: rotate(360deg); } }
+      .px-spin { animation: pxSpin .7s linear infinite; }
     `}</style>
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
 
@@ -243,9 +289,9 @@ function App() {
                     style={{ padding: '10px 13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: i < searchMatches.length - 1 ? `1px solid ${t.border2}` : 'none' }}
                   >
                     <Ava initials={initialsOf(p.name)} bg={t.brandL} color={t.brand} />
-                    <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.insurance} · {p.status}</div></div>
+                    <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.phone}{p.tag ? ` · ${p.tag}` : ''}</div></div>
                   </div>
-                )) : <div style={{ padding: '14px', fontSize: '13px', color: t.muted, textAlign: 'center' }}>No patients found</div>}
+                )) : <div style={{ padding: '14px', fontSize: '13px', color: t.muted, textAlign: 'center' }}>{isGhlConfigured ? 'No patients found' : 'Connect GoHighLevel to search patients'}</div>}
               </div>
             )}
           </div>
@@ -291,7 +337,7 @@ function App() {
           {activeTab === 'inbox' && <Inbox />}
           {activeTab === 'campaigns' && <Campaigns />}
           {activeTab === 'recall' && <Recall />}
-          {activeTab === 'patients' && <Patients query={patientQuery} onQueryChange={setPatientQuery} />}
+          {activeTab === 'patients' && <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} />}
           {activeTab === 'billing' && <Billing />}
           {activeTab === 'payments' && <Payments />}
           {activeTab === 'reports' && <Reports />}
@@ -421,6 +467,46 @@ function StarRating({ rating, size = 14 }) {
   );
 }
 
+// ─── GHL DATA STATES ───────────────────────────────────────
+function GhlNotConnected({ what }) {
+  const t = useTheme();
+  return (
+    <Card style={{ textAlign: 'center', padding: '40px 24px' }}>
+      <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: t.amberL, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+        <AlertTriangle size={20} color={t.amber} />
+      </div>
+      <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink, marginBottom: '6px' }}>GoHighLevel isn't connected</div>
+      <div style={{ fontSize: '12.5px', color: t.mid, maxWidth: '380px', margin: '0 auto', lineHeight: '1.5' }}>
+        Add <code style={{ background: t.bgRow, padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_GHL_API_KEY</code> and <code style={{ background: t.bgRow, padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_GHL_LOCATION_ID</code> to your <code style={{ background: t.bgRow, padding: '1px 5px', borderRadius: '4px' }}>.env.local</code> to load real {what} here.
+      </div>
+    </Card>
+  );
+}
+
+function LoadingState({ label }) {
+  const t = useTheme();
+  return (
+    <Card style={{ textAlign: 'center', padding: '40px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+      <Loader2 size={20} color={t.brand} className="px-spin" />
+      <div style={{ fontSize: '13px', color: t.mid }}>{label}</div>
+    </Card>
+  );
+}
+
+function ErrorState({ message, onRetry }) {
+  const t = useTheme();
+  return (
+    <Card style={{ textAlign: 'center', padding: '32px 24px' }}>
+      <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: t.redL, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
+        <AlertTriangle size={20} color={t.red} />
+      </div>
+      <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink, marginBottom: '6px' }}>Couldn't load data</div>
+      <div style={{ fontSize: '12.5px', color: t.mid, marginBottom: '16px' }}>{message}</div>
+      {onRetry && <Btn small onClick={onRetry}>Try again</Btn>}
+    </Card>
+  );
+}
+
 // ─── OVERVIEW ──────────────────────────────────────────────
 function Overview({ setActiveTab }) {
   const t = useTheme();
@@ -514,43 +600,75 @@ function Overview({ setActiveTab }) {
 // ─── INBOX ─────────────────────────────────────────────────
 function Inbox() {
   const t = useTheme();
-  const messages = [
-    { ini: 'MC', bg: t.brandL, c: t.brand, name: 'Maria Chen', via: 'via SMS · 2 minutes ago', msg: "Yes I'd like to book the cleaning for next week — does Tuesday work?", ai: 'Tuesday the 17th at 10am or 2pm are available — which works better?', borderColor: t.brand },
-    { ini: 'DW', bg: t.amberL, c: t.amber, name: 'David Wong', via: 'via SMS · 18 minutes ago', msg: 'Can I reschedule my 3pm appointment? Something came up at work.', ai: 'Of course! We have Thursday at 2pm or Friday at 10am — which works?', borderColor: t.accentAmber },
-    { ini: 'RP', bg: t.redL, c: t.red, name: 'Robert Park', via: 'missed call · 45 minutes ago', msg: 'AI answered call — triaged tooth pain. Booked 4pm emergency slot automatically.', ai: null, borderColor: t.accentRed },
-    { ini: 'TN', bg: t.greenL, c: t.green, name: 'Tina Nguyen', via: 'via SMS · 1 hour ago', msg: 'Thank you for the great service! I left you a 5-star Google review 😊', ai: null, borderColor: t.accentGreen },
-  ];
+  const { data, loading, error, refetch } = useGhlFetch(getConversations);
+  const [drafts, setDrafts] = useState({});
+  const [sendingId, setSendingId] = useState(null);
+  const [sendError, setSendError] = useState('');
+
+  if (!isGhlConfigured) return <GhlNotConnected what="conversations" />;
+  if (loading) return <LoadingState label="Loading conversations…" />;
+  if (error) return <ErrorState message={error} onRetry={refetch} />;
+
+  const conversations = (data || []).map(mapConversation);
+
+  async function handleSend(convo) {
+    const text = (drafts[convo.id] || '').trim();
+    if (!text) return;
+    setSendingId(convo.id);
+    setSendError('');
+    try {
+      await sendMessage(convo.contactId, text);
+      setDrafts(d => ({ ...d, [convo.id]: '' }));
+    } catch (err) {
+      setSendError(err.message || 'Could not send message.');
+    } finally {
+      setSendingId(null);
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        {['All (4)', 'SMS', 'Email', 'Missed calls', 'Voicemail'].map((label, i) => (
+        {[`All (${conversations.length})`, 'SMS', 'Email', 'Missed calls', 'Voicemail'].map((label, i) => (
           <span key={i} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: i === 0 ? 'none' : `1px solid ${t.border}`, background: i === 0 ? t.brand : t.bgCard, color: i === 0 ? 'white' : t.mid }}>{label}</span>
         ))}
       </div>
-      {messages.map((m, i) => (
-        <div key={i} className="px-card" style={{ background: t.bgCard, borderRadius: '14px', padding: '16px 18px', border: `1px solid ${t.border}`, marginBottom: '10px', borderLeft: `4px solid ${m.borderColor}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-            <div style={{ display: 'flex', gap: '11px', alignItems: 'center' }}>
-              <Ava initials={m.ini} bg={m.bg} color={m.c} />
-              <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{m.via}</div></div>
+
+      {sendError && (
+        <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '14px' }}>{sendError}</div>
+      )}
+
+      {conversations.length === 0 && (
+        <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No conversations yet.</Card>
+      )}
+
+      {conversations.map((m, i) => {
+        const [color, bg] = avatarStyle(t, i);
+        return (
+          <div key={m.id} className="px-card" style={{ background: t.bgCard, borderRadius: '14px', padding: '16px 18px', border: `1px solid ${t.border}`, marginBottom: '10px', borderLeft: `4px solid ${m.unread ? t.accentBlue : t.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', gap: '11px', alignItems: 'center' }}>
+                <Ava initials={initialsOf(m.name)} bg={bg} color={color} />
+                <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{m.time}</div></div>
+              </div>
+              {m.unread && <Pill label="Unread" color={t.brand} bg={t.brandL} />}
             </div>
-            <div style={{ display: 'flex', gap: '7px' }}>
-              {m.ai && <Btn small><ReplyIcon size={13} /> Reply</Btn>}
-              {m.ai && <Btn small primary><CalendarPlus size={13} /> Book</Btn>}
-              {!m.ai && i === 2 && <Btn small><Phone size={13} /> Call back</Btn>}
-              {!m.ai && i === 3 && <Pill label="Read" color={t.green} bg={t.greenL} />}
+            <div style={{ fontSize: '13px', color: t.ink2, padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '10px' }}>{m.lastMessage}</div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                value={drafts[m.id] || ''}
+                onChange={e => setDrafts(d => ({ ...d, [m.id]: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') handleSend(m); }}
+                placeholder="Type a reply…"
+                style={{ flex: 1, padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}
+              />
+              <Btn small primary onClick={() => handleSend(m)} disabled={sendingId === m.id}>
+                {sendingId === m.id ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} Send
+              </Btn>
             </div>
           </div>
-          <div style={{ fontSize: '13px', color: t.ink2, padding: '10px 12px', background: t.bgRow, borderRadius: '10px' }}>{m.msg}</div>
-          {m.ai && (
-            <div style={{ background: t.bgRow, borderRadius: '10px', padding: '10px 12px', fontSize: '12px', color: t.mid, marginTop: '10px', borderLeft: `3px solid ${t.accentBlue}` }}>
-              <div style={{ color: t.brand, fontWeight: '600', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}><Sparkles size={12} /> AI suggested reply</div>
-              {m.ai}
-              <br /><Btn small primary style={{ marginTop: '8px' }}>Send this</Btn>
-            </div>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -641,10 +759,12 @@ function Recall() {
 }
 
 // ─── PATIENTS ──────────────────────────────────────────────
-function Patients({ query, onQueryChange }) {
+function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
   const t = useTheme();
   const q = query.trim().toLowerCase();
-  const filtered = q ? PATIENTS.filter(p => p.name.toLowerCase().includes(q)) : PATIENTS;
+  const list = contacts || [];
+  const filtered = q ? list.filter(p => p.name.toLowerCase().includes(q)) : list;
+
   return (
     <div>
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
@@ -660,28 +780,34 @@ function Patients({ query, onQueryChange }) {
         <Btn primary><Plus size={14} /> Add patient</Btn>
         <Btn><Upload size={14} /> Import</Btn>
       </div>
-      <Card>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-          <thead><tr>{['Patient', 'Last visit', 'Insurance', 'Status', ''].map((h, i) => <th key={i} style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '500', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: `1px solid ${t.border}` }}>{h}</th>)}</tr></thead>
-          <tbody>
-            {filtered.map((p, i) => {
-              const [color, bg] = statusColor(p.status, t);
-              return (
-                <tr key={i} className="px-row" style={{ borderBottom: `1px solid ${t.border2}` }}>
+
+      {!isGhlConfigured ? (
+        <GhlNotConnected what="patients" />
+      ) : loading ? (
+        <LoadingState label="Loading patients…" />
+      ) : error ? (
+        <ErrorState message={error} onRetry={onRetry} />
+      ) : (
+        <Card>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead><tr>{['Patient', 'Phone', 'Tag', 'Added', ''].map((h, i) => <th key={i} style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '500', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: `1px solid ${t.border}` }}>{h}</th>)}</tr></thead>
+            <tbody>
+              {filtered.map((p, i) => (
+                <tr key={p.id || i} className="px-row" style={{ borderBottom: `1px solid ${t.border2}` }}>
                   <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.email}</div></td>
-                  <td style={{ padding: '11px 13px', color: t.mid }}>{p.visit}</td>
-                  <td style={{ padding: '11px 13px', color: t.mid }}>{p.insurance}</td>
-                  <td style={{ padding: '11px 13px' }}><Pill label={p.status} color={color} bg={bg} /></td>
+                  <td style={{ padding: '11px 13px', color: t.mid }}>{p.phone}</td>
+                  <td style={{ padding: '11px 13px' }}>{p.tag ? <Pill label={p.tag} color={t.brand} bg={t.brandL} /> : <span style={{ color: t.muted }}>—</span>}</td>
+                  <td style={{ padding: '11px 13px', color: t.mid }}>{p.dateAdded}</td>
                   <td style={{ padding: '11px 13px', textAlign: 'right' }}><Btn small>View</Btn></td>
                 </tr>
-              );
-            })}
-            {filtered.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: t.muted }}>No patients match "{query}"</td></tr>
-            )}
-          </tbody>
-        </table>
-      </Card>
+              ))}
+              {filtered.length === 0 && (
+                <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: t.muted }}>{list.length === 0 ? 'No patients yet.' : `No patients match "${query}"`}</td></tr>
+              )}
+            </tbody>
+          </table>
+        </Card>
+      )}
     </div>
   );
 }
