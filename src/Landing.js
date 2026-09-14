@@ -9,7 +9,7 @@ const t = light;
 
 const PRICING = [
   {
-    name: 'Starter', price: 299, popular: false,
+    name: 'Starter', popular: false,
     blurb: 'For solo practices getting started with automation.',
     features: [
       'Up to 500 active patients',
@@ -20,7 +20,7 @@ const PRICING = [
     ],
   },
   {
-    name: 'Growth', price: 499, popular: true,
+    name: 'Growth', popular: true,
     blurb: 'The most popular plan — built to grow your patient base.',
     features: [
       'Everything in Starter',
@@ -32,7 +32,7 @@ const PRICING = [
     ],
   },
   {
-    name: 'Pro', price: 999, popular: false,
+    name: 'Pro', popular: false,
     blurb: 'For multi-provider practices that want it fully automated.',
     features: [
       'Everything in Growth',
@@ -193,13 +193,9 @@ function Landing() {
                   </div>
                 )}
                 <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, marginBottom: '4px' }}>{plan.name}</div>
-                <div style={{ fontSize: '12.5px', color: t.mid, marginBottom: '18px', minHeight: '36px' }}>{plan.blurb}</div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '22px' }}>
-                  <span style={{ fontSize: '38px', fontWeight: '800', color: t.ink, letterSpacing: '-1px' }}>${plan.price}</span>
-                  <span style={{ fontSize: '13px', color: t.muted }}>/mo</span>
-                </div>
+                <div style={{ fontSize: '12.5px', color: t.mid, marginBottom: '22px', minHeight: '36px' }}>{plan.blurb}</div>
                 <a
-                  href="#demo"
+                  href={`mailto:sales@praxismd.com?subject=${encodeURIComponent(`Pricing inquiry — ${plan.name} plan`)}`}
                   className="px-btn"
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%',
@@ -210,7 +206,7 @@ function Landing() {
                     border: plan.popular ? 'none' : `1px solid ${t.border}`,
                   }}
                 >
-                  Book a Demo
+                  Inquire about pricing
                 </a>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {plan.features.map((f, j) => (
