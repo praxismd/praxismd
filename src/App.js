@@ -1,5 +1,12 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { light, dark, withAlpha } from './theme';
+import {
+  LayoutDashboard, Inbox as InboxIcon, Megaphone, RotateCcw, Calendar as CalendarIcon,
+  ClipboardList, Users, Contact, Shield, Star, Smile, Bot, Receipt, CreditCard,
+  TrendingUp, Settings as SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
+  ChevronRight, Phone, Hand, Zap, Reply as ReplyIcon, CalendarPlus, Sparkles,
+  Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare,
+} from 'lucide-react';
 
 export const ThemeContext = createContext(light);
 export const useTheme = () => useContext(ThemeContext);
@@ -13,10 +20,75 @@ function getInitialMode() {
   return 'light';
 }
 
+// Count-up animation for stat card values like "$8,400", "72%", "4.2h", "4.8"
+function useCountUp(value, duration = 700) {
+  const [display, setDisplay] = useState(value);
+  const frameRef = useRef(null);
+
+  useEffect(() => {
+    const str = String(value);
+    const match = str.match(/-?[\d,]+\.?\d*/);
+    if (!match) { setDisplay(value); return; }
+    const target = parseFloat(match[0].replace(/,/g, ''));
+    if (Number.isNaN(target)) { setDisplay(value); return; }
+    const prefix = str.slice(0, match.index);
+    const suffix = str.slice(match.index + match[0].length);
+    const decimals = (match[0].split('.')[1] || '').length;
+    let start = null;
+
+    function step(ts) {
+      if (start === null) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = target * eased;
+      const formatted = decimals > 0 ? current.toFixed(decimals) : Math.round(current).toLocaleString();
+      setDisplay(prefix + formatted + suffix);
+      if (progress < 1) frameRef.current = requestAnimationFrame(step);
+    }
+    frameRef.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, duration]);
+
+  return display;
+}
+
+// Demo patient dataset shared between the topbar search and the Patients page
+const PATIENTS = [
+  { name: 'Sarah Martinez', email: 'sarah.m@email.com', visit: 'Sep 13, 2026', insurance: 'Delta Dental', status: 'Active' },
+  { name: 'James Lee', email: 'jlee@gmail.com', visit: 'Aug 20, 2026', insurance: 'Aetna', status: 'Upcoming' },
+  { name: 'Maria Chen', email: 'mchen@email.com', visit: 'Mar 5, 2026', insurance: 'Cigna', status: 'Reactivating' },
+  { name: 'Robert Park', email: 'rpark@gmail.com', visit: 'Jan 12, 2026', insurance: 'UnitedHealth', status: 'Overdue' },
+  { name: 'Tina Nguyen', email: 'tnguyen@email.com', visit: 'Sep 12, 2026', insurance: 'Blue Cross', status: 'Active' },
+];
+
+function statusColor(status, t) {
+  switch (status) {
+    case 'Active': return [t.green, t.greenL];
+    case 'Upcoming': return [t.amber, t.amberL];
+    case 'Reactivating': return [t.brand, t.brandL];
+    case 'Overdue': return [t.red, t.redL];
+    default: return [t.mid, t.bgRow];
+  }
+}
+
+function initialsOf(name) {
+  return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [mode, setMode] = useState(getInitialMode);
+  const [collapsed, setCollapsed] = useState(false);
+  const [sidebarHover, setSidebarHover] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [patientQuery, setPatientQuery] = useState('');
   const t = mode === 'dark' ? dark : light;
+  const showFull = !collapsed || sidebarHover;
+
+  const notifRef = useRef(null);
+  const searchRef = useRef(null);
 
   useEffect(() => {
     window.localStorage.setItem('praxismd-theme', mode);
@@ -24,85 +96,194 @@ function App() {
     document.body.style.colorScheme = mode;
   }, [mode, t.bgPage]);
 
+  useEffect(() => {
+    function onDocClick(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  const searchMatches = patientQuery.trim()
+    ? PATIENTS.filter(p => p.name.toLowerCase().includes(patientQuery.trim().toLowerCase()))
+    : [];
+
+  const notifications = [
+    { Icon: AlertTriangle, text: 'Insurance eligibility issue for James Lee', time: '12m ago', color: t.amber },
+    { Icon: MessageSquare, text: 'New message from Maria Chen', time: '18m ago', color: t.brand },
+    { Icon: Star, text: 'New 5-star review from Sarah M.', time: '1h ago', color: t.accentAmber },
+  ];
+
   return (
     <ThemeContext.Provider value={t}>
+    <style>{`
+      @keyframes pxFadeSlide { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .px-page-transition { animation: pxFadeSlide .32s ease; }
+      .px-navitem { transition: background .12s ease, border-color .12s ease, color .12s ease; }
+      .px-navitem:hover { background: ${t.bgHover}; }
+      .px-row { transition: background .12s ease; }
+      .px-row:hover { background: ${t.bgHover}; }
+      .px-card { transition: transform .15s ease, box-shadow .15s ease; }
+      .px-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,${mode === 'dark' ? '0.4' : '0.09'}); }
+      button { transition: transform .08s ease; }
+      button:active { transform: scale(0.96); }
+      .px-tooltip-wrap { position: relative; }
+      .px-tooltip-bubble {
+        position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
+        margin-left: 12px; background: ${t.ink}; color: ${t.bgCard}; font-size: 11px;
+        font-weight: 500; padding: 6px 10px; border-radius: 6px; white-space: nowrap;
+        opacity: 0; pointer-events: none; transition: opacity .12s ease; z-index: 200;
+      }
+      .px-tooltip-wrap:hover .px-tooltip-bubble { opacity: 1; }
+      input:focus, select:focus { outline: 2px solid ${withAlpha(t.brand, .3)}; }
+    `}</style>
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
 
       {/* SIDEBAR */}
-      <div style={{
-        width: '240px', background: t.bgSidebar, borderRight: `1px solid ${t.border}`,
-        display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh'
-      }}>
-        <div style={{ padding: '20px 20px 16px', borderBottom: `1px solid ${t.border2}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '13px' }}>Px</div>
-            <span style={{ fontSize: '19px', fontWeight: '700', color: t.ink }}>PraxisMD</span>
+      <div
+        onMouseEnter={() => setSidebarHover(true)}
+        onMouseLeave={() => setSidebarHover(false)}
+        style={{
+          width: showFull ? '240px' : '72px', background: t.bgSidebar, borderRight: `1px solid ${t.border}`,
+          display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh', overflow: 'hidden',
+          zIndex: collapsed && sidebarHover ? 60 : 40,
+          boxShadow: collapsed && sidebarHover ? '4px 0 24px rgba(0,0,0,.18)' : 'none',
+          transition: 'width .18s ease, box-shadow .18s ease',
+        }}
+      >
+        <div style={{ padding: showFull ? '20px 20px 16px' : '18px 0 14px', borderBottom: `1px solid ${t.border2}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: showFull ? 'space-between' : 'center', padding: showFull ? 0 : '0 8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '13px', flexShrink: 0 }}>Px</div>
+              {showFull && <span style={{ fontSize: '19px', fontWeight: '700', color: t.ink, whiteSpace: 'nowrap' }}>PraxisMD</span>}
+            </div>
+            {showFull && (
+              <button onClick={() => setCollapsed(c => !c)} title="Collapse sidebar" style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+                <Menu size={17} />
+              </button>
+            )}
           </div>
-          <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '6px' }}>Bright Smiles Dental</div>
+          {showFull && <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '6px' }}>Bright Smiles Dental</div>}
+          {!showFull && (
+            <button onClick={() => setCollapsed(c => !c)} title="Expand sidebar" style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '12px', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', padding: '4px 0' }}>
+              <Menu size={16} />
+            </button>
+          )}
         </div>
 
-        <nav style={{ padding: '8px 12px', flex: 1, overflowY: 'auto' }}>
-          <NavSection label="Main" />
-          <NavItem label="Overview" icon="📊" tab="overview" active={activeTab} onClick={setActiveTab} />
-          <NavItem label="Inbox" icon="📥" tab="inbox" active={activeTab} onClick={setActiveTab} badge="4" badgeColor={t.red} />
-          <NavItem label="Campaigns" icon="📢" tab="campaigns" active={activeTab} onClick={setActiveTab} />
-          <NavItem label="Recall" icon="🔄" tab="recall" active={activeTab} onClick={setActiveTab} badge="89" badgeColor={t.amber} />
-          <NavItem label="Calendar" icon="📅" tab="calendar" active={activeTab} onClick={setActiveTab} />
-          <NavItem label="Waitlist" icon="📋" tab="waitlist" active={activeTab} onClick={setActiveTab} badge="12" badgeColor={t.teal} />
-          <NavSection label="Practice" />
-          <NavItem label="Patients" icon="👥" tab="patients" active={activeTab} onClick={setActiveTab} />
-          <NavItem label="Patient Portal" icon="🆔" tab="portal" active={activeTab} onClick={setActiveTab} />
-          <NavItem label="Eligibility" icon="🛡️" tab="eligibility" active={activeTab} onClick={setActiveTab} badge="3" badgeColor={t.amber} />
-          <NavItem label="Reviews" icon="⭐" tab="reviews" active={activeTab} onClick={setActiveTab} />
-          <NavItem label="Surveys" icon="😊" tab="surveys" active={activeTab} onClick={setActiveTab} />
-          <NavItem label="AI Front Desk" icon="🤖" tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} />
-          <NavSection label="Billing" />
-          <NavItem label="Billing" icon="🧾" tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} />
-          <NavItem label="Payments" icon="💳" tab="payments" active={activeTab} onClick={setActiveTab} />
-          <NavSection label="Analytics" />
-          <NavItem label="Reports" icon="📈" tab="reports" active={activeTab} onClick={setActiveTab} />
-          <NavItem label="Settings" icon="⚙️" tab="settings" active={activeTab} onClick={setActiveTab} />
+        <nav style={{ padding: showFull ? '8px 12px' : '8px 8px', flex: 1, overflowY: 'auto' }}>
+          <NavSection label="Main" collapsed={!showFull} />
+          <NavItem label="Overview" Icon={LayoutDashboard} tab="overview" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={setActiveTab} badge="4" badgeColor={t.red} collapsed={!showFull} />
+          <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={setActiveTab} badge="89" badgeColor={t.amber} collapsed={!showFull} />
+          <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={setActiveTab} badge="12" badgeColor={t.teal} collapsed={!showFull} />
+          <NavSection label="Practice" collapsed={!showFull} />
+          <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          <NavItem label="Eligibility" Icon={Shield} tab="eligibility" active={activeTab} onClick={setActiveTab} badge="3" badgeColor={t.amber} collapsed={!showFull} />
+          <NavItem label="Reviews" Icon={Star} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />
+          <NavSection label="Billing" collapsed={!showFull} />
+          <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />
+          <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          <NavSection label="Analytics" collapsed={!showFull} />
+          <NavItem label="Reports" Icon={TrendingUp} tab="reports" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          <NavItem label="Settings" Icon={SettingsIcon} tab="settings" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
         </nav>
 
-        <div style={{ padding: '12px 16px', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand }}>DR</div>
-          <div>
-            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Dr. Rivera</div>
-            <div style={{ fontSize: '11px', color: t.muted }}>Practice owner</div>
-          </div>
+        <div style={{ padding: showFull ? '12px 16px' : '12px 0', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: showFull ? 'flex-start' : 'center', gap: '10px' }}>
+          <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>DR</div>
+          {showFull && (
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Dr. Rivera</div>
+              <div style={{ fontSize: '11px', color: t.muted }}>Practice owner</div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* MAIN */}
-      <div style={{ marginLeft: '240px', flex: 1, display: 'flex', flexDirection: 'column', background: t.bgPage, minHeight: '100vh' }}>
-        
+      <div style={{ marginLeft: collapsed ? '72px' : '240px', flex: 1, display: 'flex', flexDirection: 'column', background: t.bgPage, minHeight: '100vh', transition: 'margin-left .18s ease' }}>
+
         {/* TOPBAR */}
-        <div style={{ height: '64px', background: t.bgSidebar, borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 26px', position: 'sticky', top: 0, zIndex: 50 }}>
-          <div>
+        <div style={{ height: '64px', background: t.bgSidebar, borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: '24px', padding: '0 26px', position: 'sticky', top: 0, zIndex: 50 }}>
+          <div style={{ flexShrink: 0 }}>
             <div style={{ fontSize: '16px', fontWeight: '600', color: t.ink }}>{getPageTitle(activeTab)}</div>
             <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>Sunday, September 13 · Bright Smiles Dental</div>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
+
+          <div ref={searchRef} style={{ position: 'relative', flex: 1, maxWidth: '360px' }}>
+            <Search size={15} color={t.muted} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            <input
+              value={patientQuery}
+              onChange={e => { setPatientQuery(e.target.value); setSearchOpen(true); }}
+              onFocus={() => setSearchOpen(true)}
+              placeholder="Search patients by name..."
+              style={{ width: '100%', padding: '8px 12px 8px 34px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '13px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }}
+            />
+            {searchOpen && patientQuery.trim() && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '10px', boxShadow: '0 10px 30px rgba(0,0,0,.18)', overflow: 'hidden', zIndex: 100 }}>
+                {searchMatches.length > 0 ? searchMatches.map((p, i) => (
+                  <div
+                    key={i}
+                    className="px-row"
+                    onClick={() => { setActiveTab('patients'); setSearchOpen(false); }}
+                    style={{ padding: '10px 13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: i < searchMatches.length - 1 ? `1px solid ${t.border2}` : 'none' }}
+                  >
+                    <Ava initials={initialsOf(p.name)} bg={t.brandL} color={t.brand} />
+                    <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.insurance} · {p.status}</div></div>
+                  </div>
+                )) : <div style={{ padding: '14px', fontSize: '13px', color: t.muted, textAlign: 'center' }}>No patients found</div>}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
             <button
               onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle dark mode"
               title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '15px', cursor: 'pointer', color: t.mid }}
+              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid }}
             >
-              {mode === 'dark' ? '☀️' : '🌙'}
+              {mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
-            <button style={{ padding: '8px 15px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '13px', cursor: 'pointer', color: t.mid }}>🔔 Notifications</button>
-            <button style={{ padding: '8px 15px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>+ New campaign</button>
+
+            <div ref={notifRef} style={{ position: 'relative' }}>
+              <button onClick={() => setNotifOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 15px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '13px', cursor: 'pointer', color: t.mid, position: 'relative' }}>
+                <Bell size={15} />
+                Notifications
+                <span style={{ position: 'absolute', top: '7px', right: '10px', width: '7px', height: '7px', borderRadius: '50%', background: t.red }} />
+              </button>
+              {notifOpen && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: '300px', background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,.18)', overflow: 'hidden', zIndex: 100 }}>
+                  <div style={{ padding: '12px 14px', borderBottom: `1px solid ${t.border2}`, fontSize: '13px', fontWeight: '600', color: t.ink }}>Notifications</div>
+                  {notifications.map((n, i) => (
+                    <div key={i} className="px-row" style={{ display: 'flex', gap: '10px', padding: '11px 14px', borderBottom: i < notifications.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
+                      <n.Icon size={16} color={n.color} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <div><div style={{ fontSize: '12.5px', color: t.ink2 }}>{n.text}</div><div style={{ fontSize: '11px', color: t.muted, marginTop: '2px' }}>{n.time}</div></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+              <Plus size={14} /> New campaign
+            </button>
           </div>
         </div>
 
         {/* PAGE CONTENT */}
-        <div style={{ padding: '22px 26px', flex: 1 }}>
+        <div key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
           {activeTab === 'overview' && <Overview setActiveTab={setActiveTab} />}
           {activeTab === 'inbox' && <Inbox />}
           {activeTab === 'campaigns' && <Campaigns />}
           {activeTab === 'recall' && <Recall />}
-          {activeTab === 'patients' && <Patients />}
+          {activeTab === 'patients' && <Patients query={patientQuery} onQueryChange={setPatientQuery} />}
           {activeTab === 'billing' && <Billing />}
           {activeTab === 'payments' && <Payments />}
           {activeTab === 'reports' && <Reports />}
@@ -145,30 +326,47 @@ function getPageTitle(tab) {
 }
 
 // ─── NAV COMPONENTS ────────────────────────────────────────
-function NavSection({ label }) {
+function NavSection({ label, collapsed }) {
   const t = useTheme();
+  if (collapsed) return <div style={{ height: '1px', background: t.border2, margin: '10px 10px' }} />;
   return <div style={{ fontSize: '10px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '1px', padding: '14px 10px 6px' }}>{label}</div>;
 }
 
-function NavItem({ label, icon, tab, active, onClick, badge, badgeColor }) {
+function NavItem({ label, Icon, tab, active, onClick, badge, badgeColor, collapsed }) {
   const t = useTheme();
   const isActive = active === tab;
   return (
-    <div onClick={() => onClick(tab)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 11px', borderRadius: '10px', marginBottom: '1px', background: isActive ? t.brandL : 'transparent', color: isActive ? t.brand : t.mid, cursor: 'pointer', fontSize: '13px', fontWeight: isActive ? '500' : '400', transition: 'all 0.12s' }}>
-      <span style={{ fontSize: '14px' }}>{icon}</span>
-      <span style={{ flex: 1 }}>{label}</span>
-      {badge && <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: badgeColor + '22', color: badgeColor }}>{badge}</span>}
+    <div
+      className="px-navitem px-tooltip-wrap"
+      onClick={() => onClick(tab)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '10px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        padding: collapsed ? '10px 0' : '8px 11px',
+        borderRadius: '10px', marginBottom: '1px',
+        borderLeft: `3px solid ${isActive ? t.brand : 'transparent'}`,
+        color: isActive ? t.brand : t.mid,
+        cursor: 'pointer', fontSize: '13px', fontWeight: isActive ? '600' : '400',
+      }}
+    >
+      <Icon size={16} style={{ flexShrink: 0 }} />
+      {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
+      {!collapsed && badge && <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: badgeColor + '22', color: badgeColor }}>{badge}</span>}
+      {collapsed && <span className="px-tooltip-bubble">{label}{badge ? ` · ${badge}` : ''}</span>}
     </div>
   );
 }
 
-function StatCard({ label, value, color, accent, sub }) {
+function StatCard({ label, value, color, accent, sub, icon: ValueIcon }) {
   const t = useTheme();
+  const display = useCountUp(value);
   return (
-    <div style={{ background: t.bgCard, borderRadius: '14px', padding: '16px 18px', border: `1px solid ${t.border}`, position: 'relative', overflow: 'hidden' }}>
+    <div className="px-card" style={{ background: t.bgCard, borderRadius: '14px', padding: '16px 18px', border: `1px solid ${t.border}`, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: `linear-gradient(90deg, ${accent}, ${color})` }} />
       <div style={{ fontSize: '11px', color: t.muted, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>{label}</div>
-      <div style={{ fontSize: '26px', fontWeight: '700', color, letterSpacing: '-0.5px' }}>{value}</div>
+      <div style={{ fontSize: '26px', fontWeight: '700', color, letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {display}{ValueIcon && <ValueIcon size={18} color={color} fill={color} />}
+      </div>
       <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '7px' }}>{sub}</div>
     </div>
   );
@@ -176,7 +374,7 @@ function StatCard({ label, value, color, accent, sub }) {
 
 function Card({ children, style }) {
   const t = useTheme();
-  return <div style={{ background: t.bgCard, borderRadius: '14px', padding: '18px 20px', border: `1px solid ${t.border}`, ...style }}>{children}</div>;
+  return <div className="px-card" style={{ background: t.bgCard, borderRadius: '14px', padding: '18px 20px', border: `1px solid ${t.border}`, ...style }}>{children}</div>;
 }
 
 function CardTitle({ children }) {
@@ -190,7 +388,7 @@ function Pill({ label, color, bg }) {
 
 function RowItem({ children, style }) {
   const t = useTheme();
-  return <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 13px', borderRadius: '10px', background: t.bgRow, marginBottom: '7px', border: `1px solid ${t.border2}`, ...style }}>{children}</div>;
+  return <div className="px-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 13px', borderRadius: '10px', background: t.bgRow, marginBottom: '7px', border: `1px solid ${t.border2}`, ...style }}>{children}</div>;
 }
 
 function Ava({ initials, bg, color }) {
@@ -204,15 +402,39 @@ function Btn({ children, onClick, primary, small, style }) {
   );
 }
 
+function StarRating({ rating, size = 14 }) {
+  const t = useTheme();
+  return (
+    <div style={{ display: 'flex', gap: '2px' }}>
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star key={i} size={size} color={i <= rating ? t.accentAmber : t.border} fill={i <= rating ? t.accentAmber : 'none'} />
+      ))}
+    </div>
+  );
+}
+
 // ─── OVERVIEW ──────────────────────────────────────────────
 function Overview({ setActiveTab }) {
   const t = useTheme();
   return (
     <div>
+      <div style={{ background: `linear-gradient(120deg, ${withAlpha(t.brand, .1)}, ${withAlpha(t.purple, .08)})`, border: `1px solid ${t.border}`, borderRadius: '14px', padding: '16px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '4px' }}>Today at a glance</div>
+          <div style={{ fontSize: '13px', color: t.ink2, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: '600' }}>Sunday, September 13, 2026</span>
+            <span>☀️ 72°F</span>
+            <span style={{ color: t.muted }}>·</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Sparkles size={14} color={t.purple} /> 3 patients are due for recall today — send bulk recall?</span>
+          </div>
+        </div>
+        <Btn primary onClick={() => setActiveTab('recall')}><Send size={13} /> Send bulk recall</Btn>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '13px', marginBottom: '20px' }}>
         <StatCard label="Revenue recovered" value="$8,400" color={t.green} accent={t.accentGreen} sub="↑ 14 patients reactivated" />
         <StatCard label="Appointments booked" value="31" color={t.brand} accent={t.accentBlue} sub="↑ 8 from campaigns" />
-        <StatCard label="Google rating" value="4.8 ★" color={t.amber} accent={t.accentAmber} sub="↑ 6 new reviews" />
+        <StatCard label="Google rating" value="4.8" icon={Star} color={t.amber} accent={t.accentAmber} sub="↑ 6 new reviews" />
         <StatCard label="Open messages" value="4" color={t.red} accent={t.accentRed} sub="Needs reply today" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '13px', marginBottom: '20px' }}>
@@ -225,7 +447,7 @@ function Overview({ setActiveTab }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
         <Card>
-          <CardTitle>Active campaigns <span onClick={() => setActiveTab('campaigns')} style={{ fontSize: '12px', color: t.brand, cursor: 'pointer', fontWeight: '500' }}>View all →</span></CardTitle>
+          <CardTitle>Active campaigns <span onClick={() => setActiveTab('campaigns')} style={{ fontSize: '12px', color: t.brand, cursor: 'pointer', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>View all <ChevronRight size={12} /></span></CardTitle>
           <RowItem style={{ background: t.greenL, borderColor: withAlpha(t.accentGreen, .15) }}>
             <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>6-month reactivation</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>142 patients · Touch 3 of 7</div></div>
             <Pill label="Live" color={t.green} bg={t.greenL} />
@@ -251,12 +473,12 @@ function Overview({ setActiveTab }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
         <Card>
-          <CardTitle>Recent messages <span onClick={() => setActiveTab('inbox')} style={{ fontSize: '12px', color: t.brand, cursor: 'pointer', fontWeight: '500' }}>View all →</span></CardTitle>
+          <CardTitle>Recent messages <span onClick={() => setActiveTab('inbox')} style={{ fontSize: '12px', color: t.brand, cursor: 'pointer', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>View all <ChevronRight size={12} /></span></CardTitle>
           {[{ ini: 'MC', bg: t.brandL, c: t.brand, name: 'Maria Chen', msg: "Yes I'd like to book the cleaning for next week", time: '2m ago', unread: true },
             { ini: 'DW', bg: t.amberL, c: t.amber, name: 'David Wong', msg: 'Can I reschedule my 3pm appointment?', time: '18m ago', unread: true },
             { ini: 'TN', bg: t.greenL, c: t.green, name: 'Tina Nguyen', msg: 'Thank you! I left you a Google review ⭐', time: '1h ago', unread: false }
           ].map((m, i) => (
-            <div key={i} style={{ display: 'flex', gap: '11px', padding: '11px 13px', borderRadius: '10px', marginBottom: '6px', background: m.unread ? t.brandL : t.bgRow, border: `1px solid ${m.unread ? withAlpha(t.accentBlue, .15) : t.border2}` }}>
+            <div key={i} className="px-row" style={{ display: 'flex', gap: '11px', padding: '11px 13px', borderRadius: '10px', marginBottom: '6px', background: m.unread ? t.brandL : t.bgRow, border: `1px solid ${m.unread ? withAlpha(t.accentBlue, .15) : t.border2}` }}>
               <Ava initials={m.ini} bg={m.unread ? m.c : m.bg} color={m.unread ? 'white' : m.c} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</span><span style={{ fontSize: '11px', color: t.muted }}>{m.time}</span></div>
@@ -268,13 +490,13 @@ function Overview({ setActiveTab }) {
 
         <Card>
           <CardTitle>AI front desk — today</CardTitle>
-          {[['📞', 'Calls answered', '47', t.brand], ['📅', 'Appointments booked', '6', t.green], ['🤖', 'Messages handled', '23', t.brand], ['✋', 'Escalated to team', '2', t.amber]].map(([icon, label, val, color], i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
-              <div style={{ fontSize: '12.5px', color: t.mid, display: 'flex', alignItems: 'center', gap: '8px' }}><span>{icon}</span>{label}</div>
+          {[[Phone, 'Calls answered', '47', t.brand], [CalendarPlus, 'Appointments booked', '6', t.green], [Bot, 'Messages handled', '23', t.brand], [Hand, 'Escalated to team', '2', t.amber]].map(([Icon, label, val, color], i) => (
+            <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
+              <div style={{ fontSize: '12.5px', color: t.mid, display: 'flex', alignItems: 'center', gap: '8px' }}><Icon size={14} color={t.mid} />{label}</div>
               <div style={{ fontSize: '14px', fontWeight: '600', color }}>{val}</div>
             </div>
           ))}
-          <div style={{ marginTop: '8px', padding: '10px 12px', background: t.greenL, borderRadius: '10px', fontSize: '12px', color: t.green, fontWeight: '500', border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>⚡ AI saved your team ~4.2 hours today</div>
+          <div style={{ marginTop: '8px', padding: '10px 12px', background: t.greenL, borderRadius: '10px', fontSize: '12px', color: t.green, fontWeight: '500', border: `1px solid ${withAlpha(t.accentGreen, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> AI saved your team ~4.2 hours today</div>
         </Card>
       </div>
     </div>
@@ -298,23 +520,23 @@ function Inbox() {
         ))}
       </div>
       {messages.map((m, i) => (
-        <div key={i} style={{ background: t.bgCard, borderRadius: '14px', padding: '16px 18px', border: `1px solid ${t.border}`, marginBottom: '10px', borderLeft: `4px solid ${m.borderColor}` }}>
+        <div key={i} className="px-card" style={{ background: t.bgCard, borderRadius: '14px', padding: '16px 18px', border: `1px solid ${t.border}`, marginBottom: '10px', borderLeft: `4px solid ${m.borderColor}` }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div style={{ display: 'flex', gap: '11px', alignItems: 'center' }}>
               <Ava initials={m.ini} bg={m.bg} color={m.c} />
               <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{m.via}</div></div>
             </div>
             <div style={{ display: 'flex', gap: '7px' }}>
-              {m.ai && <Btn small>↩ Reply</Btn>}
-              {m.ai && <Btn small primary>📅 Book</Btn>}
-              {!m.ai && i === 2 && <Btn small>📞 Call back</Btn>}
+              {m.ai && <Btn small><ReplyIcon size={13} /> Reply</Btn>}
+              {m.ai && <Btn small primary><CalendarPlus size={13} /> Book</Btn>}
+              {!m.ai && i === 2 && <Btn small><Phone size={13} /> Call back</Btn>}
               {!m.ai && i === 3 && <Pill label="Read" color={t.green} bg={t.greenL} />}
             </div>
           </div>
           <div style={{ fontSize: '13px', color: t.ink2, padding: '10px 12px', background: t.bgRow, borderRadius: '10px' }}>{m.msg}</div>
           {m.ai && (
             <div style={{ background: t.bgRow, borderRadius: '10px', padding: '10px 12px', fontSize: '12px', color: t.mid, marginTop: '10px', borderLeft: `3px solid ${t.accentBlue}` }}>
-              <div style={{ color: t.brand, fontWeight: '600', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '4px' }}>✨ AI suggested reply</div>
+              <div style={{ color: t.brand, fontWeight: '600', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}><Sparkles size={12} /> AI suggested reply</div>
               {m.ai}
               <br /><Btn small primary style={{ marginTop: '8px' }}>Send this</Btn>
             </div>
@@ -336,12 +558,12 @@ function Campaigns() {
         <StatCard label="Booked from campaigns" value="14" color={t.green} accent={t.accentGreen} sub="$8,400 revenue recovered" />
       </div>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        <Btn primary>+ New campaign</Btn>
-        <Btn>⬇ Export</Btn>
+        <Btn primary><Plus size={14} /> New campaign</Btn>
+        <Btn><Download size={14} /> Export</Btn>
       </div>
       {[
         { name: '6-month reactivation sequence', sub: '142 patients · 7-touch email + SMS · Touch 3 of 7', stats: [['Open rate', '34%', t.brand], ['Reply rate', '18%', t.brand], ['Booked', '9', t.green], ['Revenue', '$5,400', t.green], ['Cost/booking', '$35', t.purple]], pill: 'Live', pillColor: t.green, pillBg: t.greenL, prog: 43 },
-        { name: 'Post-visit review request', sub: 'Auto-sends 24hrs after every completed appointment', stats: [['Sent this month', '28', t.brand], ['Clicked', '19', t.brand], ['Reviews left', '6', t.green], ['Avg rating', '4.8 ★', t.amber]], pill: 'Auto', pillColor: t.brand, pillBg: t.brandL, prog: null },
+        { name: 'Post-visit review request', sub: 'Auto-sends 24hrs after every completed appointment', stats: [['Sent this month', '28', t.brand], ['Clicked', '19', t.brand], ['Reviews left', '6', t.green], ['Avg rating', '4.8', t.amber]], pill: 'Auto', pillColor: t.brand, pillBg: t.brandL, prog: null },
         { name: 'Annual checkup reminder', sub: '89 patients · 3-touch SMS · Scheduled September 20', stats: [], pill: 'Queued', pillColor: t.amber, pillBg: t.amberL, prog: null },
       ].map((c, i) => (
         <Card key={i} style={{ marginBottom: '12px' }}>
@@ -352,7 +574,7 @@ function Campaigns() {
           {c.stats.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c.stats.length},1fr)`, gap: '10px', marginBottom: c.prog ? '10px' : '0' }}>
               {c.stats.map(([label, val, color], j) => (
-                <div key={j} style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '10px', border: `1px solid ${t.border2}` }}>
+                <div key={j} className="px-row" style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '10px', border: `1px solid ${t.border2}` }}>
                   <div style={{ fontSize: '11px', color: t.muted }}>{label}</div>
                   <div style={{ fontSize: '16px', fontWeight: '600', color }}>{val}</div>
                 </div>
@@ -360,7 +582,7 @@ function Campaigns() {
             </div>
           )}
           {c.prog && <div><div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden', marginTop: '8px' }}><div style={{ height: '100%', borderRadius: '3px', background: t.accentGreen, width: `${c.prog}%` }} /></div><div style={{ fontSize: '11px', color: t.muted, marginTop: '5px' }}>Touch 3 of 7 · {c.prog}% through sequence</div></div>}
-          {c.pill === 'Queued' && <div style={{ padding: '10px 12px', background: t.amberL, borderRadius: '10px', fontSize: '12px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, marginTop: '8px' }}>🕐 Scheduled in 7 days · 89 patients receive first touch September 20</div>}
+          {c.pill === 'Queued' && <div style={{ padding: '10px 12px', background: t.amberL, borderRadius: '10px', fontSize: '12px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, marginTop: '8px', display: 'flex', alignItems: 'center', gap: '7px' }}><Clock size={13} /> Scheduled in 7 days · 89 patients receive first touch September 20</div>}
         </Card>
       ))}
     </div>
@@ -403,7 +625,7 @@ function Recall() {
               <Btn small>Send recall</Btn>
             </RowItem>
           ))}
-          <Btn primary style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}>📨 Send bulk recall to all 89 patients</Btn>
+          <Btn primary style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}><Send size={14} /> Send bulk recall to all 89 patients</Btn>
         </Card>
       </div>
     </div>
@@ -411,35 +633,44 @@ function Recall() {
 }
 
 // ─── PATIENTS ──────────────────────────────────────────────
-function Patients() {
+function Patients({ query, onQueryChange }) {
   const t = useTheme();
-  const patients = [
-    ['Sarah Martinez', 'sarah.m@email.com', 'Sep 13, 2026', 'Delta Dental', 'Active', t.green, t.greenL],
-    ['James Lee', 'jlee@gmail.com', 'Aug 20, 2026', 'Aetna', 'Upcoming', t.amber, t.amberL],
-    ['Maria Chen', 'mchen@email.com', 'Mar 5, 2026', 'Cigna', 'Reactivating', t.brand, t.brandL],
-    ['Robert Park', 'rpark@gmail.com', 'Jan 12, 2026', 'UnitedHealth', 'Overdue', t.red, t.redL],
-    ['Tina Nguyen', 'tnguyen@email.com', 'Sep 12, 2026', 'Blue Cross', 'Active', t.green, t.greenL],
-  ];
+  const q = query.trim().toLowerCase();
+  const filtered = q ? PATIENTS.filter(p => p.name.toLowerCase().includes(q)) : PATIENTS;
   return (
     <div>
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-        <input placeholder="Search patients by name, email, or phone..." style={{ flex: 1, padding: '9px 14px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }} />
-        <Btn primary>+ Add patient</Btn>
-        <Btn>⬆ Import</Btn>
+        <div style={{ position: 'relative', flex: 1 }}>
+          <Search size={15} color={t.muted} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          <input
+            placeholder="Search patients by name, email, or phone..."
+            value={query}
+            onChange={e => onQueryChange(e.target.value)}
+            style={{ width: '100%', padding: '9px 14px 9px 36px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}
+          />
+        </div>
+        <Btn primary><Plus size={14} /> Add patient</Btn>
+        <Btn><Upload size={14} /> Import</Btn>
       </div>
       <Card>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead><tr>{['Patient', 'Last visit', 'Insurance', 'Status', ''].map((h, i) => <th key={i} style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '500', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: `1px solid ${t.border}` }}>{h}</th>)}</tr></thead>
           <tbody>
-            {patients.map(([name, email, visit, ins, status, color, bg], i) => (
-              <tr key={i} style={{ borderBottom: `1px solid ${t.border2}` }}>
-                <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{name}</div><div style={{ fontSize: '11px', color: t.muted }}>{email}</div></td>
-                <td style={{ padding: '11px 13px', color: t.mid }}>{visit}</td>
-                <td style={{ padding: '11px 13px', color: t.mid }}>{ins}</td>
-                <td style={{ padding: '11px 13px' }}><Pill label={status} color={color} bg={bg} /></td>
-                <td style={{ padding: '11px 13px', textAlign: 'right' }}><Btn small>View</Btn></td>
-              </tr>
-            ))}
+            {filtered.map((p, i) => {
+              const [color, bg] = statusColor(p.status, t);
+              return (
+                <tr key={i} className="px-row" style={{ borderBottom: `1px solid ${t.border2}` }}>
+                  <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.email}</div></td>
+                  <td style={{ padding: '11px 13px', color: t.mid }}>{p.visit}</td>
+                  <td style={{ padding: '11px 13px', color: t.mid }}>{p.insurance}</td>
+                  <td style={{ padding: '11px 13px' }}><Pill label={p.status} color={color} bg={bg} /></td>
+                  <td style={{ padding: '11px 13px', textAlign: 'right' }}><Btn small>View</Btn></td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: t.muted }}>No patients match "{query}"</td></tr>
+            )}
           </tbody>
         </table>
       </Card>
@@ -453,7 +684,7 @@ function Billing() {
   return (
     <div>
       <div style={{ padding: '11px 15px', background: t.purpleL, borderRadius: '10px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${withAlpha(t.purple, .15)}` }}>
-        <span>⚡</span><span style={{ fontSize: '13px', color: t.purple, fontWeight: '500' }}>Pro — Billing automation active · Connected to Office Ally clearinghouse</span>
+        <Zap size={14} color={t.purple} /><span style={{ fontSize: '13px', color: t.purple, fontWeight: '500' }}>Pro — Billing automation active · Connected to Office Ally clearinghouse</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '13px', marginBottom: '18px' }}>
         <StatCard label="Claims submitted" value="48" color={t.brand} accent={t.accentBlue} sub="This month" />
@@ -468,11 +699,11 @@ function Billing() {
           { name: 'James Lee', code: 'D2740 · Crown · Aetna · Submitted 3 days ago', amount: '$1,200', status: 'Pending', color: t.amber, bg: t.amberL },
           { name: 'Robert Park', code: 'D7210 · Extraction · UnitedHealth · Denied: Missing info', amount: '$320', status: 'Denied', color: t.red, bg: t.redL },
         ].map((c, i) => (
-          <div key={i} style={{ padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: c.bg, border: `1px solid ${c.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div key={i} className="px-row" style={{ padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: c.bg, border: `1px solid ${c.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{c.name}</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{c.code}</div></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '14px', fontWeight: '600', color: c.color }}>{c.amount}</span>
-              {c.status === 'Denied' ? <Btn small style={{ color: c.color, borderColor: c.color }}>↻ Resubmit</Btn> : <Pill label={c.status} color={c.color} bg={c.bg} />}
+              {c.status === 'Denied' ? <Btn small style={{ color: c.color, borderColor: c.color }}><RotateCw size={12} /> Resubmit</Btn> : <Pill label={c.status} color={c.color} bg={c.bg} />}
             </div>
           </div>
         ))}
@@ -520,7 +751,7 @@ function Payments() {
               <option>Co-pay collection</option><option>Balance due</option><option>Deposit for procedure</option><option>Payment plan setup</option>
             </select>
           </div>
-          <Btn primary style={{ width: '100%', justifyContent: 'center' }}>📨 Send payment link via SMS</Btn>
+          <Btn primary style={{ width: '100%', justifyContent: 'center' }}><Send size={14} /> Send payment link via SMS</Btn>
         </Card>
       </div>
     </div>
@@ -547,7 +778,7 @@ function AIFrontDesk() {
             { dot: t.accentAmber, title: 'Maria Chen · 4 min · Insurance Q', sub: 'Asked about Delta Dental coverage. AI escalated to staff — required plan lookup.', pill: 'Escalated', c: t.amber, bg: t.amberL },
             { dot: t.accentGreen, title: 'David Wong · 2 min · Reschedule', sub: 'Wanted to move Thursday appt. AI checked calendar, offered two alternatives. Done.', pill: 'Rescheduled', c: t.green, bg: t.greenL },
           ].map((c, i) => (
-            <div key={i} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '7px', border: `1px solid ${t.border2}` }}>
+            <div key={i} className="px-row" style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '7px', border: `1px solid ${t.border2}` }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.dot, marginTop: '5px', flexShrink: 0 }} />
               <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{c.title}</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{c.sub}</div></div>
               <Pill label={c.pill} color={c.c} bg={c.bg} />
@@ -579,22 +810,22 @@ function Reviews() {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
-        <StatCard label="Google rating" value="4.8 ★" color={t.amber} accent={t.accentAmber} sub="From 142 total reviews" />
+        <StatCard label="Google rating" value="4.8" icon={Star} color={t.amber} accent={t.accentAmber} sub="From 142 total reviews" />
         <StatCard label="New this month" value="6" color={t.green} accent={t.accentGreen} sub="↑ 3 from last month" />
         <StatCard label="Response rate" value="92%" color={t.brand} accent={t.accentBlue} sub="Industry avg is 54%" />
       </div>
       <Card>
         <CardTitle>Recent reviews</CardTitle>
         {[
-          { stars: '★★★★★', text: '"Dr. Rivera and the team are absolutely wonderful. The automated reminder texts are so convenient!"', author: '— Sarah M. · 2 days ago · Google', negative: false },
-          { stars: '★★★☆☆', text: '"Good dentist but the wait time was a bit long. Would appreciate better scheduling."', author: '— Anonymous · 1 week ago · Google', negative: true },
+          { rating: 5, text: '"Dr. Rivera and the team are absolutely wonderful. The automated reminder texts are so convenient!"', author: '— Sarah M. · 2 days ago · Google', negative: false },
+          { rating: 3, text: '"Good dentist but the wait time was a bit long. Would appreciate better scheduling."', author: '— Anonymous · 1 week ago · Google', negative: true },
         ].map((r, i) => (
-          <div key={i} style={{ padding: '14px', borderRadius: '10px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.negative ? t.accentRed : t.accentAmber}` }}>
-            <div style={{ color: t.accentAmber, fontSize: '13px', marginBottom: '5px', letterSpacing: '1px' }}>{r.stars}</div>
+          <div key={i} className="px-row" style={{ padding: '14px', borderRadius: '10px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.negative ? t.accentRed : t.accentAmber}` }}>
+            <div style={{ marginBottom: '5px' }}><StarRating rating={r.rating} /></div>
             <div style={{ fontSize: '12.5px', color: t.mid, lineHeight: '1.6' }}>{r.text}</div>
             <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '7px' }}>{r.author}</div>
             <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-              {r.negative && <Btn small primary>🤖 AI draft response</Btn>}
+              {r.negative && <Btn small primary><Bot size={13} /> AI draft response</Btn>}
               <Btn small>Reply</Btn>
             </div>
           </div>
@@ -655,15 +886,20 @@ function Eligibility() {
       <Card>
         <CardTitle>Today's verification results</CardTitle>
         {[
-          { ini: 'SM', bg: t.brandL, c: t.brand, name: 'Sarah Martinez · Delta Dental', sub: '$1,200 remaining benefits · $0 deductible · D1110 covered 100%', status: 'Verified ✓', sc: t.green, sbg: t.greenL, rowBg: t.bgRow },
-          { ini: 'JL', bg: t.amberL, c: t.amber, name: 'James Lee · Aetna', sub: '⚠ Deductible not met · Patient owes $450 before insurance kicks in', status: 'Action needed', sc: t.amber, sbg: t.amberL, rowBg: t.amberL },
-          { ini: 'AK', bg: t.greenL, c: t.green, name: 'Amy Kim · Cigna', sub: 'D9972 whitening not covered · Patient responsible for full $280', status: 'Verified ✓', sc: t.teal, sbg: t.tealL, rowBg: t.bgRow },
-          { ini: 'RP', bg: t.redL, c: t.red, name: 'Robert Park · UnitedHealth', sub: '⚠ Policy terminated Sep 1 · No active coverage — collect full payment', status: 'No coverage', sc: t.red, sbg: t.redL, rowBg: t.redL },
+          { ini: 'SM', bg: t.brandL, c: t.brand, name: 'Sarah Martinez · Delta Dental', sub: '$1,200 remaining benefits · $0 deductible · D1110 covered 100%', warn: false, status: 'Verified', sc: t.green, sbg: t.greenL, rowBg: t.bgRow },
+          { ini: 'JL', bg: t.amberL, c: t.amber, name: 'James Lee · Aetna', sub: 'Deductible not met · Patient owes $450 before insurance kicks in', warn: true, status: 'Action needed', sc: t.amber, sbg: t.amberL, rowBg: t.amberL },
+          { ini: 'AK', bg: t.greenL, c: t.green, name: 'Amy Kim · Cigna', sub: 'D9972 whitening not covered · Patient responsible for full $280', warn: false, status: 'Verified', sc: t.teal, sbg: t.tealL, rowBg: t.bgRow },
+          { ini: 'RP', bg: t.redL, c: t.red, name: 'Robert Park · UnitedHealth', sub: 'Policy terminated Sep 1 · No active coverage — collect full payment', warn: true, status: 'No coverage', sc: t.red, sbg: t.redL, rowBg: t.redL },
         ].map((e, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 13px', background: e.rowBg, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
+          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 13px', background: e.rowBg, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
               <Ava initials={e.ini} bg={e.bg} color={e.c} />
-              <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{e.name}</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{e.sub}</div></div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{e.name}</div>
+                <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  {e.warn && <AlertTriangle size={12} color={t.amber} />}{e.sub}
+                </div>
+              </div>
             </div>
             <Pill label={e.status} color={e.sc} bg={e.sbg} />
           </div>
@@ -735,7 +971,7 @@ function Waitlist() {
               <Pill label={pill} color={pc} bg={pbg} />
             </RowItem>
           ))}
-          <div style={{ marginTop: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>⚡ When a slot opens PraxisMD auto-texts the next patient. First to reply gets the spot.</div>
+          <div style={{ marginTop: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> When a slot opens PraxisMD auto-texts the next patient. First to reply gets the spot.</div>
         </Card>
         <Card>
           <CardTitle>Recent auto-fills</CardTitle>
@@ -763,7 +999,7 @@ function Calendar() {
   for (let d = 1; d <= 30; d++) days.push(d);
   return (
     <Card>
-      <CardTitle>September 2026 <div style={{ display: 'flex', gap: '8px' }}><Btn small>← Prev</Btn><Btn small>Next →</Btn></div></CardTitle>
+      <CardTitle>September 2026 <div style={{ display: 'flex', gap: '8px' }}><Btn small><ChevronLeft size={14} /> Prev</Btn><Btn small>Next <ChevronRight size={14} /></Btn></div></CardTitle>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px', marginBottom: '6px' }}>
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: '11px', color: t.muted, fontWeight: '600', textAlign: 'center', padding: '6px 0', textTransform: 'uppercase', letterSpacing: '.5px' }}>{d}</div>)}
       </div>
@@ -798,7 +1034,7 @@ function Reports() {
     ['Reactivation emails sent', '847', t.brand], ['SMS messages sent', '312', t.brand],
     ['Email open rate', '34%', t.brand], ['Reply rate', '18%', t.brand],
     ['Cost per booked appointment', '$35', t.green], ['Recall conversion rate', '38%', t.teal],
-    ['Reviews collected', '6', t.amber], ['Average Google rating', '4.8 ★', t.amber],
+    ['Reviews collected', '6', t.amber], ['Average Google rating', '4.8', t.amber],
     ['NPS score', '72', t.pink], ['Waitlist slots filled', '14', t.orange],
     ['Insurance denials prevented', '$2,840', t.green], ['AI front desk calls', '847', t.purple],
     ['Claims submitted', '48', t.purple], ['Claims paid · revenue', '39 · $28,400', t.green],
@@ -810,7 +1046,7 @@ function Reports() {
         {['September 2026', 'August', 'July', 'Q3 2026'].map((label, i) => (
           <span key={i} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: i === 0 ? 'none' : `1px solid ${t.border}`, background: i === 0 ? t.brand : t.bgCard, color: i === 0 ? 'white' : t.mid }}>{label}</span>
         ))}
-        <Btn small>⬇ Export PDF</Btn>
+        <Btn small><Download size={13} /> Export PDF</Btn>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
         <StatCard label="Revenue recovered" value="$8,400" color={t.green} accent={t.accentGreen} sub="↑ 24% vs last month" />
@@ -820,7 +1056,7 @@ function Reports() {
       <Card>
         <CardTitle>Monthly performance breakdown</CardTitle>
         {metrics.map(([label, val, color], i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', background: t.bgRow, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
+          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', background: t.bgRow, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
             <span style={{ fontSize: '12.5px', color: t.mid }}>{label}</span>
             <span style={{ fontSize: '14px', fontWeight: '600', color }}>{val}</span>
           </div>
@@ -857,7 +1093,7 @@ function Settings() {
       <Card>
         <CardTitle>Integrations</CardTitle>
         {integrations.map(([name, sub, connected], i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', border: `1px solid ${t.border2}`, background: connected ? t.greenL : t.bgRow, borderColor: connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
+          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', border: `1px solid ${t.border2}`, background: connected ? t.greenL : t.bgRow, borderColor: connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
             <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
             {connected ? <Pill label="Connected" color={t.green} bg={t.greenL} /> : <Btn small>Connect</Btn>}
           </div>
