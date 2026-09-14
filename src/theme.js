@@ -27,6 +27,14 @@ export const light = {
   pinkL: '#FDF2F8',
   orange: '#C2410C',
   orangeL: '#FFF7ED',
+  accentBlue: '#3B82F6',
+  accentGreen: '#10B981',
+  accentAmber: '#F59E0B',
+  accentRed: '#EF4444',
+  accentPurple: '#8B5CF6',
+  accentTeal: '#06B6D4',
+  accentPink: '#EC4899',
+  accentOrange: '#F97316',
 };
 
 export const dark = {
@@ -58,4 +66,20 @@ export const dark = {
   pinkL: '#2D0A1A',
   orange: '#F97316',
   orangeL: '#2D1200',
+  accentBlue: '#3B82F6',
+  accentGreen: '#10B981',
+  accentAmber: '#F59E0B',
+  accentRed: '#EF4444',
+  accentPurple: '#8B5CF6',
+  accentTeal: '#22D3EE',
+  accentPink: '#EC4899',
+  accentOrange: '#F97316',
 };
+
+export function withAlpha(hex, alpha) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
