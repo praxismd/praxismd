@@ -237,7 +237,7 @@ function Onboarding() {
       <style>{`
         .px-btn { transition: transform .08s ease, box-shadow .15s ease; }
         .px-btn:active { transform: scale(0.97); }
-        input:focus, select:focus { outline: 2px solid ${withAlpha(t.brand, .3)}; }
+        input:focus, select:focus { outline: 2px solid ${withAlpha(t.teal, .35)}; }
         @keyframes pxSpin { to { transform: rotate(360deg); } }
         .px-spin { animation: pxSpin .6s linear infinite; }
       `}</style>

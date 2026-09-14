@@ -198,7 +198,7 @@ function Auth() {
         .px-btn:active { transform: scale(0.97); }
         .px-authlink { color: ${t.brand}; text-decoration: none; font-weight: 500; }
         .px-authlink:hover { text-decoration: underline; }
-        input:focus, select:focus { outline: 2px solid ${withAlpha(t.brand, .3)}; }
+        input:focus, select:focus { outline: 2px solid ${withAlpha(t.teal, .35)}; }
         @keyframes pxSpin { to { transform: rotate(360deg); } }
         .px-spin { animation: pxSpin .6s linear infinite; }
       `}</style>

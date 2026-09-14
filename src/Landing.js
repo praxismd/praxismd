@@ -264,7 +264,7 @@ function Landing() {
       </div>
 
       {/* CTA */}
-      <div id="demo" style={{ background: `linear-gradient(120deg, ${t.brand}, ${t.purple})`, padding: '70px 26px' }}>
+      <div id="demo" style={{ background: `linear-gradient(120deg, ${t.brand}, ${t.teal})`, padding: '70px 26px' }}>
         <div style={{ maxWidth: '620px', margin: '0 auto', textAlign: 'center' }}>
           <h2 style={{ fontSize: '28px', fontWeight: '700', color: 'white', margin: '0 0 12px', letterSpacing: '-.5px' }}>
             See PraxisMD on your own schedule

@@ -188,7 +188,7 @@ function App() {
         opacity: 0; pointer-events: none; transition: opacity .12s ease; z-index: 200;
       }
       .px-tooltip-wrap:hover .px-tooltip-bubble { opacity: 1; }
-      input:focus, select:focus { outline: 2px solid ${withAlpha(t.brand, .3)}; }
+      input:focus, select:focus { outline: 2px solid ${withAlpha(t.teal, .35)}; }
       @keyframes pxSpin { to { transform: rotate(360deg); } }
       .px-spin { animation: pxSpin .7s linear infinite; }
     `}</style>
@@ -398,8 +398,8 @@ function NavItem({ label, Icon, tab, active, onClick, badge, badgeColor, collaps
         justifyContent: collapsed ? 'center' : 'flex-start',
         padding: collapsed ? '10px 0' : '8px 11px',
         borderRadius: '10px', marginBottom: '1px',
-        borderLeft: `3px solid ${isActive ? t.brand : 'transparent'}`,
-        color: isActive ? t.brand : t.mid,
+        borderLeft: `3px solid ${isActive ? t.teal : 'transparent'}`,
+        color: isActive ? t.teal : t.mid,
         cursor: 'pointer', fontSize: '13px', fontWeight: isActive ? '600' : '400',
       }}
     >
@@ -512,14 +512,14 @@ function Overview({ setActiveTab }) {
   const t = useTheme();
   return (
     <div>
-      <div style={{ background: `linear-gradient(120deg, ${withAlpha(t.brand, .1)}, ${withAlpha(t.purple, .08)})`, border: `1px solid ${t.border}`, borderRadius: '14px', padding: '16px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
+      <div style={{ background: `linear-gradient(120deg, ${withAlpha(t.brand, .12)}, ${withAlpha(t.teal, .08)})`, border: `1px solid ${t.border}`, borderRadius: '14px', padding: '16px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '4px' }}>Today at a glance</div>
           <div style={{ fontSize: '13px', color: t.ink2, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <span style={{ fontWeight: '600' }}>Sunday, September 13, 2026</span>
             <span>☀️ 72°F</span>
             <span style={{ color: t.muted }}>·</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Sparkles size={14} color={t.purple} /> 3 patients are due for recall today — send bulk recall?</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Sparkles size={14} color={t.teal} /> 3 patients are due for recall today — send bulk recall?</span>
           </div>
         </div>
         <Btn primary onClick={() => setActiveTab('recall')}><Send size={13} /> Send bulk recall</Btn>
