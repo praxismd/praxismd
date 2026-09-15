@@ -4,6 +4,7 @@ import { signOut } from 'firebase/auth';
 import { light, dark, withAlpha } from './theme';
 import { auth, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, sendMessage, isGhlConfigured } from './api/ghl';
+import { createPaymentLink, isStripeConfigured } from './api/stripe';
 import {
   LayoutDashboard, Inbox as InboxIcon, Megaphone, RotateCcw, Calendar as CalendarIcon,
   ClipboardList, Users, Contact, Shield, Star, Smile, Bot, Receipt, CreditCard,
@@ -474,10 +475,10 @@ function Ava({ initials, bg, color }) {
   return <div style={{ width: '34px', height: '34px', minWidth: '34px', borderRadius: '10px', background: bg, color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600' }}>{initials}</div>;
 }
 
-function Btn({ children, onClick, primary, small, style }) {
+function Btn({ children, onClick, primary, small, style, disabled }) {
   const t = useTheme();
   return (
-    <button onClick={onClick} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: small ? '5px 11px' : '8px 14px', borderRadius: '10px', border: primary ? 'none' : `1px solid ${t.border}`, background: primary ? t.brand : t.bgCard, color: primary ? 'white' : t.mid, fontSize: small ? '12px' : '13px', fontWeight: '500', cursor: 'pointer', ...style }}>{children}</button>
+    <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: small ? '5px 11px' : '8px 14px', borderRadius: '10px', border: primary ? 'none' : `1px solid ${t.border}`, background: primary ? t.brand : t.bgCard, color: primary ? 'white' : t.mid, fontSize: small ? '12px' : '13px', fontWeight: '500', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? .65 : 1, ...style }}>{children}</button>
   );
 }
 
@@ -1037,6 +1038,27 @@ function Billing() {
 // ─── PAYMENTS ──────────────────────────────────────────────
 function Payments() {
   const t = useTheme();
+  const [patientName, setPatientName] = useState('');
+  const [amount, setAmount] = useState('');
+  const [reqType, setReqType] = useState('Co-pay collection');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+
+  async function handleSend() {
+    setError('');
+    setSent(false);
+    setSending(true);
+    try {
+      await createPaymentLink(patientName, amount, reqType);
+      setSent(true);
+    } catch (err) {
+      setError(err.message || 'Something went wrong.');
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
@@ -1061,19 +1083,35 @@ function Payments() {
         </Card>
         <Card>
           <CardTitle>Send payment request</CardTitle>
-          {[['Patient name', 'text', 'Search patient...'], ['Amount', 'text', '$0.00']].map(([label, type, placeholder], i) => (
-            <div key={i} style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>{label}</label>
-              <input type={type} placeholder={placeholder} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }} />
-            </div>
-          ))}
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Patient name</label>
+            <input value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="Search patient..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Amount</label>
+            <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="$0.00" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+          </div>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
-            <select style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+            <select value={reqType} onChange={e => setReqType(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
               <option>Co-pay collection</option><option>Balance due</option><option>Deposit for procedure</option><option>Payment plan setup</option>
             </select>
           </div>
-          <Btn primary style={{ width: '100%', justifyContent: 'center' }}><Send size={14} /> Send payment link via SMS</Btn>
+          <Btn primary onClick={handleSend} disabled={sending} style={{ width: '100%', justifyContent: 'center' }}>
+            {sending ? <Loader2 size={14} className="px-spin" /> : <Send size={14} />} Send payment link via SMS
+          </Btn>
+          {!isStripeConfigured && (
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.amberL, borderRadius: '10px', fontSize: '11.5px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+              <AlertTriangle size={13} style={{ marginTop: '1px', flexShrink: 0 }} />
+              <span>Stripe isn't connected yet. Add <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_STRIPE_PUBLISHABLE_KEY</code> to your <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>.env.local</code> — this is a bare-bones scaffold for now.</span>
+            </div>
+          )}
+          {error && isStripeConfigured && (
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.redL, borderRadius: '10px', fontSize: '11.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{error}</div>
+          )}
+          {sent && (
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '10px', fontSize: '11.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>Payment link sent.</div>
+          )}
         </Card>
       </div>
     </div>

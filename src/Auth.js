@@ -58,6 +58,7 @@ const inputStyle = {
 
 function Auth() {
   const navigate = useNavigate();
+  const [role, setRole] = useState('staff'); // 'staff' | 'patient'
   const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'forgot'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -71,6 +72,9 @@ function Auth() {
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [pmSoftware, setPmSoftware] = useState(PM_SOFTWARE_OPTIONS[0]);
+  const [patientName, setPatientName] = useState('');
+  const [patientPhone, setPatientPhone] = useState('');
+  const [patientDob, setPatientDob] = useState('');
 
   if (!isFirebaseConfigured) {
     return (
@@ -101,6 +105,13 @@ function Auth() {
     setInfo('');
   }
 
+  function switchRole(next) {
+    setRole(next);
+    setMode('login');
+    setError('');
+    setInfo('');
+  }
+
   // Returns true when a new practice doc was created (i.e. this is the
   // person's first login), so the caller can route them to onboarding.
   async function ensurePracticeDoc(user, extra = {}) {
@@ -121,12 +132,30 @@ function Auth() {
     return false;
   }
 
+  async function ensurePatientDoc(user, extra = {}) {
+    const ref = doc(db, 'patients', user.uid);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      await setDoc(ref, {
+        email: user.email,
+        name: extra.name || '',
+        phone: extra.phone || '',
+        dob: extra.dob || '',
+        createdAt: serverTimestamp(),
+      });
+    }
+  }
+
   async function handleLogin(e) {
     e.preventDefault();
     setError('');
     setLoading(true);
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
+      if (role === 'patient') {
+        navigate('/patient');
+        return;
+      }
       const snap = await getDoc(doc(db, 'practices', cred.user.uid));
       const onboardingComplete = snap.exists() && snap.data().onboardingComplete;
       navigate(onboardingComplete ? '/dashboard' : '/onboarding');
@@ -144,15 +173,25 @@ function Auth() {
       setError("Passwords don't match.");
       return;
     }
-    if (!practiceName.trim()) {
+    if (role === 'patient') {
+      if (!patientName.trim()) {
+        setError('Full name is required.');
+        return;
+      }
+    } else if (!practiceName.trim()) {
       setError('Practice name is required.');
       return;
     }
     setLoading(true);
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await ensurePracticeDoc(cred.user, { practiceName, phone, address, pmSoftware });
-      navigate('/onboarding');
+      if (role === 'patient') {
+        await ensurePatientDoc(cred.user, { name: patientName, phone: patientPhone, dob: patientDob });
+        navigate('/patient');
+      } else {
+        await ensurePracticeDoc(cred.user, { practiceName, phone, address, pmSoftware });
+        navigate('/onboarding');
+      }
     } catch (err) {
       setError(friendlyError(err.code));
     } finally {
@@ -216,14 +255,37 @@ function Auth() {
             </button>
           )}
 
+          {mode !== 'forgot' && (
+            <div style={{ display: 'flex', background: t.bgRow, borderRadius: '12px', padding: '4px', marginBottom: '20px', border: `1px solid ${t.border2}` }}>
+              {[['staff', 'Employee / Doctor'], ['patient', 'Patient']].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => switchRole(key)}
+                  className="px-btn"
+                  style={{
+                    flex: 1, padding: '8px 10px', borderRadius: '9px', border: 'none',
+                    background: role === key ? t.bgCard : 'transparent',
+                    color: role === key ? t.ink2 : t.muted,
+                    fontWeight: role === key ? '600' : '500', fontSize: '12.5px', cursor: 'pointer',
+                    boxShadow: role === key ? '0 1px 3px rgba(0,0,0,.08)' : 'none',
+                  }}
+                >{label}</button>
+              ))}
+            </div>
+          )}
+
           <div style={{ fontSize: '20px', fontWeight: '700', color: t.ink, marginBottom: '4px' }}>
             {mode === 'login' && 'Welcome back'}
-            {mode === 'signup' && 'Set up your practice'}
+            {mode === 'signup' && role === 'staff' && 'Set up your practice'}
+            {mode === 'signup' && role === 'patient' && 'Create your patient account'}
             {mode === 'forgot' && 'Reset your password'}
           </div>
           <div style={{ fontSize: '13px', color: t.muted, marginBottom: '22px' }}>
-            {mode === 'login' && 'Sign in to your PraxisMD dashboard'}
-            {mode === 'signup' && 'Create your account to get started'}
+            {mode === 'login' && role === 'staff' && 'Sign in to your PraxisMD dashboard'}
+            {mode === 'login' && role === 'patient' && 'Sign in to your patient account'}
+            {mode === 'signup' && role === 'staff' && 'Create your account to get started'}
+            {mode === 'signup' && role === 'patient' && 'Manage appointments and messages with your practice'}
             {mode === 'forgot' && "We'll email you a link to reset it"}
           </div>
 
@@ -245,7 +307,7 @@ function Auth() {
             </form>
           ) : (
             <form onSubmit={mode === 'login' ? handleLogin : handleSignup}>
-              {mode === 'signup' && (
+              {mode === 'signup' && role === 'staff' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <Field label="Practice name">
                     <input required value={practiceName} onChange={e => setPracticeName(e.target.value)} placeholder="Bright Smiles Dental" style={inputStyle} />
@@ -256,17 +318,34 @@ function Auth() {
                 </div>
               )}
 
-              {mode === 'signup' && (
+              {mode === 'signup' && role === 'staff' && (
                 <Field label="Practice address">
                   <input required value={address} onChange={e => setAddress(e.target.value)} placeholder="4210 W Bay Ave, Tampa FL 33616" style={inputStyle} />
                 </Field>
               )}
 
-              {mode === 'signup' && (
+              {mode === 'signup' && role === 'staff' && (
                 <Field label="Practice management software">
                   <select value={pmSoftware} onChange={e => setPmSoftware(e.target.value)} style={inputStyle}>
                     {PM_SOFTWARE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
+                </Field>
+              )}
+
+              {mode === 'signup' && role === 'patient' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <Field label="Full name">
+                    <input required value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="Jordan Ellis" style={inputStyle} />
+                  </Field>
+                  <Field label="Phone number">
+                    <input required value={patientPhone} onChange={e => setPatientPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
+                  </Field>
+                </div>
+              )}
+
+              {mode === 'signup' && role === 'patient' && (
+                <Field label="Date of birth">
+                  <input type="date" required value={patientDob} onChange={e => setPatientDob(e.target.value)} style={inputStyle} />
                 </Field>
               )}
 
@@ -302,7 +381,7 @@ function Auth() {
             </form>
           )}
 
-          {mode !== 'forgot' && (
+          {mode !== 'forgot' && role === 'staff' && (
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '18px 0' }}>
                 <div style={{ flex: 1, height: '1px', background: t.border }} />

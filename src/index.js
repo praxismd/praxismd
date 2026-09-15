@@ -6,6 +6,7 @@ import App from './App';
 import Landing from './Landing';
 import Auth from './Auth';
 import Onboarding from './Onboarding';
+import PatientPortal from './PatientPortal';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -16,6 +17,7 @@ root.render(
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Auth />} />
         <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/patient" element={<PatientPortal />} />
         <Route path="/dashboard" element={<App />} />
       </Routes>
     </BrowserRouter>
