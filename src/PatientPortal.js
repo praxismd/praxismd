@@ -6,7 +6,7 @@ import { auth, db, isFirebaseConfigured } from './firebase';
 import { light, withAlpha } from './theme';
 import {
   CalendarClock, MessageSquare, User, LogOut, Loader2, AlertTriangle,
-  Stethoscope, Receipt, CreditCard, Download, Info, Home,
+  Stethoscope, Receipt, CreditCard, Download, Info, Home, Shield, FileText, CheckCircle2, PenLine,
 } from 'lucide-react';
 
 const t = light;
@@ -51,11 +51,49 @@ const BILLING = {
   ],
 };
 
+const INSURANCE = {
+  payer: 'Delta Dental', plan: 'PPO Plus Premier', memberId: 'DD-2284910', group: 'GRP-4471', effective: 'Jan 1, 2026',
+  coverage: [['Preventive (cleanings, exams)', '100%'], ['Basic (fillings)', '80%'], ['Major (crowns, root canals)', '50%']],
+  deductible: { used: 0, total: 50 },
+  annualMax: { used: 640, total: 1500 },
+};
+
+const DOCUMENTS_SEED = [
+  { id: 'doc1', name: 'New patient health history', signed: true, date: 'Aug 2, 2026' },
+  { id: 'doc2', name: 'HIPAA consent form', signed: true, date: 'Aug 2, 2026' },
+  { id: 'doc3', name: 'Financial responsibility agreement', signed: false, date: null },
+  { id: 'doc4', name: 'Treatment plan consent — Crown #3', signed: false, date: null },
+];
+
 const TABS = [
   { key: 'overview', label: 'Overview', Icon: Home },
   { key: 'chart', label: 'My Chart', Icon: Stethoscope },
+  { key: 'insurance', label: 'Insurance', Icon: Shield },
+  { key: 'documents', label: 'Documents', Icon: FileText },
   { key: 'billing', label: 'Billing', Icon: CreditCard },
 ];
+
+function PortalBtn({ children, onClick, primary }) {
+  return (
+    <button
+      onClick={onClick} className="px-btn"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '10px',
+        border: primary ? 'none' : `1px solid ${t.border}`, background: primary ? t.brand : t.bgCard,
+        color: primary ? 'white' : t.mid, fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit',
+      }}
+    >{children}</button>
+  );
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div>
+      <div style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '3px' }}>{label}</div>
+      <div style={{ fontSize: '13px', color: t.ink2 }}>{value || '—'}</div>
+    </div>
+  );
+}
 
 function StatTile({ label, value, sub, color, icon: Icon }) {
   const accent = color || t.brand;
@@ -337,6 +375,136 @@ function BillingTab({ setNotice }) {
   );
 }
 
+function InsuranceTab({ setNotice }) {
+  const [showForm, setShowForm] = useState(false);
+  const [payer, setPayer] = useState('');
+  const [memberId, setMemberId] = useState('');
+
+  function submitUpdate() {
+    if (!payer.trim()) { setNotice('Add your insurance payer to continue.'); return; }
+    setNotice('Sent to your practice — they\'ll verify your new coverage before your next visit.');
+    setShowForm(false);
+    setPayer('');
+    setMemberId('');
+  }
+
+  return (
+    <>
+      <div style={{ ...cardStyle, marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <Shield size={17} color={t.brand} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Your plan</div>
+        </div>
+        <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '16px' }}>{INSURANCE.payer} · {INSURANCE.plan}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
+          <DetailRow label="Member ID" value={INSURANCE.memberId} />
+          <DetailRow label="Group number" value={INSURANCE.group} />
+          <DetailRow label="Effective date" value={INSURANCE.effective} />
+        </div>
+
+        <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>COVERAGE BREAKDOWN</div>
+        {INSURANCE.coverage.map(([label, pct], i) => (
+          <div key={i} style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>{label}</span><span style={{ fontWeight: '600', color: t.ink2 }}>{pct}</span></div>
+            <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.brand, width: pct }} /></div>
+          </div>
+        ))}
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '20px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>Deductible</span><span style={{ fontWeight: '600', color: t.ink2 }}>${INSURANCE.deductible.used} of ${INSURANCE.deductible.total}</span></div>
+            <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.teal, width: `${(INSURANCE.deductible.used / INSURANCE.deductible.total) * 100}%` }} /></div>
+          </div>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>Annual max used</span><span style={{ fontWeight: '600', color: t.ink2 }}>${INSURANCE.annualMax.used} of ${INSURANCE.annualMax.total}</span></div>
+            <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.purple, width: `${(INSURANCE.annualMax.used / INSURANCE.annualMax.total) * 100}%` }} /></div>
+          </div>
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2 }}>Insurance changed?</div>
+          <PortalBtn onClick={() => setShowForm(s => !s)}>Update insurance</PortalBtn>
+        </div>
+        {showForm && (
+          <div className="px-expand" style={{ marginTop: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+              <input value={payer} onChange={e => setPayer(e.target.value)} placeholder="New insurance payer" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+              <input value={memberId} onChange={e => setMemberId(e.target.value)} placeholder="Member ID" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            </div>
+            <PortalBtn primary onClick={submitUpdate}>Send to practice</PortalBtn>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function DocumentsTab({ setNotice }) {
+  const [docs, setDocs] = useState(DOCUMENTS_SEED);
+  const [signing, setSigning] = useState(null);
+
+  function sign(id) {
+    setDocs(ds => ds.map(d => d.id === id ? { ...d, signed: true, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) } : d));
+    setSigning(null);
+  }
+
+  const pending = docs.filter(d => !d.signed);
+  const signed = docs.filter(d => d.signed);
+
+  return (
+    <>
+      {pending.length > 0 && (
+        <div style={{ ...cardStyle, marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+            <AlertTriangle size={17} color={t.amber} />
+            <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Needs your signature</div>
+          </div>
+          <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '14px' }}>Please review and sign before your next visit.</div>
+          {pending.map(d => (
+            <div key={d.id} style={{ padding: '12px 14px', background: t.amberL, borderRadius: '10px', marginBottom: '8px', border: `1px solid ${withAlpha(t.accentAmber, .2)}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{d.name}</div>
+                <PortalBtn primary onClick={() => setSigning(signing === d.id ? null : d.id)}><PenLine size={13} /> {signing === d.id ? 'Cancel' : 'Sign now'}</PortalBtn>
+              </div>
+              {signing === d.id && (
+                <div className="px-expand" style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${withAlpha(t.accentAmber, .2)}` }}>
+                  <div style={{ fontSize: '12px', color: t.mid, marginBottom: '10px', lineHeight: '1.6' }}>
+                    By signing below, you confirm you've read and agree to this form.
+                  </div>
+                  <PortalBtn primary onClick={() => sign(d.id)}><CheckCircle2 size={13} /> I agree — sign document</PortalBtn>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+          <FileText size={17} color={t.purple} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Your documents</div>
+        </div>
+        {signed.map(d => (
+          <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${t.border2}` }}>
+            <div style={{ fontSize: '13px', color: t.ink2 }}>{d.name}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: t.green }}><CheckCircle2 size={13} /> Signed {d.date}</div>
+          </div>
+        ))}
+        {signed.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No signed documents yet.</div>}
+        <button
+          onClick={() => setNotice('Downloadable copies of your records are coming soon.')}
+          className="px-btn"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '14px', padding: '8px 14px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.mid, fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
+        >
+          <Download size={13} /> Download my records
+        </button>
+      </div>
+    </>
+  );
+}
+
 function PatientPortal() {
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
@@ -466,6 +634,8 @@ function PatientPortal() {
 
         {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} />}
         {tab === 'chart' && <ChartTab />}
+        {tab === 'insurance' && <InsuranceTab setNotice={setNotice} />}
+        {tab === 'documents' && <DocumentsTab setNotice={setNotice} />}
         {tab === 'billing' && <BillingTab setNotice={setNotice} />}
 
         {tab === 'overview' && (
