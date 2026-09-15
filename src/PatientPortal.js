@@ -6,13 +6,14 @@ import { auth, db, isFirebaseConfigured } from './firebase';
 import { light, withAlpha } from './theme';
 import {
   CalendarClock, MessageSquare, User, LogOut, Loader2, AlertTriangle,
-  Stethoscope, Receipt, CreditCard, Download, Info,
+  Stethoscope, Receipt, CreditCard, Download, Info, Home,
 } from 'lucide-react';
 
 const t = light;
 
 const cardStyle = {
   background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '16px', padding: '22px',
+  boxShadow: '0 2px 12px rgba(0,0,0,.04)',
 };
 
 // Demo clinical data for the patient-facing chart/billing views. Keyed by
@@ -51,15 +52,20 @@ const BILLING = {
 };
 
 const TABS = [
-  { key: 'overview', label: 'Overview' },
-  { key: 'chart', label: 'My Chart' },
-  { key: 'billing', label: 'Billing' },
+  { key: 'overview', label: 'Overview', Icon: Home },
+  { key: 'chart', label: 'My Chart', Icon: Stethoscope },
+  { key: 'billing', label: 'Billing', Icon: CreditCard },
 ];
 
-function StatTile({ label, value, sub, color }) {
+function StatTile({ label, value, sub, color, icon: Icon }) {
+  const accent = color || t.brand;
   return (
-    <div style={{ ...cardStyle, padding: '16px 18px' }}>
-      <div style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '6px' }}>{label}</div>
+    <div style={{ ...cardStyle, padding: '16px 18px', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: `linear-gradient(90deg, ${accent}, ${withAlpha(accent, .35)})` }} />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+        <div style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>{label}</div>
+        {Icon && <Icon size={14} color={accent} />}
+      </div>
       <div style={{ fontSize: '19px', fontWeight: '700', color: color || t.ink }}>{value}</div>
       {sub && <div style={{ fontSize: '11px', color: t.muted, marginTop: '3px' }}>{sub}</div>}
     </div>
@@ -71,9 +77,9 @@ function OverviewTab({ setNotice }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px', marginBottom: '16px' }}>
-        <StatTile label="Next appointment" value="None scheduled" sub="Request one below" />
-        <StatTile label="Balance due" value={`$${BILLING.balance}`} color={BILLING.balance > 0 ? t.amber : t.green} sub="See Billing tab" />
-        <StatTile label="Last visit" value={lastVisit.date} sub={lastVisit.procedure} />
+        <StatTile label="Next appointment" value="None scheduled" sub="Request one below" icon={CalendarClock} />
+        <StatTile label="Balance due" value={`$${BILLING.balance}`} color={BILLING.balance > 0 ? t.amber : t.green} sub="See Billing tab" icon={Receipt} />
+        <StatTile label="Last visit" value={lastVisit.date} sub={lastVisit.procedure} icon={Stethoscope} />
       </div>
 
       <div style={{ ...cardStyle, marginBottom: '16px' }}>
@@ -128,14 +134,17 @@ function ChartTab() {
             <button
               key={n}
               onClick={() => setSelectedTooth(isSelected ? null : n)}
-              className="px-btn"
+              className="px-btn px-tooth"
               title={`Tooth #${n} — ${meta.label}`}
               style={{
-                width: '26px', height: '26px', borderRadius: '7px', fontSize: '10px', fontWeight: '600',
+                width: '28px', height: '30px', borderRadius: '10px 10px 6px 6px', fontSize: '10px', fontWeight: '700',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontFamily: 'inherit',
                 background: status === 'healthy' ? t.bgCard : withAlpha(color, .16),
-                border: isSelected ? `2px solid ${color}` : `1.5px solid ${status === 'healthy' ? t.border : withAlpha(color, .5)}`,
+                borderWidth: isSelected ? '2px' : '1.5px', borderStyle: 'solid',
+                borderColor: isSelected ? color : (status === 'healthy' ? t.border : withAlpha(color, .5)),
                 color: status === 'healthy' ? t.muted : color,
+                boxShadow: isSelected ? `0 3px 10px ${withAlpha(color, .35)}` : 'none',
+                transform: isSelected ? 'translateY(-2px)' : 'none',
               }}
             >{n}</button>
           );
@@ -155,9 +164,11 @@ function ChartTab() {
         </div>
         <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '18px' }}>Tap a tooth to see its treatment history.</div>
 
-        <div style={{ marginBottom: '10px' }}>{renderRow(upper)}</div>
-        <div style={{ height: '1px', background: t.border2, margin: '10px auto', maxWidth: '480px' }} />
-        <div style={{ marginBottom: '18px' }}>{renderRow(lower)}</div>
+        <div style={{ background: `linear-gradient(180deg, ${t.bgRow}, transparent)`, borderRadius: '20px', padding: '18px 14px 6px', marginBottom: '14px' }}>
+          <div style={{ marginBottom: '10px' }}>{renderRow(upper)}</div>
+          <div style={{ height: '1px', background: t.border2, margin: '10px auto', maxWidth: '480px' }} />
+          <div>{renderRow(lower)}</div>
+        </div>
 
         <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', justifyContent: 'center', paddingTop: '4px', borderTop: `1px solid ${t.border2}` }}>
           {Object.entries(STATUS_META).map(([key, meta]) => (
@@ -208,8 +219,8 @@ function BillingTab({ setNotice }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '12px', marginBottom: '16px' }}>
-        <StatTile label="Balance due" value={`$${BILLING.balance}`} color={BILLING.balance > 0 ? t.amber : t.green} />
-        <StatTile label="On payment plan" value="No" sub="Ask your practice to set one up" />
+        <StatTile label="Balance due" value={`$${BILLING.balance}`} color={BILLING.balance > 0 ? t.amber : t.green} icon={CreditCard} />
+        <StatTile label="On payment plan" value="No" sub="Ask your practice to set one up" icon={Receipt} />
       </div>
 
       <div style={{ ...cardStyle, marginBottom: '16px' }}>
@@ -325,13 +336,16 @@ function PatientPortal() {
   }
 
   const firstName = (profile?.name || '').split(' ')[0] || 'there';
+  const initials = (profile?.name || '').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'P';
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', minHeight: '100vh', background: t.bgPage }}>
       <style>{`
-        .px-btn { transition: transform .08s ease, box-shadow .15s ease; }
+        .px-btn { transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease; }
         .px-btn:active { transform: scale(0.97); }
-        .px-action:hover { border-color: ${t.brand} !important; }
+        .px-action:hover { border-color: ${t.brand} !important; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.06); }
+        .px-tooth:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,.08); }
+        .px-tab:hover { color: ${t.ink} !important; }
         @keyframes pxFadeIn { from { opacity: 0; } to { opacity: 1; } }
         .px-expand { animation: pxFadeIn .15s ease; }
       `}</style>
@@ -347,21 +361,35 @@ function PatientPortal() {
       </div>
 
       <div style={{ maxWidth: '820px', margin: '0 auto', padding: '32px 20px' }}>
-        <div style={{ fontSize: '22px', fontWeight: '700', color: t.ink, marginBottom: '4px' }}>Hi, {firstName}</div>
-        <div style={{ fontSize: '13.5px', color: t.muted, marginBottom: '20px' }}>Here's what's going on with your care.</div>
+        <div style={{
+          background: `linear-gradient(120deg, ${t.brandL}, ${t.tealL})`, border: `1px solid ${t.border2}`,
+          borderRadius: '18px', padding: '20px 24px', marginBottom: '22px', display: 'flex', alignItems: 'center', gap: '16px',
+        }}>
+          <div style={{
+            width: '50px', height: '50px', borderRadius: '14px', background: t.brand, color: 'white',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', fontWeight: '700',
+            flexShrink: 0, boxShadow: `0 4px 14px ${withAlpha(t.brand, .35)}`,
+          }}>{initials}</div>
+          <div>
+            <div style={{ fontSize: '21px', fontWeight: '700', color: t.ink, marginBottom: '2px' }}>Hi, {firstName}</div>
+            <div style={{ fontSize: '13px', color: t.mid }}>Here's what's going on with your care.</div>
+          </div>
+        </div>
 
         <div style={{ display: 'flex', gap: '4px', borderBottom: `1px solid ${t.border}`, marginBottom: '20px' }}>
           {TABS.map(tb => (
             <button
               key={tb.key}
               onClick={() => setTab(tb.key)}
+              className="px-tab"
               style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
                 padding: '10px 4px', marginRight: '24px', background: 'transparent', border: 'none',
                 borderBottom: tab === tb.key ? `2px solid ${t.brand}` : '2px solid transparent',
                 color: tab === tb.key ? t.ink : t.muted, fontWeight: tab === tb.key ? '600' : '500',
                 fontSize: '13.5px', cursor: 'pointer', fontFamily: 'inherit',
               }}
-            >{tb.label}</button>
+            ><tb.Icon size={14} />{tb.label}</button>
           ))}
         </div>
 
