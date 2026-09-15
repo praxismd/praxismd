@@ -12,7 +12,7 @@ import {
   TrendingUp, Settings as SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
   ChevronRight, ChevronDown, Phone, Hand, Zap, CalendarPlus, Sparkles, LogOut,
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
-  X, ArrowUp, ArrowDown, Check,
+  X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -149,6 +149,56 @@ function useGhlFetch(fetchFn) {
   return { data, loading, error, refetch: () => setReloadKey(k => k + 1) };
 }
 
+// ─── ROLES & PERMISSIONS ───────────────────────────────────
+const ROLES = ['Owner', 'Office Manager', 'Front Desk', 'Biller'];
+
+const ROLE_TAB_RULES = {
+  'Owner': null,
+  'Office Manager': { hide: ['billing', 'payments'] },
+  'Front Desk': { only: ['inbox', 'calendar', 'patients', 'eligibility'] },
+  'Biller': { only: ['billing', 'payments', 'reports'] },
+};
+
+const ROLE_DEFAULT_TAB = {
+  'Owner': 'overview',
+  'Office Manager': 'overview',
+  'Front Desk': 'inbox',
+  'Biller': 'billing',
+};
+
+function isTabVisible(tab, role) {
+  const rule = ROLE_TAB_RULES[role];
+  if (!rule) return true;
+  if (rule.only) return rule.only.includes(tab);
+  if (rule.hide) return !rule.hide.includes(tab);
+  return true;
+}
+
+const MAIN_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist'];
+const PRACTICE_TABS = ['patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk'];
+const BILLINGSEC_TABS = ['billing', 'payments'];
+const ANALYTICS_TABS = ['reports', 'settings', 'activitylog'];
+
+const STAFF_MEMBERS = [
+  { id: 'u1', name: 'Dr. Rivera', email: 'drrivera@brightsmiles.com', role: 'Owner', lastLogin: 'Just now' },
+  { id: 'u2', name: 'Nina Torres', email: 'nina@brightsmiles.com', role: 'Office Manager', lastLogin: '2h ago' },
+  { id: 'u3', name: 'Casey Byrd', email: 'casey@brightsmiles.com', role: 'Front Desk', lastLogin: 'Yesterday' },
+  { id: 'u4', name: 'Priya Shah', email: 'priya@brightsmiles.com', role: 'Biller', lastLogin: '3 days ago' },
+];
+
+const ACTIVITY_LOG = [
+  { id: 1, ts: '2026-09-15T09:14:00', user: 'Dr. Rivera', role: 'Owner', action: 'Logged in', patient: null },
+  { id: 2, ts: '2026-09-15T09:20:00', user: 'Casey Byrd', role: 'Front Desk', action: 'Viewed patient record', patient: 'Maria Chen' },
+  { id: 3, ts: '2026-09-15T09:32:00', user: 'Nina Torres', role: 'Office Manager', action: 'Sent message', patient: 'James Lee' },
+  { id: 4, ts: '2026-09-15T10:05:00', user: 'Casey Byrd', role: 'Front Desk', action: 'Booked appointment', patient: 'Sarah Malone' },
+  { id: 5, ts: '2026-09-15T10:41:00', user: 'Priya Shah', role: 'Biller', action: 'Submitted claim', patient: 'David Kim' },
+  { id: 6, ts: '2026-09-14T16:12:00', user: 'Dr. Rivera', role: 'Owner', action: 'Logged in', patient: null },
+  { id: 7, ts: '2026-09-14T15:03:00', user: 'Priya Shah', role: 'Biller', action: 'Submitted claim', patient: 'Angela Ruiz' },
+  { id: 8, ts: '2026-09-14T11:47:00', user: 'Nina Torres', role: 'Office Manager', action: 'Viewed patient record', patient: 'Tom Alvarez' },
+  { id: 9, ts: '2026-09-13T14:22:00', user: 'Casey Byrd', role: 'Front Desk', action: 'Sent message', patient: 'Maria Chen' },
+  { id: 10, ts: '2026-09-13T08:00:00', user: 'Dr. Rivera', role: 'Owner', action: 'Logged in', patient: null },
+];
+
 function App() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -158,6 +208,10 @@ function App() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [patientQuery, setPatientQuery] = useState('');
+  const [userRole, setUserRole] = useState('Owner');
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [switchOpen, setSwitchOpen] = useState(false);
+  const currentUser = { name: 'Dr. Rivera', role: userRole };
   const t = mode === 'dark' ? dark : light;
   const showFull = !collapsed || sidebarHover;
   const suppressHoverRef = useRef(false);
@@ -178,6 +232,7 @@ function App() {
 
   const notifRef = useRef(null);
   const searchRef = useRef(null);
+  const userMenuRef = useRef(null);
 
   useEffect(() => {
     window.localStorage.setItem('praxismd-theme', mode);
@@ -189,10 +244,16 @@ function App() {
     function onDocClick(e) {
       if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
       if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) { setUserMenuOpen(false); setSwitchOpen(false); }
     }
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
+
+  useEffect(() => {
+    if (!isTabVisible(activeTab, userRole)) setActiveTab(ROLE_DEFAULT_TAB[userRole] || 'overview');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole]);
 
   const { data: contactsData, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useGhlFetch(getContacts);
   const [demoContacts, setDemoContacts] = useState(DEMO_CONTACTS);
@@ -278,26 +339,27 @@ function App() {
         </div>
 
         <nav style={{ padding: showFull ? '8px 12px' : '8px 8px', flex: 1, overflowY: 'auto' }}>
-          <NavSection label="Main" collapsed={!showFull} />
-          <NavItem label="Overview" Icon={LayoutDashboard} tab="overview" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
-          <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={setActiveTab} badge="4" badgeColor={t.red} collapsed={!showFull} />
-          <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
-          <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={setActiveTab} badge="89" badgeColor={t.amber} collapsed={!showFull} />
-          <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
-          <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={setActiveTab} badge="12" badgeColor={t.teal} collapsed={!showFull} />
-          <NavSection label="Practice" collapsed={!showFull} />
-          <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
-          <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
-          <NavItem label="Eligibility" Icon={Shield} tab="eligibility" active={activeTab} onClick={setActiveTab} badge="3" badgeColor={t.amber} collapsed={!showFull} />
-          <NavItem label="Reviews" Icon={Star} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
-          <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
-          <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />
-          <NavSection label="Billing" collapsed={!showFull} />
-          <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />
-          <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
-          <NavSection label="Analytics" collapsed={!showFull} />
-          <NavItem label="Reports" Icon={TrendingUp} tab="reports" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
-          <NavItem label="Settings" Icon={SettingsIcon} tab="settings" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />
+          {MAIN_TABS.some(tb => isTabVisible(tb, userRole)) && <NavSection label="Main" collapsed={!showFull} />}
+          {isTabVisible('overview', userRole) && <NavItem label="Overview" Icon={LayoutDashboard} tab="overview" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('inbox', userRole) && <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={setActiveTab} badge="4" badgeColor={t.red} collapsed={!showFull} />}
+          {isTabVisible('campaigns', userRole) && <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('recall', userRole) && <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={setActiveTab} badge="89" badgeColor={t.amber} collapsed={!showFull} />}
+          {isTabVisible('calendar', userRole) && <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('waitlist', userRole) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={setActiveTab} badge="12" badgeColor={t.teal} collapsed={!showFull} />}
+          {PRACTICE_TABS.some(tb => isTabVisible(tb, userRole)) && <NavSection label="Practice" collapsed={!showFull} />}
+          {isTabVisible('patients', userRole) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('portal', userRole) && <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('eligibility', userRole) && <NavItem label="Eligibility" Icon={Shield} tab="eligibility" active={activeTab} onClick={setActiveTab} badge="3" badgeColor={t.amber} collapsed={!showFull} />}
+          {isTabVisible('reviews', userRole) && <NavItem label="Reviews" Icon={Star} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('surveys', userRole) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('aifrontdesk', userRole) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
+          {BILLINGSEC_TABS.some(tb => isTabVisible(tb, userRole)) && <NavSection label="Billing" collapsed={!showFull} />}
+          {isTabVisible('billing', userRole) && <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />}
+          {isTabVisible('payments', userRole) && <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {ANALYTICS_TABS.some(tb => isTabVisible(tb, userRole)) && <NavSection label="Analytics" collapsed={!showFull} />}
+          {isTabVisible('reports', userRole) && <NavItem label="Reports" Icon={TrendingUp} tab="reports" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('activitylog', userRole) && <NavItem label="Activity Log" Icon={Activity} tab="activitylog" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('settings', userRole) && <NavItem label="Settings" Icon={SettingsIcon} tab="settings" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
         </nav>
 
         <div style={{ padding: showFull ? '12px 16px' : '12px 0', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: showFull ? 'space-between' : 'center', gap: '10px' }}>
@@ -306,7 +368,7 @@ function App() {
             {showFull && (
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Dr. Rivera</div>
-                <div style={{ fontSize: '11px', color: t.muted }}>Practice owner</div>
+                <div style={{ fontSize: '11px', color: t.muted }}>{userRole}</div>
               </div>
             )}
           </div>
@@ -386,27 +448,64 @@ function App() {
             <button onClick={() => setActiveTab('campaigns')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
               <Plus size={14} /> New campaign
             </button>
+
+            <div ref={userMenuRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => { setUserMenuOpen(o => !o); setSwitchOpen(false); }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px 5px 5px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer' }}
+              >
+                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>{initialsOf(currentUser.name)}</div>
+                <div style={{ textAlign: 'left' }}>
+                  <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, lineHeight: 1.25 }}>{currentUser.name}</div>
+                  <div style={{ fontSize: '10.5px', color: t.muted, lineHeight: 1.25 }}>{currentUser.role}</div>
+                </div>
+                <ChevronDown size={14} color={t.muted} />
+              </button>
+              {userMenuOpen && (
+                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: '210px', background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,.18)', overflow: 'hidden', zIndex: 100 }}>
+                  {!switchOpen ? (
+                    <>
+                      <button onClick={() => setSwitchOpen(true)} className="px-row" style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: `1px solid ${t.border2}`, background: 'transparent', fontSize: '13px', color: t.ink2, cursor: 'pointer', fontFamily: 'inherit' }}>Switch account</button>
+                      <button onClick={() => { setActiveTab('settings'); setUserMenuOpen(false); }} className="px-row" style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: `1px solid ${t.border2}`, background: 'transparent', fontSize: '13px', color: t.ink2, cursor: 'pointer', fontFamily: 'inherit' }}>My profile</button>
+                      <button onClick={handleLogout} className="px-row" style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', background: 'transparent', fontSize: '13px', color: t.red, cursor: 'pointer', fontFamily: 'inherit' }}>Sign out</button>
+                    </>
+                  ) : (
+                    ROLES.map((r, i) => (
+                      <button
+                        key={r}
+                        onClick={() => { setUserRole(r); setSwitchOpen(false); setUserMenuOpen(false); }}
+                        className="px-row"
+                        style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 14px', border: 'none', borderBottom: i < ROLES.length - 1 ? `1px solid ${t.border2}` : 'none', background: 'transparent', fontSize: '13px', fontWeight: r === userRole ? '600' : '400', color: r === userRole ? t.teal : t.ink2, cursor: 'pointer', fontFamily: 'inherit' }}
+                      >
+                        {r}{r === userRole ? ' ✓' : ''}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
         {/* PAGE CONTENT */}
         <div key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
-          {activeTab === 'overview' && <Overview setActiveTab={setActiveTab} />}
-          {activeTab === 'inbox' && <Inbox contacts={contacts} />}
-          {activeTab === 'campaigns' && <Campaigns />}
-          {activeTab === 'recall' && <Recall />}
-          {activeTab === 'patients' && <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} />}
-          {activeTab === 'billing' && <Billing />}
-          {activeTab === 'payments' && <Payments />}
-          {activeTab === 'reports' && <Reports />}
-          {activeTab === 'settings' && <Settings />}
-          {activeTab === 'aifrontdesk' && <AIFrontDesk />}
-          {activeTab === 'reviews' && <Reviews />}
-          {activeTab === 'surveys' && <Surveys />}
-          {activeTab === 'eligibility' && <Eligibility />}
-          {activeTab === 'portal' && <Portal />}
-          {activeTab === 'waitlist' && <Waitlist />}
-          {activeTab === 'calendar' && <Calendar />}
+          {activeTab === 'overview' && <Overview setActiveTab={setActiveTab} userRole={userRole} />}
+          {activeTab === 'inbox' && <Inbox contacts={contacts} userRole={userRole} />}
+          {activeTab === 'campaigns' && <Campaigns userRole={userRole} />}
+          {activeTab === 'recall' && <Recall userRole={userRole} />}
+          {activeTab === 'patients' && <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />}
+          {activeTab === 'billing' && <Billing userRole={userRole} />}
+          {activeTab === 'payments' && <Payments userRole={userRole} />}
+          {activeTab === 'reports' && <Reports userRole={userRole} />}
+          {activeTab === 'settings' && <Settings userRole={userRole} onRoleChange={setUserRole} />}
+          {activeTab === 'activitylog' && <ActivityLog userRole={userRole} />}
+          {activeTab === 'aifrontdesk' && <AIFrontDesk userRole={userRole} />}
+          {activeTab === 'reviews' && <Reviews userRole={userRole} />}
+          {activeTab === 'surveys' && <Surveys userRole={userRole} />}
+          {activeTab === 'eligibility' && <Eligibility userRole={userRole} />}
+          {activeTab === 'portal' && <Portal userRole={userRole} />}
+          {activeTab === 'waitlist' && <Waitlist userRole={userRole} />}
+          {activeTab === 'calendar' && <Calendar userRole={userRole} />}
         </div>
       </div>
     </div>
@@ -433,6 +532,7 @@ function getPageTitle(tab) {
     payments: 'Payments & Plans',
     reports: 'Reports',
     settings: 'Settings',
+    activitylog: 'Activity Log',
   };
   return titles[tab] || tab;
 }
@@ -2248,10 +2348,14 @@ const INTEGRATIONS = [
   { id: 'availity', name: 'Availity', sub: 'Eligibility verification', connected: false },
 ];
 
-function Settings() {
+function Settings({ userRole, onRoleChange }) {
   const t = useTheme();
   const [saved, setSaved] = useState(false);
   const [connectNotice, setConnectNotice] = useState('');
+  const [staff, setStaff] = useState(STAFF_MEMBERS);
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'Front Desk' });
+  const [inviteNotice, setInviteNotice] = useState('');
 
   function saveChanges() {
     setSaved(true);
@@ -2264,29 +2368,184 @@ function Settings() {
       : `${item.name} isn't wired up yet — this is a bare-bones scaffold for now.`);
   }
 
+  function removeStaff(id) {
+    setStaff(list => list.filter(s => s.id !== id));
+  }
+
+  function sendInvite() {
+    if (!inviteForm.name.trim() || !inviteForm.email.trim()) return;
+    setStaff(list => [...list, { id: `u-new-${Date.now()}`, name: inviteForm.name.trim(), email: inviteForm.email.trim(), role: inviteForm.role, lastLogin: 'Never' }]);
+    setInviteNotice(`Invite sent to ${inviteForm.email.trim()} — they'll show up as "Never" logged in until they accept.`);
+    setInviteForm({ name: '', email: '', role: 'Front Desk' });
+    setShowInvite(false);
+  }
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-      <Card>
-        <CardTitle>Practice details</CardTitle>
-        {[['Practice name', 'Bright Smiles Dental'], ['Phone number', '(813) 555-0142'], ['Email', 'hello@brightsmiles.com'], ['Address', '4210 W Bay Ave, Tampa FL 33616'], ['NPI number', '1234567890']].map(([label, val], i) => (
-          <div key={i} style={{ marginBottom: '13px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>{label}</label>
-            <input defaultValue={val} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }} />
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+        <Card>
+          <CardTitle>Practice details</CardTitle>
+          {[['Practice name', 'Bright Smiles Dental'], ['Phone number', '(813) 555-0142'], ['Email', 'hello@brightsmiles.com'], ['Address', '4210 W Bay Ave, Tampa FL 33616'], ['NPI number', '1234567890']].map(([label, val], i) => (
+            <div key={i} style={{ marginBottom: '13px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>{label}</label>
+              <input defaultValue={val} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }} />
+            </div>
+          ))}
+          <Btn primary onClick={saveChanges}>{saved ? <Check size={14} /> : null}{saved ? 'Saved' : 'Save changes'}</Btn>
+        </Card>
+        <Card>
+          <CardTitle>Integrations</CardTitle>
+          {INTEGRATIONS.map(item => (
+            <div key={item.id} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', borderWidth: '1px', borderStyle: 'solid', background: item.connected ? t.greenL : t.bgRow, borderColor: item.connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
+              <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{item.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{item.sub}</div></div>
+              {item.connected ? <Pill label="Connected" color={t.green} bg={t.greenL} /> : <Btn small onClick={() => connect(item)}>Connect</Btn>}
+            </div>
+          ))}
+          {connectNotice && (
+            <div style={{ marginTop: '8px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{connectNotice}</div>
+          )}
+        </Card>
+      </div>
+
+      <Card style={{ marginBottom: '14px' }}>
+        <CardTitle>
+          Team
+          <Btn small primary onClick={() => setShowInvite(s => !s)}><UserPlus size={13} /> Invite staff member</Btn>
+        </CardTitle>
+        {showInvite && (
+          <div style={{ padding: '14px', background: t.bgRow, borderRadius: '10px', marginBottom: '12px', border: `1px solid ${t.border2}` }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <input value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))} placeholder="Full name" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }} />
+              <input value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="Email address" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }} />
+              <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))} style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
+                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Btn primary small onClick={sendInvite}>Send invite</Btn>
+              <Btn small onClick={() => setShowInvite(false)}>Cancel</Btn>
+            </div>
+          </div>
+        )}
+        {inviteNotice && (
+          <div style={{ marginBottom: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{inviteNotice}</div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.2fr 40px', gap: '8px', padding: '0 13px 8px', fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>
+          <div>Name</div><div>Role</div><div>Last login</div><div />
+        </div>
+        {staff.map(s => (
+          <div key={s.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.2fr 40px', gap: '8px', alignItems: 'center', padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: t.bgRow }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <Ava initials={initialsOf(s.name)} bg={t.brandL} color={t.brand} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
+                <div style={{ fontSize: '11px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.email}</div>
+              </div>
+            </div>
+            <div style={{ fontSize: '12.5px', color: t.ink2 }}>{s.role}</div>
+            <div style={{ fontSize: '12.5px', color: t.muted }}>{s.lastLogin}</div>
+            <button onClick={() => removeStaff(s.id)} title="Remove" style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+              <Trash2 size={14} />
+            </button>
           </div>
         ))}
-        <Btn primary onClick={saveChanges}>{saved ? <Check size={14} /> : null}{saved ? 'Saved' : 'Save changes'}</Btn>
+      </Card>
+
+      <Card>
+        <CardTitle>Demo: role switcher</CardTitle>
+        <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '12px' }}>No real auth yet — flip roles here to preview what the sidebar and tabs look like for each one.</div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {ROLES.map(r => (
+            <Btn key={r} small primary={r === userRole} onClick={() => onRoleChange && onRoleChange(r)}>{r}</Btn>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ─── ACTIVITY LOG ──────────────────────────────────────────
+function ActivityLog() {
+  const t = useTheme();
+  const [userFilter, setUserFilter] = useState('All');
+  const [roleFilter, setRoleFilter] = useState('All');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  const users = ['All', ...Array.from(new Set(ACTIVITY_LOG.map(a => a.user)))];
+  const roles = ['All', ...ROLES];
+  const selectStyle = { padding: '8px 11px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
+  const filterLabelStyle = { fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '5px', display: 'block' };
+
+  const filtered = ACTIVITY_LOG
+    .filter(a => (userFilter === 'All' || a.user === userFilter))
+    .filter(a => (roleFilter === 'All' || a.role === roleFilter))
+    .filter(a => (!fromDate || a.ts.slice(0, 10) >= fromDate))
+    .filter(a => (!toDate || a.ts.slice(0, 10) <= toDate))
+    .sort((a, b) => new Date(b.ts) - new Date(a.ts));
+
+  function formatTs(ts) {
+    return new Date(ts).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function exportCsv() {
+    const header = ['Timestamp', 'User', 'Role', 'Action', 'Patient'];
+    const rows = filtered.map(a => [a.ts, a.user, a.role, a.action, a.patient || '']);
+    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'activity-log.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div>
+      <Card style={{ marginBottom: '14px' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <div>
+            <label style={filterLabelStyle}>User</label>
+            <select value={userFilter} onChange={e => setUserFilter(e.target.value)} style={selectStyle}>
+              {users.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={filterLabelStyle}>Role</label>
+            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} style={selectStyle}>
+              {roles.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={filterLabelStyle}>From</label>
+            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={selectStyle} />
+          </div>
+          <div>
+            <label style={filterLabelStyle}>To</label>
+            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={selectStyle} />
+          </div>
+          <Btn small onClick={exportCsv} style={{ marginLeft: 'auto' }}><Download size={13} /> Export CSV</Btn>
+        </div>
       </Card>
       <Card>
-        <CardTitle>Integrations</CardTitle>
-        {INTEGRATIONS.map(item => (
-          <div key={item.id} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', borderWidth: '1px', borderStyle: 'solid', background: item.connected ? t.greenL : t.bgRow, borderColor: item.connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
-            <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{item.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{item.sub}</div></div>
-            {item.connected ? <Pill label="Connected" color={t.green} bg={t.greenL} /> : <Btn small onClick={() => connect(item)}>Connect</Btn>}
-          </div>
+        <CardTitle>
+          Activity feed
+          <span style={{ fontSize: '12px', color: t.muted, fontWeight: '500' }}>{filtered.length} event{filtered.length === 1 ? '' : 's'}</span>
+        </CardTitle>
+        {filtered.length === 0 && <div style={{ fontSize: '13px', color: t.muted, textAlign: 'center', padding: '28px 0' }}>No activity matches these filters.</div>}
+        {filtered.map(a => (
+          <RowItem key={a.id}>
+            <div style={{ width: '128px', flexShrink: 0, fontSize: '12px', color: t.muted }}>{formatTs(a.ts)}</div>
+            <Ava initials={initialsOf(a.user)} bg={t.brandL} color={t.brand} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{a.action}{a.patient ? ` · ${a.patient}` : ''}</div>
+              <div style={{ fontSize: '11.5px', color: t.muted }}>{a.user} · {a.role}</div>
+            </div>
+          </RowItem>
         ))}
-        {connectNotice && (
-          <div style={{ marginTop: '8px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{connectNotice}</div>
-        )}
       </Card>
     </div>
   );
