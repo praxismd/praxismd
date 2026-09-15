@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { light, withAlpha } from './theme';
 import {
@@ -71,6 +71,7 @@ const TABS = [
   { key: 'insurance', label: 'Insurance', Icon: Shield },
   { key: 'documents', label: 'Documents', Icon: FileText },
   { key: 'billing', label: 'Billing', Icon: CreditCard },
+  { key: 'messages', label: 'Messages', Icon: MessageSquare },
 ];
 
 function PortalBtn({ children, onClick, primary }) {
@@ -110,7 +111,7 @@ function StatTile({ label, value, sub, color, icon: Icon }) {
   );
 }
 
-function OverviewTab({ setNotice, profile }) {
+function OverviewTab({ setNotice, profile, onOpenMessages }) {
   const lastVisit = TREATMENT_HISTORY[0];
   const [showForm, setShowForm] = useState(false);
   const [reqWhen, setReqWhen] = useState('');
@@ -178,7 +179,7 @@ function OverviewTab({ setNotice, profile }) {
           <div style={{ fontSize: '11.5px', color: t.muted }}>Ask your practice to schedule a visit</div>
         </button>
         <button
-          onClick={() => setNotice('Secure messaging with your practice is coming soon.')}
+          onClick={onOpenMessages}
           className="px-btn px-action"
           style={{ textAlign: 'left', background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '14px', padding: '18px', cursor: 'pointer', fontFamily: 'inherit' }}
         >
@@ -505,6 +506,104 @@ function DocumentsTab({ setNotice }) {
   );
 }
 
+function formatMsgTime(ts) {
+  if (!ts?.toDate) return 'Sending…';
+  return ts.toDate().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function MessagesTab({ profile }) {
+  const [messages, setMessages] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setLoading(false); return; }
+    const user = auth.currentUser;
+    if (!user) { setLoading(false); return; }
+    const q = query(collection(db, 'patientMessages'), where('patientUid', '==', user.uid), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, snap => {
+      setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, err => { setError(err.message); setLoading(false); });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages.length]);
+
+  async function send() {
+    if (!draft.trim()) return;
+    setSending(true);
+    setError('');
+    try {
+      const user = auth.currentUser;
+      await addDoc(collection(db, 'patientMessages'), {
+        patientUid: user.uid,
+        patientName: profile?.name || user.email,
+        sender: 'patient',
+        text: draft.trim(),
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+      setDraft('');
+    } catch (err) {
+      setError(err.message || 'Could not send message.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+        <MessageSquare size={17} color={t.teal} />
+        <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Messages with your practice</div>
+      </div>
+
+      {error && (
+        <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.red, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '12px' }}>{error}</div>
+      )}
+
+      <div style={{ height: '420px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', background: t.bgRow, borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
+        {loading ? (
+          <div style={{ margin: 'auto', display: 'flex', alignItems: 'center', gap: '8px', color: t.muted, fontSize: '12.5px' }}><Loader2 size={16} className="px-spin" /> Loading…</div>
+        ) : messages.length === 0 ? (
+          <div style={{ margin: 'auto', color: t.muted, fontSize: '12.5px', textAlign: 'center', maxWidth: '240px' }}>No messages yet — send one below to start the conversation with your practice.</div>
+        ) : messages.map(m => (
+          <div key={m.id} style={{ alignSelf: m.sender === 'patient' ? 'flex-end' : 'flex-start', maxWidth: '78%' }}>
+            <div style={{
+              padding: '9px 13px', borderRadius: '14px', fontSize: '13px', lineHeight: '1.5',
+              background: m.sender === 'patient' ? t.brand : t.bgCard, color: m.sender === 'patient' ? 'white' : t.ink2,
+              border: m.sender === 'patient' ? 'none' : `1px solid ${t.border}`,
+            }}>{m.text}</div>
+            <div style={{ fontSize: '10px', color: t.muted, marginTop: '3px', textAlign: m.sender === 'patient' ? 'right' : 'left' }}>
+              {m.sender === 'patient' ? 'You' : 'Your practice'} · {formatMsgTime(m.createdAt)}
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          value={draft} onChange={e => setDraft(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') send(); }}
+          placeholder="Type a message…"
+          style={{ flex: 1, padding: '10px 14px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' }}
+        />
+        <button
+          onClick={send} disabled={sending} className="px-btn"
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600', cursor: sending ? 'default' : 'pointer', opacity: sending ? .7 : 1, fontFamily: 'inherit' }}
+        >{sending ? <Loader2 size={14} className="px-spin" /> : <MessageSquare size={14} />} Send</button>
+      </div>
+    </div>
+  );
+}
+
 function PatientPortal() {
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
@@ -632,11 +731,12 @@ function PatientPortal() {
           <div style={{ background: t.tealL, color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, borderRadius: '10px', padding: '10px 14px', fontSize: '12.5px', marginBottom: '18px' }}>{notice}</div>
         )}
 
-        {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} />}
+        {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} onOpenMessages={() => setTab('messages')} />}
         {tab === 'chart' && <ChartTab />}
         {tab === 'insurance' && <InsuranceTab setNotice={setNotice} />}
         {tab === 'documents' && <DocumentsTab setNotice={setNotice} />}
         {tab === 'billing' && <BillingTab setNotice={setNotice} />}
+        {tab === 'messages' && <MessagesTab profile={profile} />}
 
         {tab === 'overview' && (
           <div style={{ ...cardStyle, marginTop: '16px' }}>

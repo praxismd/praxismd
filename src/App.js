@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { light, dark, withAlpha } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, sendMessage, isGhlConfigured } from './api/ghl';
@@ -671,6 +671,126 @@ function Overview({ setActiveTab }) {
   );
 }
 
+function PatientMessages() {
+  const t = useTheme();
+  const [allMessages, setAllMessages] = useState([]);
+  const [loading, setLoading] = useState(isFirebaseConfigured);
+  const [expandedUid, setExpandedUid] = useState(null);
+  const [reply, setReply] = useState('');
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setLoading(false); return; }
+    const q = query(collection(db, 'patientMessages'), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, snap => {
+      setAllMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, []);
+
+  const threadsByUid = {};
+  allMessages.forEach(m => {
+    if (!threadsByUid[m.patientUid]) threadsByUid[m.patientUid] = [];
+    threadsByUid[m.patientUid].push(m);
+  });
+  const threadList = Object.entries(threadsByUid).map(([uid, msgs]) => {
+    const last = msgs[msgs.length - 1];
+    const unread = msgs.filter(m => m.sender === 'patient' && !m.read).length;
+    return { uid, patientName: last.patientName, msgs, last, unread };
+  }).sort((a, b) => (b.last.createdAt?.toMillis?.() || 0) - (a.last.createdAt?.toMillis?.() || 0));
+
+  async function openThread(thread) {
+    const isExpanding = expandedUid !== thread.uid;
+    setExpandedUid(isExpanding ? thread.uid : null);
+    setReply('');
+    if (isExpanding && thread.unread > 0) {
+      const unreadDocs = thread.msgs.filter(m => m.sender === 'patient' && !m.read);
+      await Promise.all(unreadDocs.map(m => updateDoc(doc(db, 'patientMessages', m.id), { read: true })));
+    }
+  }
+
+  async function sendReply(thread) {
+    if (!reply.trim()) return;
+    setSending(true);
+    try {
+      await addDoc(collection(db, 'patientMessages'), {
+        patientUid: thread.uid,
+        patientName: thread.patientName,
+        sender: 'staff',
+        text: reply.trim(),
+        createdAt: serverTimestamp(),
+        read: true,
+      });
+      setReply('');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (!isFirebaseConfigured) {
+    return (
+      <Card style={{ marginBottom: '14px' }}>
+        <CardTitle>Patient portal messages</CardTitle>
+        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>
+          Messages patients send from their portal will show up here live once Firebase is connected.
+        </div>
+      </Card>
+    );
+  }
+
+  if (loading) return <LoadingState label="Loading patient messages…" />;
+
+  const totalUnread = threadList.reduce((n, th) => n + th.unread, 0);
+
+  return (
+    <Card style={{ marginBottom: '14px' }}>
+      <CardTitle>Patient portal messages {totalUnread > 0 && <Pill label={`${totalUnread} unread`} color={t.brand} bg={t.brandL} />}</CardTitle>
+      {threadList.length === 0 && (
+        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No patient messages yet — they'll appear here as soon as a patient sends one from their portal.</div>
+      )}
+      {threadList.map(thread => {
+        const isExpanded = expandedUid === thread.uid;
+        return (
+          <div key={thread.uid} style={{ borderBottom: `1px solid ${t.border2}` }}>
+            <div onClick={() => openThread(thread)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 0', cursor: 'pointer' }}>
+              <Ava initials={initialsOf(thread.patientName || 'Patient')} bg={t.tealL} color={t.teal} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{thread.patientName}</div>
+                <div style={{ fontSize: '11.5px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{thread.last.sender === 'staff' ? 'You: ' : ''}{thread.last.text}</div>
+              </div>
+              {thread.unread > 0 && <Pill label="Unread" color={t.brand} bg={t.brandL} />}
+              <ChevronDown size={14} color={t.muted} style={{ flexShrink: 0, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+            </div>
+            {isExpanded && (
+              <div className="px-expand" style={{ padding: '0 0 14px' }}>
+                <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', background: t.bgRow, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
+                  {thread.msgs.map(m => (
+                    <div key={m.id} style={{ alignSelf: m.sender === 'staff' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
+                      <div style={{ padding: '8px 11px', borderRadius: '12px', fontSize: '12.5px', background: m.sender === 'staff' ? t.brand : t.bgCard, color: m.sender === 'staff' ? 'white' : t.ink2, border: m.sender === 'staff' ? 'none' : `1px solid ${t.border}` }}>{m.text}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    value={reply} onChange={e => setReply(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') sendReply(thread); }}
+                    placeholder="Reply…"
+                    style={{ flex: 1, padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}
+                  />
+                  <Btn small primary onClick={() => sendReply(thread)} disabled={sending}>
+                    {sending ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} Send
+                  </Btn>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </Card>
+  );
+}
+
 // ─── INBOX ─────────────────────────────────────────────────
 function Inbox({ contacts }) {
   const t = useTheme();
@@ -714,6 +834,8 @@ function Inbox({ contacts }) {
           <span key={i} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: i === 0 ? 'none' : `1px solid ${t.border}`, background: i === 0 ? t.brand : t.bgCard, color: i === 0 ? 'white' : t.mid }}>{label}</span>
         ))}
       </div>
+
+      <PatientMessages />
 
       {!isGhlConfigured && (
         <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}>
