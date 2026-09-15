@@ -27,7 +27,7 @@ function friendlyError(code) {
     'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
     'auth/network-request-failed': 'Network error — check your connection and try again.',
   };
-  return map[code] || 'Something went wrong. Please try again.';
+  return map[code] || `Something went wrong${code ? ` (${code})` : ''}. Please try again.`;
 }
 
 function GoogleIcon() {
