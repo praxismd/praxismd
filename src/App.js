@@ -97,6 +97,32 @@ function mapConversation(c) {
   };
 }
 
+// Seeded demo data shown when GoHighLevel isn't connected, so Patients and
+// Inbox feel alive out of the box instead of showing a blocking "not
+// connected" wall. Same shape mapContact/mapConversation produce from real
+// GHL data, so swapping in a real account changes nothing else.
+const DEMO_CONTACTS = [
+  { id: 'p1', name: 'Maria Chen', email: 'maria.chen@gmail.com', phone: '(813) 555-0142', tag: 'VIP', dateAdded: '8/2/2026' },
+  { id: 'p2', name: 'David Wong', email: 'dwong82@gmail.com', phone: '(813) 555-0198', tag: 'New patient', dateAdded: '9/1/2026' },
+  { id: 'p3', name: 'Sam Kim', email: 'samkim.k@yahoo.com', phone: '(813) 555-0221', tag: null, dateAdded: '7/14/2026' },
+  { id: 'p4', name: 'Priya Patel', email: 'priya.patel@outlook.com', phone: '(813) 555-0345', tag: 'Inactive 6mo', dateAdded: '3/2/2025' },
+  { id: 'p5', name: 'Sarah Martinez', email: 'sarahm22@gmail.com', phone: '(813) 555-0410', tag: 'VIP', dateAdded: '1/9/2024' },
+  { id: 'p6', name: 'James Lee', email: 'jlee.dental@gmail.com', phone: '(813) 555-0555', tag: null, dateAdded: '5/30/2025' },
+  { id: 'p7', name: 'Patricia Green', email: 'pgreen77@gmail.com', phone: '(813) 555-0678', tag: 'New patient', dateAdded: '9/10/2026' },
+  { id: 'p8', name: 'Mike Brown', email: 'mbrown.fl@gmail.com', phone: '(813) 555-0791', tag: 'Payment plan', dateAdded: '6/18/2025' },
+  { id: 'p9', name: 'Robert Park', email: 'rpark.dds@gmail.com', phone: '(813) 555-0823', tag: null, dateAdded: '2/2/2026' },
+  { id: 'p10', name: 'Jordan Ellis', email: 'jellis99@gmail.com', phone: '(813) 555-0934', tag: 'Inactive 6mo', dateAdded: '11/5/2024' },
+];
+
+const DEMO_CONVERSATIONS = [
+  { id: 'c1', contactId: 'p1', name: 'Maria Chen', lastMessage: 'Yes, 2:30pm on Thursday works great for me — thank you!', time: 'Today, 9:14 AM', unread: true },
+  { id: 'c2', contactId: 'p2', name: 'David Wong', lastMessage: 'Can I get an appointment reminder text instead of email?', time: 'Today, 8:02 AM', unread: true },
+  { id: 'c3', contactId: 'p8', name: 'Mike Brown', lastMessage: 'My card on file was declined — can you resend the payment link?', time: 'Yesterday, 4:47 PM', unread: false },
+  { id: 'c4', contactId: 'p7', name: 'Patricia Green', lastMessage: 'Thanks for the reminder, see you at 1:30!', time: 'Yesterday, 11:20 AM', unread: false },
+  { id: 'c5', contactId: 'p10', name: 'Jordan Ellis', lastMessage: 'Still interested but need to check my schedule for next week.', time: 'Sep 12, 3:10 PM', unread: false },
+  { id: 'c6', contactId: null, name: 'Unknown Caller', lastMessage: 'Hi, I saw your ad and wanted to ask about new patient specials.', time: 'Sep 11, 6:45 PM', unread: true },
+];
+
 // Fetches once on mount (and whenever refetch() is called). Skips the call
 // entirely — no spinner, no error — when GHL isn't configured, since that's
 // an expected, common state here, not a failure.
@@ -168,7 +194,7 @@ function App() {
   }, []);
 
   const { data: contactsData, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useGhlFetch(getContacts);
-  const contacts = (contactsData || []).map(mapContact);
+  const contacts = isGhlConfigured ? (contactsData || []).map(mapContact) : DEMO_CONTACTS;
 
   const searchMatches = patientQuery.trim()
     ? contacts.filter(p => p.name.toLowerCase().includes(patientQuery.trim().toLowerCase()))
@@ -494,21 +520,6 @@ function StarRating({ rating, size = 14 }) {
 }
 
 // ─── GHL DATA STATES ───────────────────────────────────────
-function GhlNotConnected({ what }) {
-  const t = useTheme();
-  return (
-    <Card style={{ textAlign: 'center', padding: '40px 24px' }}>
-      <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: t.amberL, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}>
-        <AlertTriangle size={20} color={t.amber} />
-      </div>
-      <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink, marginBottom: '6px' }}>GoHighLevel isn't connected</div>
-      <div style={{ fontSize: '12.5px', color: t.mid, maxWidth: '380px', margin: '0 auto', lineHeight: '1.5' }}>
-        Add <code style={{ background: t.bgRow, padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_GHL_API_KEY</code> and <code style={{ background: t.bgRow, padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_GHL_LOCATION_ID</code> to your <code style={{ background: t.bgRow, padding: '1px 5px', borderRadius: '4px' }}>.env.local</code> to load real {what} here.
-      </div>
-    </Card>
-  );
-}
-
 function LoadingState({ label }) {
   const t = useTheme();
   return (
@@ -658,21 +669,26 @@ function Overview({ setActiveTab }) {
 function Inbox({ contacts }) {
   const t = useTheme();
   const { data, loading, error, refetch } = useGhlFetch(getConversations);
+  const [demoConversations, setDemoConversations] = useState(DEMO_CONVERSATIONS);
   const [drafts, setDrafts] = useState({});
   const [sendingId, setSendingId] = useState(null);
   const [sendError, setSendError] = useState('');
   const [expandedId, setExpandedId] = useState(null);
 
-  if (!isGhlConfigured) return <GhlNotConnected what="conversations" />;
-  if (loading) return <LoadingState label="Loading conversations…" />;
-  if (error) return <ErrorState message={error} onRetry={refetch} />;
+  if (isGhlConfigured && loading) return <LoadingState label="Loading conversations…" />;
+  if (isGhlConfigured && error) return <ErrorState message={error} onRetry={refetch} />;
 
-  const conversations = (data || []).map(mapConversation);
+  const conversations = isGhlConfigured ? (data || []).map(mapConversation) : demoConversations;
   const contactList = contacts || [];
 
   async function handleSend(convo) {
     const text = (drafts[convo.id] || '').trim();
     if (!text) return;
+    if (!isGhlConfigured) {
+      setDemoConversations(cs => cs.map(c => c.id === convo.id ? { ...c, lastMessage: text, time: 'Just now', unread: false } : c));
+      setDrafts(d => ({ ...d, [convo.id]: '' }));
+      return;
+    }
     setSendingId(convo.id);
     setSendError('');
     try {
@@ -692,6 +708,12 @@ function Inbox({ contacts }) {
           <span key={i} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: i === 0 ? 'none' : `1px solid ${t.border}`, background: i === 0 ? t.brand : t.bgCard, color: i === 0 ? 'white' : t.mid }}>{label}</span>
         ))}
       </div>
+
+      {!isGhlConfigured && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <Sparkles size={13} /> Showing demo conversations — connect GoHighLevel to load real messages.
+        </div>
+      )}
 
       {sendError && (
         <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '14px' }}>{sendError}</div>
@@ -945,32 +967,37 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
         <Btn><Upload size={14} /> Import</Btn>
       </div>
 
-      {!isGhlConfigured ? (
-        <GhlNotConnected what="patients" />
-      ) : loading ? (
+      {loading ? (
         <LoadingState label="Loading patients…" />
       ) : error ? (
         <ErrorState message={error} onRetry={onRetry} />
       ) : (
-        <Card>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-            <thead><tr>{['Patient', 'Phone', 'Tag', 'Added', ''].map((h, i) => <th key={i} style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '500', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: `1px solid ${t.border}` }}>{h}</th>)}</tr></thead>
-            <tbody>
-              {filtered.map((p, i) => (
-                <tr key={p.id || i} onClick={() => setSelected(p)} className="px-row" style={{ borderBottom: `1px solid ${t.border2}`, cursor: 'pointer' }}>
-                  <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.email}</div></td>
-                  <td style={{ padding: '11px 13px', color: t.mid }}>{p.phone}</td>
-                  <td style={{ padding: '11px 13px' }}>{p.tag ? <Pill label={p.tag} color={t.brand} bg={t.brandL} /> : <span style={{ color: t.muted }}>—</span>}</td>
-                  <td style={{ padding: '11px 13px', color: t.mid }}>{p.dateAdded}</td>
-                  <td style={{ padding: '11px 13px', textAlign: 'right' }}><Btn small onClick={e => { e.stopPropagation(); setSelected(p); }}>View</Btn></td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: t.muted }}>{list.length === 0 ? 'No patients yet.' : `No patients match "${query}"`}</td></tr>
-              )}
-            </tbody>
-          </table>
-        </Card>
+        <>
+          {!isGhlConfigured && (
+            <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}>
+              <Sparkles size={13} /> Showing demo data — connect GoHighLevel to load your real patients.
+            </div>
+          )}
+          <Card>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead><tr>{['Patient', 'Phone', 'Tag', 'Added', ''].map((h, i) => <th key={i} style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '500', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: `1px solid ${t.border}` }}>{h}</th>)}</tr></thead>
+              <tbody>
+                {filtered.map((p, i) => (
+                  <tr key={p.id || i} onClick={() => setSelected(p)} className="px-row" style={{ borderBottom: `1px solid ${t.border2}`, cursor: 'pointer' }}>
+                    <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.email}</div></td>
+                    <td style={{ padding: '11px 13px', color: t.mid }}>{p.phone}</td>
+                    <td style={{ padding: '11px 13px' }}>{p.tag ? <Pill label={p.tag} color={t.brand} bg={t.brandL} /> : <span style={{ color: t.muted }}>—</span>}</td>
+                    <td style={{ padding: '11px 13px', color: t.mid }}>{p.dateAdded}</td>
+                    <td style={{ padding: '11px 13px', textAlign: 'right' }}><Btn small onClick={e => { e.stopPropagation(); setSelected(p); }}>View</Btn></td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: t.muted }}>{list.length === 0 ? 'No patients yet.' : `No patients match "${query}"`}</td></tr>
+                )}
+              </tbody>
+            </table>
+          </Card>
+        </>
       )}
 
       {selected && (
