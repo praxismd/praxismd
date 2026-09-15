@@ -195,7 +195,12 @@ function App() {
   }, []);
 
   const { data: contactsData, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useGhlFetch(getContacts);
-  const contacts = isGhlConfigured ? (contactsData || []).map(mapContact) : DEMO_CONTACTS;
+  const [demoContacts, setDemoContacts] = useState(DEMO_CONTACTS);
+  const contacts = isGhlConfigured ? (contactsData || []).map(mapContact) : demoContacts;
+
+  function addDemoPatient(patient) {
+    setDemoContacts(cs => [{ id: `p-new-${Date.now()}`, tag: null, dateAdded: new Date().toLocaleDateString(), ...patient }, ...cs]);
+  }
 
   const searchMatches = patientQuery.trim()
     ? contacts.filter(p => p.name.toLowerCase().includes(patientQuery.trim().toLowerCase()))
@@ -378,7 +383,7 @@ function App() {
               )}
             </div>
 
-            <button style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+            <button onClick={() => setActiveTab('campaigns')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
               <Plus size={14} /> New campaign
             </button>
           </div>
@@ -390,7 +395,7 @@ function App() {
           {activeTab === 'inbox' && <Inbox contacts={contacts} />}
           {activeTab === 'campaigns' && <Campaigns />}
           {activeTab === 'recall' && <Recall />}
-          {activeTab === 'patients' && <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} />}
+          {activeTab === 'patients' && <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} />}
           {activeTab === 'billing' && <Billing />}
           {activeTab === 'payments' && <Payments />}
           {activeTab === 'reports' && <Reports />}
@@ -818,10 +823,40 @@ const CAMPAIGNS_DATA = [
   },
 ];
 
+const CAMPAIGN_TYPES = ['Reactivation', 'Recall', 'Review request', 'Custom'];
+const CAMPAIGN_AUDIENCES = ['Inactive 3mo', 'Inactive 6mo', 'All patients', 'Custom tag'];
+const CAMPAIGN_TOUCHES = [3, 5, 7];
+const CAMPAIGN_CHANNELS = ['SMS', 'Email', 'Both'];
+
 function Campaigns() {
   const t = useTheme();
+  const [campaigns, setCampaigns] = useState(CAMPAIGNS_DATA);
   const [selected, setSelected] = useState(null);
-  const colorMap = { brand: t.brand, green: t.green, amber: t.amber, purple: t.purple };
+  const [showForm, setShowForm] = useState(false);
+  const [exported, setExported] = useState(false);
+  const [form, setForm] = useState({ name: '', type: CAMPAIGN_TYPES[0], audience: CAMPAIGN_AUDIENCES[0], touches: CAMPAIGN_TOUCHES[1], channel: CAMPAIGN_CHANNELS[0], message: '' });
+  const colorMap = { brand: t.brand, green: t.green, amber: t.amber, purple: t.purple, muted: t.muted };
+
+  function toggleStatus(name) {
+    setCampaigns(cs => cs.map(c => c.name === name
+      ? (c.pill === 'Live' ? { ...c, pill: 'Paused', pillColor: 'muted' } : { ...c, pill: 'Live', pillColor: 'green' })
+      : c));
+  }
+
+  function launchNow(name) {
+    setCampaigns(cs => cs.map(c => c.name === name ? { ...c, pill: 'Live', pillColor: 'green', prog: 0 } : c));
+  }
+
+  function createCampaign() {
+    if (!form.name.trim()) return;
+    setCampaigns(cs => [{
+      name: form.name.trim(), sub: `${form.audience} · ${form.touches}-touch ${form.channel.toLowerCase()} · ${form.type}`,
+      stats: [], statColors: [], pill: 'Live', pillColor: 'green', prog: 0,
+      sequence: [{ day: 'Day 0', channel: form.channel === 'Both' ? 'SMS' : form.channel, label: form.message.trim() || 'First touch message', status: 'upcoming' }],
+    }, ...cs]);
+    setForm({ name: '', type: CAMPAIGN_TYPES[0], audience: CAMPAIGN_AUDIENCES[0], touches: CAMPAIGN_TOUCHES[1], channel: CAMPAIGN_CHANNELS[0], message: '' });
+    setShowForm(false);
+  }
 
   return (
     <div>
@@ -830,18 +865,64 @@ function Campaigns() {
         <StatCard label="Replies this month" value="47" color={t.amber} accent={t.accentAmber} sub="↑ 20% from last month" />
         <StatCard label="Booked from campaigns" value="14" color={t.green} accent={t.accentGreen} sub="$8,400 revenue recovered" />
       </div>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-        <Btn primary><Plus size={14} /> New campaign</Btn>
-        <Btn><Download size={14} /> Export</Btn>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
+        <Btn primary onClick={() => setShowForm(s => !s)}><Plus size={14} /> New campaign</Btn>
+        <Btn onClick={() => { setExported(true); setTimeout(() => setExported(false), 2200); }}>{exported ? <Check size={14} /> : <Download size={14} />} {exported ? 'Exported' : 'Export'}</Btn>
       </div>
-      {CAMPAIGNS_DATA.map((c, i) => (
+
+      {showForm && (
+        <Card className="px-expand" style={{ marginBottom: '14px' }}>
+          <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>New campaign</div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Campaign name</label>
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Spring cleaning push" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+                {CAMPAIGN_TYPES.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Audience</label>
+              <select value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+                {CAMPAIGN_AUDIENCES.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Touches</label>
+              <select value={form.touches} onChange={e => setForm(f => ({ ...f, touches: Number(e.target.value) }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+                {CAMPAIGN_TOUCHES.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Channel</label>
+              <select value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+                {CAMPAIGN_CHANNELS.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+          </div>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>First message ({form.message.length}/160)</label>
+            <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value.slice(0, 160) }))} rows={3} placeholder="Hi {'{'}first_name{'}'}, ..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn primary onClick={createCampaign}>Create campaign</Btn>
+            <Btn onClick={() => setShowForm(false)}>Cancel</Btn>
+          </div>
+        </Card>
+      )}
+
+      {campaigns.map((c, i) => (
         <Card key={i} className="px-card" style={{ marginBottom: '12px', cursor: 'pointer' }} onClick={() => setSelected(c)}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div><div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{c.name}</div><div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{c.sub}</div></div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <Pill label={c.pill} color={colorMap[c.pillColor]} bg={withAlpha(colorMap[c.pillColor], .12)} />
-              {c.pill === 'Live' && <Btn small onClick={e => e.stopPropagation()}>Pause</Btn>}
-              {c.pill === 'Queued' && <Btn small onClick={e => e.stopPropagation()}>Launch now</Btn>}
+              <Pill label={c.pill} color={colorMap[c.pillColor] || t.muted} bg={c.pillColor ? withAlpha(colorMap[c.pillColor], .12) : t.bgRow} />
+              {c.pill === 'Live' && <Btn small onClick={e => { e.stopPropagation(); toggleStatus(c.name); }}>Pause</Btn>}
+              {c.pill === 'Paused' && <Btn small onClick={e => { e.stopPropagation(); toggleStatus(c.name); }}>Resume</Btn>}
+              {c.pill === 'Queued' && <Btn small onClick={e => { e.stopPropagation(); launchNow(c.name); }}>Launch now</Btn>}
             </div>
           </div>
           {c.stats.length > 0 && (
@@ -968,8 +1049,19 @@ function PatientRequests() {
   );
 }
 
+const OVERDUE_PATIENTS = [
+  { id: 'op1', ini: 'RP', bg: 'redL', c: 'red', name: 'Robert Park', sub: 'Last visit Jan 12 · 8 months overdue' },
+  { id: 'op2', ini: 'JL', bg: 'amberL', c: 'amber', name: 'James Lee', sub: 'Last visit Aug 20 · 1 month overdue' },
+  { id: 'op3', ini: 'MC', bg: 'redL', c: 'red', name: 'Maria Chen', sub: 'Last visit Mar 5 · 6 months overdue' },
+];
+
 function Recall() {
   const t = useTheme();
+  const bgMap = { redL: t.redL, amberL: t.amberL };
+  const colorMap = { red: t.red, amber: t.amber };
+  const [sent, setSent] = useState({});
+  const [bulkSent, setBulkSent] = useState(false);
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
@@ -994,17 +1086,16 @@ function Recall() {
         </Card>
         <Card>
           <CardTitle>Overdue patients — action needed</CardTitle>
-          {[['RP', t.redL, t.red, 'Robert Park', 'Last visit Jan 12 · 8 months overdue'],
-            ['JL', t.amberL, t.amber, 'James Lee', 'Last visit Aug 20 · 1 month overdue'],
-            ['MC', t.redL, t.red, 'Maria Chen', 'Last visit Mar 5 · 6 months overdue'],
-          ].map(([ini, bg, c, name, sub], i) => (
-            <RowItem key={i} style={{ background: bg, borderColor: withAlpha(t.accentRed, .15) }}>
-              <Ava initials={ini} bg={bg} color={c} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
-              <Btn small>Send recall</Btn>
+          {OVERDUE_PATIENTS.map(p => (
+            <RowItem key={p.id} style={{ background: bgMap[p.bg], borderColor: withAlpha(t.accentRed, .15) }}>
+              <Ava initials={p.ini} bg={bgMap[p.bg]} color={colorMap[p.c]} />
+              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{p.sub}</div></div>
+              {sent[p.id] ? <Pill label="Sent" color={t.green} bg={t.greenL} /> : <Btn small onClick={() => setSent(s => ({ ...s, [p.id]: true }))}>Send recall</Btn>}
             </RowItem>
           ))}
-          <Btn primary style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }}><Send size={14} /> Send bulk recall to all 89 patients</Btn>
+          <Btn primary style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }} onClick={() => setBulkSent(true)} disabled={bulkSent}>
+            {bulkSent ? <Check size={14} /> : <Send size={14} />} {bulkSent ? 'Bulk recall sent to all 89 patients' : 'Send bulk recall to all 89 patients'}
+          </Btn>
         </Card>
       </div>
     </div>
@@ -1012,7 +1103,7 @@ function Recall() {
 }
 
 // ─── PATIENTS ──────────────────────────────────────────────
-function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
+function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onAddPatient }) {
   const t = useTheme();
   const q = query.trim().toLowerCase();
   const list = contacts || [];
@@ -1020,6 +1111,25 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
   const [selected, setSelected] = useState(null);
   const [sortKey, setSortKey] = useState(null); // 'name' | 'tag' | 'dateAdded'
   const [sortDir, setSortDir] = useState('asc');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [notice, setNotice] = useState('');
+
+  function handleAddClick() {
+    if (!onAddPatient) {
+      setNotice("Adding patients writes to GoHighLevel — that's not wired up in this scaffold yet.");
+      return;
+    }
+    setShowAddForm(s => !s);
+  }
+
+  function submitNewPatient() {
+    if (!newName.trim()) return;
+    onAddPatient({ name: newName.trim(), email: newEmail.trim() || '—', phone: newPhone.trim() || '—' });
+    setNewName(''); setNewEmail(''); setNewPhone(''); setShowAddForm(false);
+  }
 
   function toggleSort(key) {
     if (sortKey === key) {
@@ -1061,9 +1171,28 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
             style={{ width: '100%', padding: '9px 14px 9px 36px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
           />
         </div>
-        <Btn primary><Plus size={14} /> Add patient</Btn>
-        <Btn><Upload size={14} /> Import</Btn>
+        <Btn primary onClick={handleAddClick}><Plus size={14} /> Add patient</Btn>
+        <Btn onClick={() => setNotice("Bulk import isn't wired up in this scaffold yet.")}><Upload size={14} /> Import</Btn>
       </div>
+
+      {notice && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{notice}</div>
+      )}
+
+      {showAddForm && (
+        <Card className="px-expand" style={{ marginBottom: '14px' }}>
+          <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>Add a patient</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full name" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Phone" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn primary onClick={submitNewPatient}>Add patient</Btn>
+            <Btn onClick={() => setShowAddForm(false)}>Cancel</Btn>
+          </div>
+        </Card>
+      )}
 
       {loading ? (
         <LoadingState label="Loading patients…" />
@@ -1148,8 +1277,22 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
 }
 
 // ─── BILLING ───────────────────────────────────────────────
+const CLAIMS_DATA = [
+  { id: 'cl1', name: 'Sarah Martinez', code: 'D1110 · Prophylaxis · Delta Dental · ERA auto-posted', amount: '$180', status: 'Paid', color: 'green', bg: 'greenL' },
+  { id: 'cl2', name: 'James Lee', code: 'D2740 · Crown · Aetna · Submitted 3 days ago', amount: '$1,200', status: 'Pending', color: 'amber', bg: 'amberL' },
+  { id: 'cl3', name: 'Robert Park', code: 'D7210 · Extraction · UnitedHealth · Denied: Missing info', amount: '$320', status: 'Denied', color: 'red', bg: 'redL' },
+];
+
 function Billing() {
   const t = useTheme();
+  const colorMap = { green: t.green, amber: t.amber, red: t.red };
+  const bgMap = { greenL: t.greenL, amberL: t.amberL, redL: t.redL };
+  const [claims, setClaims] = useState(CLAIMS_DATA);
+
+  function resubmit(id) {
+    setClaims(cs => cs.map(c => c.id === id ? { ...c, status: 'Pending', color: 'amber', bg: 'amberL' } : c));
+  }
+
   return (
     <div>
       <div style={{ padding: '11px 15px', background: t.purpleL, borderRadius: '10px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${withAlpha(t.purple, .15)}` }}>
@@ -1163,16 +1306,12 @@ function Billing() {
       </div>
       <Card>
         <CardTitle>Recent claims</CardTitle>
-        {[
-          { name: 'Sarah Martinez', code: 'D1110 · Prophylaxis · Delta Dental · ERA auto-posted', amount: '$180', status: 'Paid', color: t.green, bg: t.greenL },
-          { name: 'James Lee', code: 'D2740 · Crown · Aetna · Submitted 3 days ago', amount: '$1,200', status: 'Pending', color: t.amber, bg: t.amberL },
-          { name: 'Robert Park', code: 'D7210 · Extraction · UnitedHealth · Denied: Missing info', amount: '$320', status: 'Denied', color: t.red, bg: t.redL },
-        ].map((c, i) => (
-          <div key={i} className="px-row" style={{ padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: c.bg, border: `1px solid ${c.color}22`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {claims.map(c => (
+          <div key={c.id} className="px-row" style={{ padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: bgMap[c.bg], border: `1px solid ${colorMap[c.color]}22`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{c.name}</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{c.code}</div></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '14px', fontWeight: '600', color: c.color }}>{c.amount}</span>
-              {c.status === 'Denied' ? <Btn small style={{ color: c.color, borderColor: c.color }}><RotateCw size={12} /> Resubmit</Btn> : <Pill label={c.status} color={c.color} bg={c.bg} />}
+              <span style={{ fontSize: '14px', fontWeight: '600', color: colorMap[c.color] }}>{c.amount}</span>
+              {c.status === 'Denied' ? <Btn small style={{ color: colorMap[c.color], borderColor: colorMap[c.color] }} onClick={() => resubmit(c.id)}><RotateCw size={12} /> Resubmit</Btn> : <Pill label={c.status} color={colorMap[c.color]} bg={bgMap[c.bg]} />}
             </div>
           </div>
         ))}
@@ -1311,8 +1450,32 @@ function AIFrontDesk() {
 }
 
 // ─── REVIEWS ───────────────────────────────────────────────
+const REVIEWS_DATA = [
+  { id: 'rv1', rating: 5, text: '"Dr. Rivera and the team are absolutely wonderful. The automated reminder texts are so convenient!"', author: '— Sarah M. · 2 days ago · Google', negative: false },
+  { id: 'rv2', rating: 3, text: '"Good dentist but the wait time was a bit long. Would appreciate better scheduling."', author: '— Anonymous · 1 week ago · Google', negative: true },
+];
+
 function Reviews() {
   const t = useTheme();
+  const [openId, setOpenId] = useState(null);
+  const [drafts, setDrafts] = useState({});
+  const [replied, setReplied] = useState({});
+  const [aiDrafting, setAiDrafting] = useState(null);
+
+  function draftWithAi(r) {
+    setAiDrafting(r.id);
+    setTimeout(() => {
+      setDrafts(d => ({ ...d, [r.id]: "Thank you for the feedback — we're sorry your wait ran long and are working on tightening up scheduling. We'd love the chance to give you a smoother visit next time." }));
+      setAiDrafting(null);
+    }, 600);
+  }
+
+  function send(r) {
+    if (!(drafts[r.id] || '').trim()) return;
+    setReplied(rp => ({ ...rp, [r.id]: true }));
+    setOpenId(null);
+  }
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
@@ -1322,18 +1485,35 @@ function Reviews() {
       </div>
       <Card>
         <CardTitle>Recent reviews</CardTitle>
-        {[
-          { rating: 5, text: '"Dr. Rivera and the team are absolutely wonderful. The automated reminder texts are so convenient!"', author: '— Sarah M. · 2 days ago · Google', negative: false },
-          { rating: 3, text: '"Good dentist but the wait time was a bit long. Would appreciate better scheduling."', author: '— Anonymous · 1 week ago · Google', negative: true },
-        ].map((r, i) => (
-          <div key={i} className="px-row" style={{ padding: '14px', borderRadius: '10px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.negative ? t.accentRed : t.accentAmber}` }}>
+        {REVIEWS_DATA.map(r => (
+          <div key={r.id} className="px-row" style={{ padding: '14px', borderRadius: '10px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.negative ? t.accentRed : t.accentAmber}` }}>
             <div style={{ marginBottom: '5px' }}><StarRating rating={r.rating} /></div>
             <div style={{ fontSize: '12.5px', color: t.mid, lineHeight: '1.6' }}>{r.text}</div>
             <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '7px' }}>{r.author}</div>
-            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-              {r.negative && <Btn small primary><Bot size={13} /> AI draft response</Btn>}
-              <Btn small>Reply</Btn>
-            </div>
+            {replied[r.id] ? (
+              <div style={{ marginTop: '8px' }}><Pill label="Replied" color={t.green} bg={t.greenL} /></div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                  {r.negative && (
+                    <Btn small primary onClick={() => { setOpenId(r.id); draftWithAi(r); }} disabled={aiDrafting === r.id}>
+                      {aiDrafting === r.id ? <Loader2 size={13} className="px-spin" /> : <Bot size={13} />} AI draft response
+                    </Btn>
+                  )}
+                  <Btn small onClick={() => setOpenId(id => (id === r.id ? null : r.id))}>Reply</Btn>
+                </div>
+                {openId === r.id && (
+                  <div className="px-expand" style={{ marginTop: '10px' }}>
+                    <textarea
+                      value={drafts[r.id] || ''} onChange={e => setDrafts(d => ({ ...d, [r.id]: e.target.value }))}
+                      placeholder="Write a reply…" rows={3}
+                      style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '8px' }}
+                    />
+                    <Btn small primary onClick={() => send(r)}><Send size={12} /> Send reply</Btn>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         ))}
       </Card>
@@ -1936,17 +2116,32 @@ function Reports() {
 }
 
 // ─── SETTINGS ──────────────────────────────────────────────
+const INTEGRATIONS = [
+  { id: 'ghl', name: 'GoHighLevel', sub: 'CRM and automation', connected: true, envVars: ['REACT_APP_GHL_API_KEY', 'REACT_APP_GHL_LOCATION_ID'] },
+  { id: 'oa', name: 'Office Ally', sub: 'Clearinghouse · billing', connected: true },
+  { id: 'stripe', name: 'Stripe', sub: 'Payment processing', connected: true, envVars: ['REACT_APP_STRIPE_PUBLISHABLE_KEY'] },
+  { id: 'gb', name: 'Google Business', sub: 'Reviews and reputation', connected: false },
+  { id: 'dentrix', name: 'Dentrix', sub: 'Practice management sync', connected: false },
+  { id: 'eaglesoft', name: 'Eaglesoft', sub: 'Practice management sync', connected: false },
+  { id: 'availity', name: 'Availity', sub: 'Eligibility verification', connected: false },
+];
+
 function Settings() {
   const t = useTheme();
-  const integrations = [
-    ['GoHighLevel', 'CRM and automation', true],
-    ['Office Ally', 'Clearinghouse · billing', true],
-    ['Stripe', 'Payment processing', true],
-    ['Google Business', 'Reviews and reputation', false],
-    ['Dentrix', 'Practice management sync', false],
-    ['Eaglesoft', 'Practice management sync', false],
-    ['Availity', 'Eligibility verification', false],
-  ];
+  const [saved, setSaved] = useState(false);
+  const [connectNotice, setConnectNotice] = useState('');
+
+  function saveChanges() {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2200);
+  }
+
+  function connect(item) {
+    setConnectNotice(item.envVars
+      ? `Add ${item.envVars.join(' and ')} to your .env.local to connect ${item.name}.`
+      : `${item.name} isn't wired up yet — this is a bare-bones scaffold for now.`);
+  }
+
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
       <Card>
@@ -1957,16 +2152,19 @@ function Settings() {
             <input defaultValue={val} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }} />
           </div>
         ))}
-        <Btn primary>Save changes</Btn>
+        <Btn primary onClick={saveChanges}>{saved ? <Check size={14} /> : null}{saved ? 'Saved' : 'Save changes'}</Btn>
       </Card>
       <Card>
         <CardTitle>Integrations</CardTitle>
-        {integrations.map(([name, sub, connected], i) => (
-          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', borderWidth: '1px', borderStyle: 'solid', background: connected ? t.greenL : t.bgRow, borderColor: connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
-            <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
-            {connected ? <Pill label="Connected" color={t.green} bg={t.greenL} /> : <Btn small>Connect</Btn>}
+        {INTEGRATIONS.map(item => (
+          <div key={item.id} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', borderWidth: '1px', borderStyle: 'solid', background: item.connected ? t.greenL : t.bgRow, borderColor: item.connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
+            <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{item.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{item.sub}</div></div>
+            {item.connected ? <Pill label="Connected" color={t.green} bg={t.greenL} /> : <Btn small onClick={() => connect(item)}>Connect</Btn>}
           </div>
         ))}
+        {connectNotice && (
+          <div style={{ marginTop: '8px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{connectNotice}</div>
+        )}
       </Card>
     </div>
   );
