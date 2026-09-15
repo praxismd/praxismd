@@ -8,8 +8,9 @@ import {
   LayoutDashboard, Inbox as InboxIcon, Megaphone, RotateCcw, Calendar as CalendarIcon,
   ClipboardList, Users, Contact, Shield, Star, Smile, Bot, Receipt, CreditCard,
   TrendingUp, Settings as SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
-  ChevronRight, Phone, Hand, Zap, CalendarPlus, Sparkles, LogOut,
+  ChevronRight, ChevronDown, Phone, Hand, Zap, CalendarPlus, Sparkles, LogOut,
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
+  X, ArrowUp, ArrowDown,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -202,6 +203,12 @@ function App() {
       input:focus, select:focus { outline: 2px solid ${withAlpha(t.teal, .35)}; }
       @keyframes pxSpin { to { transform: rotate(360deg); } }
       .px-spin { animation: pxSpin .7s linear infinite; }
+      @keyframes pxSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+      @keyframes pxFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      .px-panel-backdrop { animation: pxFadeIn .15s ease; }
+      .px-panel { animation: pxSlideIn .2s ease; }
+      @keyframes pxExpand { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+      .px-expand { animation: pxExpand .15s ease; }
     `}</style>
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
 
@@ -352,7 +359,7 @@ function App() {
         {/* PAGE CONTENT */}
         <div key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
           {activeTab === 'overview' && <Overview setActiveTab={setActiveTab} />}
-          {activeTab === 'inbox' && <Inbox />}
+          {activeTab === 'inbox' && <Inbox contacts={contacts} />}
           {activeTab === 'campaigns' && <Campaigns />}
           {activeTab === 'recall' && <Recall />}
           {activeTab === 'patients' && <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} />}
@@ -444,9 +451,9 @@ function StatCard({ label, value, color, accent, sub, icon: ValueIcon }) {
   );
 }
 
-function Card({ children, style }) {
+function Card({ children, style, onClick, className }) {
   const t = useTheme();
-  return <div className="px-card" style={{ background: t.bgCard, borderRadius: '14px', padding: '18px 20px', border: `1px solid ${t.border}`, ...style }}>{children}</div>;
+  return <div className={className ? `px-card ${className}` : 'px-card'} onClick={onClick} style={{ background: t.bgCard, borderRadius: '14px', padding: '18px 20px', border: `1px solid ${t.border}`, ...style }}>{children}</div>;
 }
 
 function CardTitle({ children }) {
@@ -522,6 +529,37 @@ function ErrorState({ message, onRetry }) {
       <div style={{ fontSize: '12.5px', color: t.mid, marginBottom: '16px' }}>{message}</div>
       {onRetry && <Btn small onClick={onRetry}>Try again</Btn>}
     </Card>
+  );
+}
+
+function SlidePanel({ title, subtitle, onClose, children }) {
+  const t = useTheme();
+  return (
+    <>
+      <div onClick={onClose} className="px-panel-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 200 }} />
+      <div className="px-panel" style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: '420px', maxWidth: '92vw', background: t.bgCard, borderLeft: `1px solid ${t.border}`, boxShadow: '-8px 0 30px rgba(0,0,0,.18)', zIndex: 201, overflowY: 'auto' }}>
+        <div style={{ padding: '18px 20px', borderBottom: `1px solid ${t.border2}`, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'sticky', top: 0, background: t.bgCard }}>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
+            {subtitle && <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{subtitle}</div>}
+          </div>
+          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px', flexShrink: 0 }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ padding: '20px' }}>{children}</div>
+      </div>
+    </>
+  );
+}
+
+function DetailRow({ label, value }) {
+  const t = useTheme();
+  return (
+    <div style={{ marginBottom: '14px' }}>
+      <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '3px' }}>{label}</div>
+      <div style={{ fontSize: '13.5px', color: t.ink2 }}>{value || '—'}</div>
+    </div>
   );
 }
 
@@ -616,18 +654,20 @@ function Overview({ setActiveTab }) {
 }
 
 // ─── INBOX ─────────────────────────────────────────────────
-function Inbox() {
+function Inbox({ contacts }) {
   const t = useTheme();
   const { data, loading, error, refetch } = useGhlFetch(getConversations);
   const [drafts, setDrafts] = useState({});
   const [sendingId, setSendingId] = useState(null);
   const [sendError, setSendError] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
 
   if (!isGhlConfigured) return <GhlNotConnected what="conversations" />;
   if (loading) return <LoadingState label="Loading conversations…" />;
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
   const conversations = (data || []).map(mapConversation);
+  const contactList = contacts || [];
 
   async function handleSend(convo) {
     const text = (drafts[convo.id] || '').trim();
@@ -662,28 +702,52 @@ function Inbox() {
 
       {conversations.map((m, i) => {
         const [color, bg] = avatarStyle(t, i);
+        const isExpanded = expandedId === m.id;
+        const matchedContact = contactList.find(c => c.id === m.contactId);
         return (
           <div key={m.id} className="px-card" style={{ background: t.bgCard, borderRadius: '14px', padding: '16px 18px', border: `1px solid ${t.border}`, marginBottom: '10px', borderLeft: `4px solid ${m.unread ? t.accentBlue : t.border}` }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div onClick={() => setExpandedId(isExpanded ? null : m.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', cursor: 'pointer' }}>
               <div style={{ display: 'flex', gap: '11px', alignItems: 'center' }}>
                 <Ava initials={initialsOf(m.name)} bg={bg} color={color} />
                 <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{m.time}</div></div>
               </div>
-              {m.unread && <Pill label="Unread" color={t.brand} bg={t.brandL} />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {m.unread && <Pill label="Unread" color={t.brand} bg={t.brandL} />}
+                <ChevronDown size={16} color={t.muted} style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }} />
+              </div>
             </div>
-            <div style={{ fontSize: '13px', color: t.ink2, padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '10px' }}>{m.lastMessage}</div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <input
-                value={drafts[m.id] || ''}
-                onChange={e => setDrafts(d => ({ ...d, [m.id]: e.target.value }))}
-                onKeyDown={e => { if (e.key === 'Enter') handleSend(m); }}
-                placeholder="Type a reply…"
-                style={{ flex: 1, padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}
-              />
-              <Btn small primary onClick={() => handleSend(m)} disabled={sendingId === m.id}>
-                {sendingId === m.id ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} Send
-              </Btn>
-            </div>
+            <div style={{ fontSize: '13px', color: t.ink2, padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: isExpanded ? '10px' : 0, whiteSpace: isExpanded ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.lastMessage}</div>
+
+            {isExpanded && (
+              <div className="px-expand">
+                {matchedContact ? (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                    <div style={{ padding: '9px 11px', background: t.bgRow, borderRadius: '8px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: '600', color: t.muted, textTransform: 'uppercase' }}>Phone</div>
+                      <div style={{ fontSize: '12.5px', color: t.ink2, marginTop: '2px' }}>{matchedContact.phone}</div>
+                    </div>
+                    <div style={{ padding: '9px 11px', background: t.bgRow, borderRadius: '8px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: '600', color: t.muted, textTransform: 'uppercase' }}>Tag</div>
+                      <div style={{ fontSize: '12.5px', color: t.ink2, marginTop: '2px' }}>{matchedContact.tag || '—'}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '12px' }}>No matching contact record found.</div>
+                )}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <input
+                    value={drafts[m.id] || ''}
+                    onChange={e => setDrafts(d => ({ ...d, [m.id]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSend(m); }}
+                    placeholder="Type a reply…"
+                    style={{ flex: 1, padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}
+                  />
+                  <Btn small primary onClick={() => handleSend(m)} disabled={sendingId === m.id}>
+                    {sendingId === m.id ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} Send
+                  </Btn>
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
@@ -692,8 +756,49 @@ function Inbox() {
 }
 
 // ─── CAMPAIGNS ─────────────────────────────────────────────
+const CAMPAIGNS_DATA = [
+  {
+    name: '6-month reactivation sequence', sub: '142 patients · 7-touch email + SMS · Touch 3 of 7',
+    stats: [['Open rate', '34%'], ['Reply rate', '18%'], ['Booked', '9'], ['Revenue', '$5,400'], ['Cost/booking', '$35']],
+    statColors: ['brand', 'brand', 'green', 'green', 'purple'],
+    pill: 'Live', pillColor: 'green', prog: 43,
+    sequence: [
+      { day: 'Day 0', channel: 'Email', label: 'Welcome back — we miss you!', status: 'sent', metric: '38% opened' },
+      { day: 'Day 3', channel: 'SMS', label: '"Still thinking about your next cleaning?"', status: 'sent', metric: '61% replied' },
+      { day: 'Day 14', channel: 'Email', label: 'Special offer: $25 off your next visit', status: 'sent', metric: '29% opened' },
+      { day: 'Day 30', channel: 'SMS', label: '"We have openings this week — want one?"', status: 'upcoming' },
+      { day: 'Day 60', channel: 'Email', label: 'Your smile called, it wants a checkup', status: 'upcoming' },
+      { day: 'Day 90', channel: 'SMS', label: '"Last chance — book before fall is booked up"', status: 'upcoming' },
+      { day: 'Day 180', channel: 'Email', label: 'Final reactivation offer', status: 'upcoming' },
+    ],
+  },
+  {
+    name: 'Post-visit review request', sub: 'Auto-sends 24hrs after every completed appointment',
+    stats: [['Sent this month', '28'], ['Clicked', '19'], ['Reviews left', '6'], ['Avg rating', '4.8']],
+    statColors: ['brand', 'brand', 'green', 'amber'],
+    pill: 'Auto', pillColor: 'brand', prog: null,
+    sequence: [
+      { day: '+24 hrs', channel: 'SMS', label: '"How was your visit today? Leave us a review!"', status: 'sent', metric: '68% clicked' },
+      { day: '+5 days', channel: 'Email', label: 'Reminder — a review means a lot to us', status: 'sent', metric: '22% opened', condition: 'only if no review left' },
+    ],
+  },
+  {
+    name: 'Annual checkup reminder', sub: '89 patients · 3-touch SMS · Scheduled September 20',
+    stats: [], statColors: [],
+    pill: 'Queued', pillColor: 'amber', prog: null,
+    sequence: [
+      { day: 'Day 0', channel: 'SMS', label: '"It\'s been a year — time for your checkup!"', status: 'upcoming' },
+      { day: 'Day 7', channel: 'SMS', label: '"Still able to book you in this month"', status: 'upcoming' },
+      { day: 'Day 14', channel: 'Email', label: 'Last reminder — book your annual visit', status: 'upcoming' },
+    ],
+  },
+];
+
 function Campaigns() {
   const t = useTheme();
+  const [selected, setSelected] = useState(null);
+  const colorMap = { brand: t.brand, green: t.green, amber: t.amber, purple: t.purple };
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
@@ -705,22 +810,22 @@ function Campaigns() {
         <Btn primary><Plus size={14} /> New campaign</Btn>
         <Btn><Download size={14} /> Export</Btn>
       </div>
-      {[
-        { name: '6-month reactivation sequence', sub: '142 patients · 7-touch email + SMS · Touch 3 of 7', stats: [['Open rate', '34%', t.brand], ['Reply rate', '18%', t.brand], ['Booked', '9', t.green], ['Revenue', '$5,400', t.green], ['Cost/booking', '$35', t.purple]], pill: 'Live', pillColor: t.green, pillBg: t.greenL, prog: 43 },
-        { name: 'Post-visit review request', sub: 'Auto-sends 24hrs after every completed appointment', stats: [['Sent this month', '28', t.brand], ['Clicked', '19', t.brand], ['Reviews left', '6', t.green], ['Avg rating', '4.8', t.amber]], pill: 'Auto', pillColor: t.brand, pillBg: t.brandL, prog: null },
-        { name: 'Annual checkup reminder', sub: '89 patients · 3-touch SMS · Scheduled September 20', stats: [], pill: 'Queued', pillColor: t.amber, pillBg: t.amberL, prog: null },
-      ].map((c, i) => (
-        <Card key={i} style={{ marginBottom: '12px' }}>
+      {CAMPAIGNS_DATA.map((c, i) => (
+        <Card key={i} className="px-card" style={{ marginBottom: '12px', cursor: 'pointer' }} onClick={() => setSelected(c)}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div><div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{c.name}</div><div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{c.sub}</div></div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}><Pill label={c.pill} color={c.pillColor} bg={c.pillBg} />{c.pill === 'Live' && <Btn small>Pause</Btn>}{c.pill === 'Queued' && <Btn small>Launch now</Btn>}</div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Pill label={c.pill} color={colorMap[c.pillColor]} bg={withAlpha(colorMap[c.pillColor], .12)} />
+              {c.pill === 'Live' && <Btn small onClick={e => e.stopPropagation()}>Pause</Btn>}
+              {c.pill === 'Queued' && <Btn small onClick={e => e.stopPropagation()}>Launch now</Btn>}
+            </div>
           </div>
           {c.stats.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c.stats.length},1fr)`, gap: '10px', marginBottom: c.prog ? '10px' : '0' }}>
-              {c.stats.map(([label, val, color], j) => (
+              {c.stats.map(([label, val], j) => (
                 <div key={j} className="px-row" style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '10px', border: `1px solid ${t.border2}` }}>
                   <div style={{ fontSize: '11px', color: t.muted }}>{label}</div>
-                  <div style={{ fontSize: '16px', fontWeight: '600', color }}>{val}</div>
+                  <div style={{ fontSize: '16px', fontWeight: '600', color: colorMap[c.statColors[j]] }}>{val}</div>
                 </div>
               ))}
             </div>
@@ -729,6 +834,45 @@ function Campaigns() {
           {c.pill === 'Queued' && <div style={{ padding: '10px 12px', background: t.amberL, borderRadius: '10px', fontSize: '12px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, marginTop: '8px', display: 'flex', alignItems: 'center', gap: '7px' }}><Clock size={13} /> Scheduled in 7 days · 89 patients receive first touch September 20</div>}
         </Card>
       ))}
+
+      {selected && (
+        <SlidePanel title={selected.name} subtitle={selected.sub} onClose={() => setSelected(null)}>
+          {selected.stats.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(selected.stats.length, 3)},1fr)`, gap: '8px', marginBottom: '20px' }}>
+              {selected.stats.map(([label, val], j) => (
+                <div key={j} style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '10px', border: `1px solid ${t.border2}` }}>
+                  <div style={{ fontSize: '10px', color: t.muted }}>{label}</div>
+                  <div style={{ fontSize: '15px', fontWeight: '600', color: colorMap[selected.statColors[j]] }}>{val}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '12px' }}>TOUCH-BY-TOUCH SEQUENCE</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {selected.sequence.map((touch, i) => (
+              <div key={i} style={{ display: 'flex', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                  <div style={{
+                    width: '26px', height: '26px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: touch.status === 'sent' ? t.green : t.bgRow, color: touch.status === 'sent' ? 'white' : t.muted,
+                    border: touch.status === 'sent' ? 'none' : `1px solid ${t.border}`, fontSize: '11px', fontWeight: '700', flexShrink: 0,
+                  }}>{i + 1}</div>
+                  {i < selected.sequence.length - 1 && <div style={{ width: '2px', flex: 1, minHeight: '18px', background: touch.status === 'sent' ? t.green : t.border }} />}
+                </div>
+                <div style={{ paddingBottom: '16px', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: '600', color: t.ink2 }}>{touch.day}</span>
+                    <span style={{ fontSize: '10.5px', color: t.muted }}>· {touch.channel}</span>
+                    {touch.status === 'sent' ? <Pill label="Sent" color={t.green} bg={t.greenL} /> : <Pill label="Upcoming" color={t.muted} bg={t.bgRow} />}
+                  </div>
+                  <div style={{ fontSize: '12.5px', color: t.mid }}>{touch.label}</div>
+                  {touch.metric && <div style={{ fontSize: '11px', color: t.green, marginTop: '3px', fontWeight: '500' }}>{touch.metric}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </SlidePanel>
+      )}
     </div>
   );
 }
@@ -782,6 +926,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
   const q = query.trim().toLowerCase();
   const list = contacts || [];
   const filtered = q ? list.filter(p => p.name.toLowerCase().includes(q)) : list;
+  const [selected, setSelected] = useState(null);
 
   return (
     <div>
@@ -811,12 +956,12 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
             <thead><tr>{['Patient', 'Phone', 'Tag', 'Added', ''].map((h, i) => <th key={i} style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '500', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: `1px solid ${t.border}` }}>{h}</th>)}</tr></thead>
             <tbody>
               {filtered.map((p, i) => (
-                <tr key={p.id || i} className="px-row" style={{ borderBottom: `1px solid ${t.border2}` }}>
+                <tr key={p.id || i} onClick={() => setSelected(p)} className="px-row" style={{ borderBottom: `1px solid ${t.border2}`, cursor: 'pointer' }}>
                   <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.email}</div></td>
                   <td style={{ padding: '11px 13px', color: t.mid }}>{p.phone}</td>
                   <td style={{ padding: '11px 13px' }}>{p.tag ? <Pill label={p.tag} color={t.brand} bg={t.brandL} /> : <span style={{ color: t.muted }}>—</span>}</td>
                   <td style={{ padding: '11px 13px', color: t.mid }}>{p.dateAdded}</td>
-                  <td style={{ padding: '11px 13px', textAlign: 'right' }}><Btn small>View</Btn></td>
+                  <td style={{ padding: '11px 13px', textAlign: 'right' }}><Btn small onClick={e => { e.stopPropagation(); setSelected(p); }}>View</Btn></td>
                 </tr>
               ))}
               {filtered.length === 0 && (
@@ -825,6 +970,31 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
             </tbody>
           </table>
         </Card>
+      )}
+
+      {selected && (
+        <SlidePanel title={selected.name} subtitle={selected.tag || 'Patient'} onClose={() => setSelected(null)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
+            <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: t.brandL, color: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', fontWeight: '700' }}>{initialsOf(selected.name)}</div>
+            <div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: t.ink }}>{selected.name}</div>
+              {selected.tag && <div style={{ marginTop: '4px' }}><Pill label={selected.tag} color={t.brand} bg={t.brandL} /></div>}
+            </div>
+          </div>
+          <DetailRow label="Email" value={selected.email} />
+          <DetailRow label="Phone" value={selected.phone} />
+          <DetailRow label="Patient since" value={selected.dateAdded} />
+          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>APPOINTMENT HISTORY</div>
+            <div style={{ padding: '16px', background: t.bgRow, borderRadius: '10px', fontSize: '12.5px', color: t.muted, textAlign: 'center' }}>
+              Connect the calendar sync to see this patient's visit history here.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', marginTop: '22px' }}>
+            <Btn primary style={{ flex: 1, justifyContent: 'center' }}>Message</Btn>
+            <Btn style={{ flex: 1, justifyContent: 'center' }}>Schedule</Btn>
+          </div>
+        </SlidePanel>
       )}
     </div>
   );
@@ -1100,29 +1270,82 @@ function Portal() {
 }
 
 // ─── WAITLIST ──────────────────────────────────────────────
+const WAITLIST_SEED = [
+  { id: 'w1', ini: 'MC', bg: 'brandL', c: 'brand', name: 'Maria Chen', service: 'Cleaning', pref: 'Any time this week', phone: '(555) 201-4482', waitingSince: 'Sep 9', notes: 'Prefers Dr. Alvarez. Flexible on days.' },
+  { id: 'w2', ini: 'DW', bg: 'amberL', c: 'amber', name: 'David Wong', service: 'Cleaning', pref: 'Mornings preferred', phone: '(555) 774-1190', waitingSince: 'Sep 10', notes: 'Cannot do Fridays. Works near the office.' },
+  { id: 'w3', ini: 'SK', bg: 'greenL', c: 'green', name: 'Sam Kim', service: 'Exam', pref: 'Afternoons only', phone: '(555) 330-8827', waitingSince: 'Sep 11', notes: 'New patient intake still needs to be finished.' },
+  { id: 'w4', ini: 'PP', bg: 'purpleL', c: 'purple', name: 'Priya Patel', service: 'Whitening', pref: 'Weekends preferred', phone: '(555) 662-0093', waitingSince: 'Sep 12', notes: 'Asked to be notified by text only.' },
+];
+
 function Waitlist() {
   const t = useTheme();
+  const [list, setList] = useState(WAITLIST_SEED);
+  const [expandedId, setExpandedId] = useState(null);
+  const colorMap = { brand: t.brand, amber: t.amber, green: t.green, purple: t.purple };
+  const bgMap = { brandL: t.brandL, amberL: t.amberL, greenL: t.greenL, purpleL: t.purpleL };
+
+  function move(index, dir) {
+    setList(l => {
+      const next = l.slice();
+      const target = index + dir;
+      if (target < 0 || target >= next.length) return l;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  }
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
-        <StatCard label="On waitlist" value="12" color={t.teal} accent={t.accentTeal} sub="Waiting for open slots" />
+        <StatCard label="On waitlist" value={String(list.length)} color={t.teal} accent={t.accentTeal} sub="Waiting for open slots" />
         <StatCard label="Slots filled this week" value="5" color={t.green} accent={t.accentGreen} sub="Auto-filled · no manual work" />
         <StatCard label="Avg fill time" value="8 min" color={t.brand} accent={t.accentBlue} sub="From cancellation to fill" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'start' }}>
         <Card>
           <CardTitle>Current waitlist</CardTitle>
-          {[['1', 'MC', t.brandL, t.brand, 'Maria Chen', 'Cleaning · Any time this week', 'Next up', t.brand, t.brandL],
-            ['2', 'DW', t.amberL, t.amber, 'David Wong', 'Cleaning · Mornings preferred', '#2', t.muted, t.bgRow],
-            ['3', 'SK', t.greenL, t.green, 'Sam Kim', 'Exam · Afternoons only', '#3', t.muted, t.bgRow],
-          ].map(([rank, ini, bg, c, name, sub, pill, pc, pbg], i) => (
-            <RowItem key={i}>
-              <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: t.brandL, color: t.brand, fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{rank}</div>
-              <Ava initials={ini} bg={bg} color={c} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
-              <Pill label={pill} color={pc} bg={pbg} />
-            </RowItem>
-          ))}
+          {list.map((p, i) => {
+            const isExpanded = expandedId === p.id;
+            const pillLabel = i === 0 ? 'Next up' : `#${i + 1}`;
+            const pillColor = i === 0 ? t.brand : t.muted;
+            const pillBg = i === 0 ? t.brandL : t.bgRow;
+            return (
+              <div key={p.id} style={{ borderBottom: `1px solid ${t.border2}` }}>
+                <div
+                  onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 0', cursor: 'pointer' }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
+                    <button
+                      onClick={e => { e.stopPropagation(); move(i, -1); }}
+                      disabled={i === 0}
+                      style={{ width: '18px', height: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: i === 0 ? t.border : t.muted, cursor: i === 0 ? 'default' : 'pointer', padding: 0 }}
+                    ><ArrowUp size={12} /></button>
+                    <button
+                      onClick={e => { e.stopPropagation(); move(i, 1); }}
+                      disabled={i === list.length - 1}
+                      style={{ width: '18px', height: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: i === list.length - 1 ? t.border : t.muted, cursor: i === list.length - 1 ? 'default' : 'pointer', padding: 0 }}
+                    ><ArrowDown size={12} /></button>
+                  </div>
+                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: t.brandL, color: t.brand, fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</div>
+                  <Ava initials={p.ini} bg={bgMap[p.bg]} color={colorMap[p.c]} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div>
+                    <div style={{ fontSize: '11.5px', color: t.muted }}>{p.service} · {p.pref}</div>
+                  </div>
+                  <Pill label={pillLabel} color={pillColor} bg={pillBg} />
+                  <ChevronDown size={14} color={t.muted} style={{ flexShrink: 0, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                </div>
+                {isExpanded && (
+                  <div className="px-expand" style={{ padding: '0 0 14px 60px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <DetailRow label="Phone" value={p.phone} />
+                    <DetailRow label="Waiting since" value={p.waitingSince} />
+                    <div style={{ gridColumn: '1 / -1' }}><DetailRow label="Notes" value={p.notes} /></div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
           <div style={{ marginTop: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> When a slot opens PraxisMD auto-texts the next patient. First to reply gets the spot.</div>
         </Card>
         <Card>
@@ -1143,39 +1366,157 @@ function Waitlist() {
 }
 
 // ─── CALENDAR ──────────────────────────────────────────────
+const CAL_BASE_YEAR = 2026;
+const CAL_BASE_MONTH = 8; // September (0-indexed)
+const CAL_TODAY = { year: 2026, month: 8, day: 13 };
+
+const CAL_NAME_POOL = ['Sarah Martinez', 'James Lee', 'Amy Kim', 'Robert Park', 'Maria Chen', 'David Wong', 'Tina Nguyen', 'Priya Patel', 'Sam Kim', 'Patricia Green', 'Mike Brown', 'Jordan Ellis'];
+const CAL_TYPE_POOL = [['Cleaning', 60], ['Crown fitting', 90], ['Whitening', 45], ['Exam', 30], ['Filling', 45], ['Consultation', 30], ['Emergency', 30], ['Root canal', 90]];
+const CAL_TIME_POOL = ['8:00 AM', '9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '1:00 PM', '1:30 PM', '2:00 PM', '2:30 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM'];
+
+function timeToMinutes(time) {
+  const [, h, m, ap] = time.match(/(\d+):(\d+) (AM|PM)/) || [];
+  let hours = parseInt(h, 10) % 12;
+  if (ap === 'PM') hours += 12;
+  return hours * 60 + parseInt(m, 10);
+}
+
+function seedSeptemberAppointments() {
+  const counts = { 13: 4, 15: 2, 16: 3, 17: 5, 18: 2, 20: 1, 22: 3, 23: 4, 24: 2, 27: 3, 29: 2, 30: 3 };
+  const seed = {};
+  Object.entries(counts).forEach(([day, n], di) => {
+    seed[`${CAL_BASE_YEAR}-${CAL_BASE_MONTH}-${day}`] = Array.from({ length: n }).map((_, i) => {
+      const idx = di * 7 + i;
+      const [type, duration] = CAL_TYPE_POOL[idx % CAL_TYPE_POOL.length];
+      return { id: `${day}-${i}`, time: CAL_TIME_POOL[(idx * 3) % CAL_TIME_POOL.length], patient: CAL_NAME_POOL[idx % CAL_NAME_POOL.length], type, duration };
+    });
+  });
+  return seed;
+}
+
 function Calendar() {
   const t = useTheme();
-  const appts = { 13: 4, 15: 2, 16: 3, 17: 5, 18: 2, 20: 1, 22: 3, 23: 4, 24: 2, 27: 3, 29: 2, 30: 3 };
+  const [monthOffset, setMonthOffset] = useState(0);
+  const [selectedKey, setSelectedKey] = useState(`${CAL_BASE_YEAR}-${CAL_BASE_MONTH}-${CAL_TODAY.day}`);
+  const [appointments, setAppointments] = useState(seedSeptemberAppointments);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newPatient, setNewPatient] = useState('');
+  const [newTime, setNewTime] = useState(CAL_TIME_POOL[0]);
+  const [newType, setNewType] = useState(CAL_TYPE_POOL[0][0]);
+
+  const viewDate = new Date(CAL_BASE_YEAR, CAL_BASE_MONTH + monthOffset, 1);
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const monthLabel = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startWeekday = new Date(year, month, 1).getDay();
+
   const days = [];
-  for (let i = 0; i < 2; i++) days.push(null);
-  for (let d = 1; d <= 30; d++) days.push(d);
+  for (let i = 0; i < startWeekday; i++) days.push(null);
+  for (let d = 1; d <= daysInMonth; d++) days.push(d);
+
+  function keyFor(d) { return `${year}-${month}-${d}`; }
+  const selectedList = (appointments[selectedKey] || []).slice().sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+  const [, , selectedDay] = selectedKey.split('-');
+  const selectedLabel = new Date(year, month, parseInt(selectedDay, 10)).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  function addAppointment() {
+    if (!newPatient.trim()) return;
+    const entry = { id: `new-${Date.now()}`, time: newTime, patient: newPatient.trim(), type: newType, duration: (CAL_TYPE_POOL.find(([ty]) => ty === newType) || [null, 30])[1] };
+    setAppointments(a => ({ ...a, [selectedKey]: [...(a[selectedKey] || []), entry] }));
+    setNewPatient('');
+    setShowAddForm(false);
+  }
+
+  function removeAppointment(id) {
+    setAppointments(a => ({ ...a, [selectedKey]: (a[selectedKey] || []).filter(e => e.id !== id) }));
+  }
+
   return (
-    <Card>
-      <CardTitle>September 2026 <div style={{ display: 'flex', gap: '8px' }}><Btn small><ChevronLeft size={14} /> Prev</Btn><Btn small>Next <ChevronRight size={14} /></Btn></div></CardTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px', marginBottom: '6px' }}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: '11px', color: t.muted, fontWeight: '600', textAlign: 'center', padding: '6px 0', textTransform: 'uppercase', letterSpacing: '.5px' }}>{d}</div>)}
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px' }}>
-        {days.map((d, i) => {
-          if (!d) return <div key={i} />;
-          const isToday = d === 13;
-          const has = appts[d] || 0;
-          return (
-            <div key={i} style={{ borderRadius: '10px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', minHeight: '54px', border: `1px solid ${isToday ? t.brand : has ? withAlpha(t.accentBlue, .2) : t.border2}`, background: isToday ? t.brand : has ? t.brandL : t.bgRow, transition: 'all .12s' }}>
-              <div style={{ fontSize: '13px', fontWeight: isToday ? '700' : has ? '500' : '400', color: isToday ? 'white' : has ? t.ink2 : t.muted }}>{d}</div>
-              {has > 0 && <div style={{ fontSize: '10px', marginTop: '3px', color: isToday ? 'rgba(255,255,255,.85)' : t.brand, fontWeight: '600' }}>{has} apt{has > 1 ? 's' : ''}</div>}
+    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '14px', alignItems: 'start' }}>
+      <Card>
+        <CardTitle>{monthLabel} <div style={{ display: 'flex', gap: '8px' }}><Btn small onClick={() => setMonthOffset(o => o - 1)}><ChevronLeft size={14} /> Prev</Btn><Btn small onClick={() => setMonthOffset(o => o + 1)}>Next <ChevronRight size={14} /></Btn></div></CardTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px', marginBottom: '6px' }}>
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: '11px', color: t.muted, fontWeight: '600', textAlign: 'center', padding: '6px 0', textTransform: 'uppercase', letterSpacing: '.5px' }}>{d}</div>)}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px' }}>
+          {days.map((d, i) => {
+            if (!d) return <div key={i} />;
+            const isToday = year === CAL_TODAY.year && month === CAL_TODAY.month && d === CAL_TODAY.day;
+            const dayKey = keyFor(d);
+            const has = (appointments[dayKey] || []).length;
+            const isSelected = dayKey === selectedKey;
+            return (
+              <div
+                key={i}
+                onClick={() => { setSelectedKey(dayKey); setShowAddForm(false); }}
+                className="px-btn"
+                style={{
+                  borderRadius: '10px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', minHeight: '54px',
+                  border: `${isSelected ? '2px' : '1px'} solid ${isToday ? t.brand : isSelected ? t.teal : has ? withAlpha(t.accentBlue, .2) : t.border2}`,
+                  background: isToday ? t.brand : has ? t.brandL : t.bgRow, transition: 'all .12s',
+                }}
+              >
+                <div style={{ fontSize: '13px', fontWeight: isToday ? '700' : has ? '500' : '400', color: isToday ? 'white' : has ? t.ink2 : t.muted }}>{d}</div>
+                {has > 0 && <div style={{ fontSize: '10px', marginTop: '3px', color: isToday ? 'rgba(255,255,255,.85)' : t.brand, fontWeight: '600' }}>{has} apt{has > 1 ? 's' : ''}</div>}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: '14px', marginTop: '14px', paddingTop: '12px', borderTop: `1px solid ${t.border2}` }}>
+          {[[t.brand, 'Today'], [t.brandL, 'Has appointments'], [t.bgRow, 'Available']].map(([bg, label], i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: t.muted }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: bg, border: `1px solid ${t.border}` }} />{label}
             </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card>
+        <CardTitle>{selectedLabel}</CardTitle>
+        {selectedList.length === 0 && !showAddForm && (
+          <div style={{ padding: '20px', textAlign: 'center', color: t.muted, fontSize: '13px' }}>No appointments this day.</div>
+        )}
+        {selectedList.map((appt, i) => {
+          const [color, bg] = avatarStyle(t, i);
+          return (
+            <RowItem key={appt.id}>
+              <div style={{ fontSize: '11.5px', color: t.muted, width: '60px', flexShrink: 0, fontWeight: '500' }}>{appt.time}</div>
+              <Ava initials={initialsOf(appt.patient)} bg={bg} color={color} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{appt.patient}</div>
+                <div style={{ fontSize: '11.5px', color: t.muted }}>{appt.type} · {appt.duration} min</div>
+              </div>
+              <button onClick={() => removeAppointment(appt.id)} title="Remove" style={{ background: 'none', border: 'none', color: t.muted, cursor: 'pointer', padding: '4px', display: 'flex' }}>
+                <X size={14} />
+              </button>
+            </RowItem>
           );
         })}
-      </div>
-      <div style={{ display: 'flex', gap: '14px', marginTop: '14px', paddingTop: '12px', borderTop: `1px solid ${t.border2}` }}>
-        {[[t.brand, 'Today'], [t.brandL, 'Has appointments'], [t.bgRow, 'Available']].map(([bg, label], i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: t.muted }}>
-            <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: bg, border: `1px solid ${t.border}` }} />{label}
+
+        {showAddForm ? (
+          <div style={{ background: t.bgRow, border: `1px solid ${t.border2}`, borderRadius: '10px', padding: '12px', marginTop: '8px' }}>
+            <input value={newPatient} onChange={e => setNewPatient(e.target.value)} placeholder="Patient name" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, marginBottom: '8px', boxSizing: 'border-box' }} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+              <select value={newTime} onChange={e => setNewTime(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
+                {CAL_TIME_POOL.map(time => <option key={time} value={time}>{time}</option>)}
+              </select>
+              <select value={newType} onChange={e => setNewType(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
+                {CAL_TYPE_POOL.map(([type]) => <option key={type} value={type}>{type}</option>)}
+              </select>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <Btn small onClick={() => setShowAddForm(false)} style={{ flex: 1, justifyContent: 'center' }}>Cancel</Btn>
+              <Btn small primary onClick={addAppointment} style={{ flex: 1, justifyContent: 'center' }}>Add</Btn>
+            </div>
           </div>
-        ))}
-      </div>
-    </Card>
+        ) : (
+          <Btn primary style={{ width: '100%', justifyContent: 'center', marginTop: selectedList.length ? '8px' : '0' }} onClick={() => setShowAddForm(true)}>
+            <Plus size={14} /> Add appointment
+          </Btn>
+        )}
+      </Card>
+    </div>
   );
 }
 
