@@ -950,6 +950,36 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
   const list = contacts || [];
   const filtered = q ? list.filter(p => p.name.toLowerCase().includes(q)) : list;
   const [selected, setSelected] = useState(null);
+  const [sortKey, setSortKey] = useState(null); // 'name' | 'tag' | 'dateAdded'
+  const [sortDir, setSortDir] = useState('asc');
+
+  function toggleSort(key) {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  }
+
+  const sorted = !sortKey ? filtered : filtered.slice().sort((a, b) => {
+    let av, bv;
+    if (sortKey === 'dateAdded') {
+      const ad = new Date(a.dateAdded).getTime();
+      const bd = new Date(b.dateAdded).getTime();
+      av = Number.isNaN(ad) ? -Infinity : ad;
+      bv = Number.isNaN(bd) ? -Infinity : bd;
+    } else if (sortKey === 'tag') {
+      av = (a.tag || '').toLowerCase();
+      bv = (b.tag || '').toLowerCase();
+    } else {
+      av = (a.name || '').toLowerCase();
+      bv = (b.name || '').toLowerCase();
+    }
+    if (av < bv) return sortDir === 'asc' ? -1 : 1;
+    if (av > bv) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   return (
     <div>
@@ -960,7 +990,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
             placeholder="Search patients by name, email, or phone..."
             value={query}
             onChange={e => onQueryChange(e.target.value)}
-            style={{ width: '100%', padding: '9px 14px 9px 36px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}
+            style={{ width: '100%', padding: '9px 14px 9px 36px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
           />
         </div>
         <Btn primary><Plus size={14} /> Add patient</Btn>
@@ -980,9 +1010,30 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry }) {
           )}
           <Card>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead><tr>{['Patient', 'Phone', 'Tag', 'Added', ''].map((h, i) => <th key={i} style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '500', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: `1px solid ${t.border}` }}>{h}</th>)}</tr></thead>
+              <thead>
+                <tr>
+                  {[
+                    { label: 'Patient', key: 'name' },
+                    { label: 'Phone', key: null },
+                    { label: 'Tag', key: 'tag' },
+                    { label: 'Added', key: 'dateAdded' },
+                    { label: '', key: null },
+                  ].map((h, i) => (
+                    <th
+                      key={i}
+                      onClick={h.key ? () => toggleSort(h.key) : undefined}
+                      style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '500', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: `1px solid ${t.border}`, cursor: h.key ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        {h.label}
+                        {h.key && sortKey === h.key && (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
               <tbody>
-                {filtered.map((p, i) => (
+                {sorted.map((p, i) => (
                   <tr key={p.id || i} onClick={() => setSelected(p)} className="px-row" style={{ borderBottom: `1px solid ${t.border2}`, cursor: 'pointer' }}>
                     <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.email}</div></td>
                     <td style={{ padding: '11px 13px', color: t.mid }}>{p.phone}</td>
