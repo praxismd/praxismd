@@ -493,9 +493,9 @@ function Pill({ label, color, bg }) {
   return <span style={{ fontSize: '11px', fontWeight: '600', padding: '3px 9px', borderRadius: '20px', background: bg, color, whiteSpace: 'nowrap' }}>{label}</span>;
 }
 
-function RowItem({ children, style }) {
+function RowItem({ children, style, onClick }) {
   const t = useTheme();
-  return <div className="px-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 13px', borderRadius: '10px', background: t.bgRow, marginBottom: '7px', borderWidth: '1px', borderStyle: 'solid', borderColor: t.border2, ...style }}>{children}</div>;
+  return <div className="px-row" onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 13px', borderRadius: '10px', background: t.bgRow, marginBottom: '7px', borderWidth: '1px', borderStyle: 'solid', borderColor: t.border2, ...style }}>{children}</div>;
 }
 
 function Ava({ initials, bg, color }) {
@@ -1342,8 +1342,59 @@ function Reviews() {
 }
 
 // ─── SURVEYS ───────────────────────────────────────────────
+const SURVEY_RESPONSES = [
+  {
+    ini: 'TN', bg: 'greenL', c: 'green', name: 'Tina Nguyen', score: 10, status: 'Promoter', sc: 'green', sbg: 'greenL',
+    quote: 'Amazing experience — staff was so kind!', date: 'Sep 11',
+    answers: [
+      ['How likely are you to recommend us?', '10/10'],
+      ['How was your wait time?', 'Seen right on time'],
+      ['Was the staff friendly and helpful?', 'Extremely — best dental visit I\'ve had'],
+    ],
+  },
+  {
+    ini: 'SM', bg: 'brandL', c: 'brand', name: 'Sarah Martinez', score: 9, status: 'Promoter', sc: 'green', sbg: 'greenL',
+    quote: 'Great service, would definitely return', date: 'Sep 9',
+    answers: [
+      ['How likely are you to recommend us?', '9/10'],
+      ['How was your wait time?', 'A few minutes, no big deal'],
+      ['Was the staff friendly and helpful?', 'Yes, very professional'],
+    ],
+  },
+  {
+    ini: 'AN', bg: 'redL', c: 'red', name: 'Anonymous', score: 4, status: 'Detractor', sc: 'red', sbg: 'redL',
+    quote: 'Wait time too long, felt rushed', date: 'Sep 6',
+    answers: [
+      ['How likely are you to recommend us?', '4/10'],
+      ['How was your wait time?', 'Waited almost 40 minutes past my appointment time'],
+      ['Was the staff friendly and helpful?', 'Felt rushed through the actual appointment'],
+    ],
+  },
+];
+
 function Surveys() {
   const t = useTheme();
+  const colorMap = { brand: t.brand, green: t.green, red: t.red };
+  const bgMap = { brandL: t.brandL, greenL: t.greenL, redL: t.redL };
+  const [selected, setSelected] = useState(null);
+  const [reply, setReply] = useState('');
+  const [sentReply, setSentReply] = useState(false);
+  const [aiDrafting, setAiDrafting] = useState(false);
+
+  function openSurvey(s) {
+    setSelected(s);
+    setReply('');
+    setSentReply(false);
+  }
+
+  function draftWithAi() {
+    setAiDrafting(true);
+    setTimeout(() => {
+      setReply(`Hi ${selected.name === 'Anonymous' ? 'there' : selected.name.split(' ')[0]}, thank you for the honest feedback — I'm sorry your visit felt rushed and the wait ran long. We're addressing scheduling so this doesn't happen again. We'd love the chance to make it right on your next visit.`);
+      setAiDrafting(false);
+    }, 600);
+  }
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
@@ -1354,14 +1405,14 @@ function Surveys() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
         <Card>
           <CardTitle>Recent responses</CardTitle>
-          {[['TN', t.greenL, t.green, 'Tina Nguyen · Score: 10', '"Amazing experience — staff was so kind!"', 'Promoter', t.green, t.greenL],
-            ['SM', t.brandL, t.brand, 'Sarah Martinez · Score: 9', '"Great service, would definitely return"', 'Promoter', t.green, t.greenL],
-            ['AN', t.redL, t.red, 'Anonymous · Score: 4', '"Wait time too long, felt rushed"', 'Detractor', t.red, t.redL],
-          ].map(([ini, bg, c, name, text, status, sc, sbg], i) => (
-            <RowItem key={i} style={status === 'Detractor' ? { background: t.redL, borderColor: withAlpha(t.accentRed, .15) } : {}}>
-              <Ava initials={ini} bg={bg} color={c} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{text}</div></div>
-              <Pill label={status} color={sc} bg={sbg} />
+          {SURVEY_RESPONSES.map((s, i) => (
+            <RowItem
+              key={i} onClick={() => openSurvey(s)}
+              style={{ cursor: 'pointer', ...(s.status === 'Detractor' ? { background: t.redL, borderColor: withAlpha(t.accentRed, .15) } : {}) }}
+            >
+              <Ava initials={s.ini} bg={bgMap[s.bg]} color={colorMap[s.c]} />
+              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{s.name} · Score: {s.score}</div><div style={{ fontSize: '11.5px', color: t.muted }}>"{s.quote}"</div></div>
+              <Pill label={s.status} color={colorMap[s.sc]} bg={bgMap[s.sbg]} />
             </RowItem>
           ))}
         </Card>
@@ -1375,13 +1426,80 @@ function Surveys() {
           ))}
         </Card>
       </div>
+
+      {selected && (
+        <SlidePanel title={selected.name} subtitle={`${selected.date} · Score ${selected.score}/10`} onClose={() => setSelected(null)}>
+          {selected.answers.map(([q, a], i) => (
+            <div key={i} style={{ marginBottom: '16px' }}>
+              <div style={{ fontSize: '11.5px', fontWeight: '600', color: t.muted, marginBottom: '4px' }}>{q}</div>
+              <div style={{ fontSize: '13px', color: t.ink2, lineHeight: '1.5' }}>{a}</div>
+            </div>
+          ))}
+          <div style={{ marginTop: '20px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>REPLY TO PATIENT</div>
+            {sentReply ? (
+              <div style={{ padding: '12px 14px', background: t.greenL, color: t.green, borderRadius: '10px', fontSize: '12.5px' }}>Reply sent.</div>
+            ) : (
+              <>
+                {selected.status === 'Detractor' && (
+                  <Btn small onClick={draftWithAi} style={{ marginBottom: '10px' }} disabled={aiDrafting}>
+                    {aiDrafting ? <Loader2 size={13} className="px-spin" /> : <Bot size={13} />} AI draft response
+                  </Btn>
+                )}
+                <textarea
+                  value={reply} onChange={e => setReply(e.target.value)} placeholder="Write a reply…" rows={4}
+                  style={{ width: '100%', padding: '10px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '10px' }}
+                />
+                <Btn primary style={{ width: '100%', justifyContent: 'center' }} onClick={() => reply.trim() && setSentReply(true)}>
+                  <Send size={13} /> Send reply
+                </Btn>
+              </>
+            )}
+          </div>
+        </SlidePanel>
+      )}
     </div>
   );
 }
 
 // ─── ELIGIBILITY ───────────────────────────────────────────
+const ELIGIBILITY_DATA = [
+  {
+    ini: 'SM', bg: 'brandL', c: 'brand', name: 'Sarah Martinez', payer: 'Delta Dental', memberId: 'DD-2284910', group: 'GRP-4471',
+    sub: '$1,200 remaining benefits · $0 deductible · D1110 covered 100%', warn: false, status: 'Verified', sc: 'green', sbg: 'greenL', rowBg: 'bgRow',
+    coverage: [['Preventive (cleanings, exams)', '100%'], ['Basic (fillings)', '80%'], ['Major (crowns, root canals)', '50%']],
+    deductible: '$0 of $50 used', nextAppt: 'Sep 20 · Cleaning',
+  },
+  {
+    ini: 'JL', bg: 'amberL', c: 'amber', name: 'James Lee', payer: 'Aetna', memberId: 'AET-9938201', group: 'GRP-1120',
+    sub: 'Deductible not met · Patient owes $450 before insurance kicks in', warn: true, status: 'Action needed', sc: 'amber', sbg: 'amberL', rowBg: 'amberL',
+    coverage: [['Preventive (cleanings, exams)', '100%'], ['Basic (fillings)', '80%'], ['Major (crowns, root canals)', '50%']],
+    deductible: '$450 of $50 used — collect at check-in', nextAppt: 'Sep 22 · Crown fitting',
+  },
+  {
+    ini: 'AK', bg: 'greenL', c: 'green', name: 'Amy Kim', payer: 'Cigna', memberId: 'CIG-5512038', group: 'GRP-7734',
+    sub: 'D9972 whitening not covered · Patient responsible for full $280', warn: false, status: 'Verified', sc: 'teal', sbg: 'tealL', rowBg: 'bgRow',
+    coverage: [['Preventive (cleanings, exams)', '100%'], ['Basic (fillings)', '80%'], ['Cosmetic (whitening)', '0%']],
+    deductible: '$0 of $75 used', nextAppt: 'Sep 24 · Whitening',
+  },
+  {
+    ini: 'RP', bg: 'redL', c: 'red', name: 'Robert Park', payer: 'UnitedHealth', memberId: 'UHC-1029384', group: 'GRP-3301',
+    sub: 'Policy terminated Sep 1 · No active coverage — collect full payment', warn: true, status: 'No coverage', sc: 'red', sbg: 'redL', rowBg: 'redL',
+    coverage: [], deductible: 'N/A — policy inactive', nextAppt: 'Sep 25 · Extraction',
+  },
+];
+
 function Eligibility() {
   const t = useTheme();
+  const colorMap = { brand: t.brand, amber: t.amber, green: t.green, red: t.red, teal: t.teal };
+  const bgMap = { brandL: t.brandL, amberL: t.amberL, greenL: t.greenL, redL: t.redL, tealL: t.tealL, bgRow: t.bgRow };
+  const [selected, setSelected] = useState(null);
+  const [reverified, setReverified] = useState({});
+
+  function reverify(name) {
+    setReverified(r => ({ ...r, [name]: true }));
+  }
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
@@ -1391,26 +1509,46 @@ function Eligibility() {
       </div>
       <Card>
         <CardTitle>Today's verification results</CardTitle>
-        {[
-          { ini: 'SM', bg: t.brandL, c: t.brand, name: 'Sarah Martinez · Delta Dental', sub: '$1,200 remaining benefits · $0 deductible · D1110 covered 100%', warn: false, status: 'Verified', sc: t.green, sbg: t.greenL, rowBg: t.bgRow },
-          { ini: 'JL', bg: t.amberL, c: t.amber, name: 'James Lee · Aetna', sub: 'Deductible not met · Patient owes $450 before insurance kicks in', warn: true, status: 'Action needed', sc: t.amber, sbg: t.amberL, rowBg: t.amberL },
-          { ini: 'AK', bg: t.greenL, c: t.green, name: 'Amy Kim · Cigna', sub: 'D9972 whitening not covered · Patient responsible for full $280', warn: false, status: 'Verified', sc: t.teal, sbg: t.tealL, rowBg: t.bgRow },
-          { ini: 'RP', bg: t.redL, c: t.red, name: 'Robert Park · UnitedHealth', sub: 'Policy terminated Sep 1 · No active coverage — collect full payment', warn: true, status: 'No coverage', sc: t.red, sbg: t.redL, rowBg: t.redL },
-        ].map((e, i) => (
-          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 13px', background: e.rowBg, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
+        {ELIGIBILITY_DATA.map((e, i) => (
+          <div
+            key={i} onClick={() => setSelected(e)} className="px-row"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 13px', background: bgMap[e.rowBg], borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
-              <Ava initials={e.ini} bg={e.bg} color={e.c} />
+              <Ava initials={e.ini} bg={bgMap[e.bg]} color={colorMap[e.c]} />
               <div>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{e.name}</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{e.name} · {e.payer}</div>
                 <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   {e.warn && <AlertTriangle size={12} color={t.amber} />}{e.sub}
                 </div>
               </div>
             </div>
-            <Pill label={e.status} color={e.sc} bg={e.sbg} />
+            {reverified[e.name] ? <Pill label="Re-verified" color={t.green} bg={t.greenL} /> : <Pill label={e.status} color={colorMap[e.sc]} bg={bgMap[e.sbg]} />}
           </div>
         ))}
       </Card>
+
+      {selected && (
+        <SlidePanel title={selected.name} subtitle={`${selected.payer} · Member ID ${selected.memberId}`} onClose={() => setSelected(null)}>
+          <DetailRow label="Group number" value={selected.group} />
+          <DetailRow label="Deductible" value={selected.deductible} />
+          <DetailRow label="Next appointment" value={selected.nextAppt} />
+          {selected.coverage.length > 0 && (
+            <div style={{ marginTop: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>COVERAGE BREAKDOWN</div>
+              {selected.coverage.map(([label, pct], i) => (
+                <div key={i} style={{ marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>{label}</span><span style={{ fontWeight: '600', color: t.ink2 }}>{pct}</span></div>
+                  <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.brand, width: pct }} /></div>
+                </div>
+              ))}
+            </div>
+          )}
+          <Btn primary style={{ width: '100%', justifyContent: 'center', marginTop: '8px' }} onClick={() => reverify(selected.name)}>
+            <RotateCw size={14} /> Re-verify eligibility
+          </Btn>
+        </SlidePanel>
+      )}
     </div>
   );
 }
@@ -1705,37 +1843,91 @@ function Calendar() {
 }
 
 // ─── REPORTS ───────────────────────────────────────────────
+const REPORTS_PERIODS = ['September 2026', 'August', 'July', 'Q3 2026'];
+
+const REPORTS_DATA = {
+  'September 2026': {
+    stats: [['Revenue recovered', '$8,400', 'green', '↑ 24% vs last month'], ['New appointments', '31', 'brand', '↑ 8 from campaigns'], ['Patient retention', '87%', 'teal', '↑ 4% improvement']],
+    metrics: [
+      ['Reactivation emails sent', '847', 'brand'], ['SMS messages sent', '312', 'brand'],
+      ['Email open rate', '34%', 'brand'], ['Reply rate', '18%', 'brand'],
+      ['Cost per booked appointment', '$35', 'green'], ['Recall conversion rate', '38%', 'teal'],
+      ['Reviews collected', '6', 'amber'], ['Average Google rating', '4.8', 'amber'],
+      ['NPS score', '72', 'pink'], ['Waitlist slots filled', '14', 'orange'],
+      ['Insurance denials prevented', '$2,840', 'green'], ['AI front desk calls', '847', 'purple'],
+      ['Claims submitted', '48', 'purple'], ['Claims paid · revenue', '39 · $28,400', 'green'],
+      ['AI hours saved total', '~68 hrs', 'green'],
+    ],
+  },
+  'August': {
+    stats: [['Revenue recovered', '$6,780', 'green', '↑ 11% vs July'], ['New appointments', '27', 'brand', '↑ 3 from campaigns'], ['Patient retention', '84%', 'teal', '↑ 1% improvement']],
+    metrics: [
+      ['Reactivation emails sent', '792', 'brand'], ['SMS messages sent', '288', 'brand'],
+      ['Email open rate', '31%', 'brand'], ['Reply rate', '16%', 'brand'],
+      ['Cost per booked appointment', '$38', 'green'], ['Recall conversion rate', '35%', 'teal'],
+      ['Reviews collected', '5', 'amber'], ['Average Google rating', '4.7', 'amber'],
+      ['NPS score', '69', 'pink'], ['Waitlist slots filled', '11', 'orange'],
+      ['Insurance denials prevented', '$2,100', 'green'], ['AI front desk calls', '760', 'purple'],
+      ['Claims submitted', '44', 'purple'], ['Claims paid · revenue', '36 · $24,900', 'green'],
+      ['AI hours saved total', '~61 hrs', 'green'],
+    ],
+  },
+  'July': {
+    stats: [['Revenue recovered', '$5,920', 'green', '↑ 6% vs June'], ['New appointments', '24', 'brand', '↑ 2 from campaigns'], ['Patient retention', '83%', 'teal', 'Flat vs June']],
+    metrics: [
+      ['Reactivation emails sent', '710', 'brand'], ['SMS messages sent', '254', 'brand'],
+      ['Email open rate', '29%', 'brand'], ['Reply rate', '15%', 'brand'],
+      ['Cost per booked appointment', '$41', 'green'], ['Recall conversion rate', '33%', 'teal'],
+      ['Reviews collected', '4', 'amber'], ['Average Google rating', '4.7', 'amber'],
+      ['NPS score', '67', 'pink'], ['Waitlist slots filled', '9', 'orange'],
+      ['Insurance denials prevented', '$1,780', 'green'], ['AI front desk calls', '690', 'purple'],
+      ['Claims submitted', '40', 'purple'], ['Claims paid · revenue', '33 · $21,300', 'green'],
+      ['AI hours saved total', '~55 hrs', 'green'],
+    ],
+  },
+  'Q3 2026': {
+    stats: [['Revenue recovered', '$21,100', 'green', '↑ 18% vs Q2'], ['New appointments', '82', 'brand', '↑ 13 from campaigns'], ['Patient retention', '85%', 'teal', '↑ 2% improvement']],
+    metrics: [
+      ['Reactivation emails sent', '2,349', 'brand'], ['SMS messages sent', '854', 'brand'],
+      ['Email open rate', '31%', 'brand'], ['Reply rate', '16%', 'brand'],
+      ['Cost per booked appointment', '$38', 'green'], ['Recall conversion rate', '35%', 'teal'],
+      ['Reviews collected', '15', 'amber'], ['Average Google rating', '4.8', 'amber'],
+      ['NPS score', '69', 'pink'], ['Waitlist slots filled', '34', 'orange'],
+      ['Insurance denials prevented', '$6,720', 'green'], ['AI front desk calls', '2,297', 'purple'],
+      ['Claims submitted', '132', 'purple'], ['Claims paid · revenue', '108 · $74,600', 'green'],
+      ['AI hours saved total', '~184 hrs', 'green'],
+    ],
+  },
+};
+
 function Reports() {
   const t = useTheme();
-  const metrics = [
-    ['Reactivation emails sent', '847', t.brand], ['SMS messages sent', '312', t.brand],
-    ['Email open rate', '34%', t.brand], ['Reply rate', '18%', t.brand],
-    ['Cost per booked appointment', '$35', t.green], ['Recall conversion rate', '38%', t.teal],
-    ['Reviews collected', '6', t.amber], ['Average Google rating', '4.8', t.amber],
-    ['NPS score', '72', t.pink], ['Waitlist slots filled', '14', t.orange],
-    ['Insurance denials prevented', '$2,840', t.green], ['AI front desk calls', '847', t.purple],
-    ['Claims submitted', '48', t.purple], ['Claims paid · revenue', '39 · $28,400', t.green],
-    ['AI hours saved total', '~68 hrs', t.green],
-  ];
+  const colorMap = { brand: t.brand, green: t.green, teal: t.teal, amber: t.amber, pink: t.pink, orange: t.orange, purple: t.purple };
+  const accentMap = { brand: t.accentBlue, green: t.accentGreen, teal: t.accentTeal, amber: t.accentAmber, pink: t.accentPink, orange: t.accentOrange, purple: t.accentPurple };
+  const [period, setPeriod] = useState(REPORTS_PERIODS[0]);
+  const [notice, setNotice] = useState('');
+  const data = REPORTS_DATA[period];
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        {['September 2026', 'August', 'July', 'Q3 2026'].map((label, i) => (
-          <span key={i} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: i === 0 ? 'none' : `1px solid ${t.border}`, background: i === 0 ? t.brand : t.bgCard, color: i === 0 ? 'white' : t.mid }}>{label}</span>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
+        {REPORTS_PERIODS.map((label, i) => (
+          <span key={i} onClick={() => setPeriod(label)} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: period === label ? 'none' : `1px solid ${t.border}`, background: period === label ? t.brand : t.bgCard, color: period === label ? 'white' : t.mid }}>{label}</span>
         ))}
-        <Btn small><Download size={13} /> Export PDF</Btn>
+        <Btn small onClick={() => setNotice(`Exported ${period} report as PDF.`)}><Download size={13} /> Export PDF</Btn>
+        {notice && <span style={{ fontSize: '12px', color: t.green, marginLeft: '4px' }}>{notice}</span>}
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
-        <StatCard label="Revenue recovered" value="$8,400" color={t.green} accent={t.accentGreen} sub="↑ 24% vs last month" />
-        <StatCard label="New appointments" value="31" color={t.brand} accent={t.accentBlue} sub="↑ 8 from campaigns" />
-        <StatCard label="Patient retention" value="87%" color={t.teal} accent={t.accentTeal} sub="↑ 4% improvement" />
+        {data.stats.map(([label, value, color, sub], i) => (
+          <StatCard key={i} label={label} value={value} color={colorMap[color]} accent={accentMap[color]} sub={sub} />
+        ))}
       </div>
       <Card>
         <CardTitle>Monthly performance breakdown</CardTitle>
-        {metrics.map(([label, val, color], i) => (
+        {data.metrics.map(([label, val, color], i) => (
           <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', background: t.bgRow, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
             <span style={{ fontSize: '12.5px', color: t.mid }}>{label}</span>
-            <span style={{ fontSize: '14px', fontWeight: '600', color }}>{val}</span>
+            <span style={{ fontSize: '14px', fontWeight: '600', color: colorMap[color] }}>{val}</span>
           </div>
         ))}
       </Card>
