@@ -494,7 +494,7 @@ function Pill({ label, color, bg }) {
 
 function RowItem({ children, style }) {
   const t = useTheme();
-  return <div className="px-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 13px', borderRadius: '10px', background: t.bgRow, marginBottom: '7px', border: `1px solid ${t.border2}`, ...style }}>{children}</div>;
+  return <div className="px-row" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 13px', borderRadius: '10px', background: t.bgRow, marginBottom: '7px', borderWidth: '1px', borderStyle: 'solid', borderColor: t.border2, ...style }}>{children}</div>;
 }
 
 function Ava({ initials, bg, color }) {
@@ -504,7 +504,7 @@ function Ava({ initials, bg, color }) {
 function Btn({ children, onClick, primary, small, style, disabled }) {
   const t = useTheme();
   return (
-    <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: small ? '5px 11px' : '8px 14px', borderRadius: '10px', border: primary ? 'none' : `1px solid ${t.border}`, background: primary ? t.brand : t.bgCard, color: primary ? 'white' : t.mid, fontSize: small ? '12px' : '13px', fontWeight: '500', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? .65 : 1, ...style }}>{children}</button>
+    <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: small ? '5px 11px' : '8px 14px', borderRadius: '10px', borderWidth: '1px', borderStyle: 'solid', borderColor: primary ? 'transparent' : t.border, background: primary ? t.brand : t.bgCard, color: primary ? 'white' : t.mid, fontSize: small ? '12px' : '13px', fontWeight: '500', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? .65 : 1, ...style }}>{children}</button>
   );
 }
 
@@ -1702,7 +1702,7 @@ function Settings() {
       <Card>
         <CardTitle>Integrations</CardTitle>
         {integrations.map(([name, sub, connected], i) => (
-          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', border: `1px solid ${t.border2}`, background: connected ? t.greenL : t.bgRow, borderColor: connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
+          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', borderWidth: '1px', borderStyle: 'solid', background: connected ? t.greenL : t.bgRow, borderColor: connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
             <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
             {connected ? <Pill label="Connected" color={t.green} bg={t.greenL} /> : <Btn small>Connect</Btn>}
           </div>
