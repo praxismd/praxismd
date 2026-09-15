@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { light, withAlpha } from './theme';
 import {
@@ -72,12 +72,47 @@ function StatTile({ label, value, sub, color, icon: Icon }) {
   );
 }
 
-function OverviewTab({ setNotice }) {
+function OverviewTab({ setNotice, profile }) {
   const lastVisit = TREATMENT_HISTORY[0];
+  const [showForm, setShowForm] = useState(false);
+  const [reqWhen, setReqWhen] = useState('');
+  const [reqReason, setReqReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [justRequested, setJustRequested] = useState(false);
+
+  async function submitRequest() {
+    if (!reqWhen.trim()) {
+      setNotice("Let us know when you'd like to come in.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const user = auth.currentUser;
+      await addDoc(collection(db, 'appointmentRequests'), {
+        patientUid: user.uid,
+        patientName: profile?.name || user.email,
+        patientPhone: profile?.phone || '',
+        preferredWhen: reqWhen.trim(),
+        reason: reqReason.trim(),
+        status: 'pending',
+        createdAt: serverTimestamp(),
+      });
+      setNotice('Request sent! Your practice will confirm a time with you.');
+      setJustRequested(true);
+      setShowForm(false);
+      setReqWhen('');
+      setReqReason('');
+    } catch (err) {
+      setNotice(`Could not send request (${err.code || err.message || 'unknown error'}).`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px', marginBottom: '16px' }}>
-        <StatTile label="Next appointment" value="None scheduled" sub="Request one below" icon={CalendarClock} />
+        <StatTile label="Next appointment" value={justRequested ? 'Request pending' : 'None scheduled'} sub={justRequested ? 'Awaiting confirmation' : 'Request one below'} icon={CalendarClock} />
         <StatTile label="Balance due" value={`$${BILLING.balance}`} color={BILLING.balance > 0 ? t.amber : t.green} sub="See Billing tab" icon={Receipt} />
         <StatTile label="Last visit" value={lastVisit.date} sub={lastVisit.procedure} icon={Stethoscope} />
       </div>
@@ -88,13 +123,15 @@ function OverviewTab({ setNotice }) {
           <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Upcoming appointment</div>
         </div>
         <div style={{ fontSize: '12.5px', color: t.muted, lineHeight: '1.6' }}>
-          No upcoming appointments on file yet. Once your practice connects their calendar, you'll see your next visit here.
+          {justRequested
+            ? "Your request has been sent — your practice will reach out to confirm a time."
+            : "No upcoming appointments on file yet. Once your practice connects their calendar, you'll see your next visit here."}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: showForm ? '14px' : 0 }}>
         <button
-          onClick={() => setNotice('Appointment requests will go straight to your practice once messaging is connected.')}
+          onClick={() => setShowForm(s => !s)}
           className="px-btn px-action"
           style={{ textAlign: 'left', background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '14px', padding: '18px', cursor: 'pointer', fontFamily: 'inherit' }}
         >
@@ -112,6 +149,36 @@ function OverviewTab({ setNotice }) {
           <div style={{ fontSize: '11.5px', color: t.muted }}>Ask a question or share an update</div>
         </button>
       </div>
+
+      {showForm && (
+        <div className="px-expand" style={cardStyle}>
+          <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>Request an appointment</div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>When works for you?</label>
+            <input
+              value={reqWhen} onChange={e => setReqWhen(e.target.value)} placeholder="e.g. Next Tuesday afternoon"
+              style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
+            />
+          </div>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Reason for visit</label>
+            <input
+              value={reqReason} onChange={e => setReqReason(e.target.value)} placeholder="e.g. Routine cleaning, tooth pain..."
+              style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={submitRequest} disabled={submitting} className="px-btn"
+              style={{ padding: '9px 16px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600', cursor: submitting ? 'default' : 'pointer', opacity: submitting ? .7 : 1, fontFamily: 'inherit' }}
+            >{submitting ? 'Sending…' : 'Send request'}</button>
+            <button
+              onClick={() => setShowForm(false)} className="px-btn"
+              style={{ padding: '9px 16px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.mid, fontSize: '13px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
+            >Cancel</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -397,7 +464,7 @@ function PatientPortal() {
           <div style={{ background: t.tealL, color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, borderRadius: '10px', padding: '10px 14px', fontSize: '12.5px', marginBottom: '18px' }}>{notice}</div>
         )}
 
-        {tab === 'overview' && <OverviewTab setNotice={setNotice} />}
+        {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} />}
         {tab === 'chart' && <ChartTab />}
         {tab === 'billing' && <BillingTab setNotice={setNotice} />}
 

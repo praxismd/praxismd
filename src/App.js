@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
+import { collection, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { light, dark, withAlpha } from './theme';
-import { auth, isFirebaseConfigured } from './firebase';
+import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, sendMessage, isGhlConfigured } from './api/ghl';
 import { createPaymentLink, isStripeConfigured } from './api/stripe';
 import {
@@ -11,7 +12,7 @@ import {
   TrendingUp, Settings as SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
   ChevronRight, ChevronDown, Phone, Hand, Zap, CalendarPlus, Sparkles, LogOut,
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
-  X, ArrowUp, ArrowDown,
+  X, ArrowUp, ArrowDown, Check,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -901,6 +902,72 @@ function Campaigns() {
 }
 
 // ─── RECALL ────────────────────────────────────────────────
+function PatientRequests() {
+  const t = useTheme();
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(isFirebaseConfigured);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setLoading(false); return; }
+    const q = query(collection(db, 'appointmentRequests'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, []);
+
+  async function respond(id, status) {
+    await updateDoc(doc(db, 'appointmentRequests', id), { status });
+  }
+
+  if (!isFirebaseConfigured) {
+    return (
+      <Card style={{ marginBottom: '14px' }}>
+        <CardTitle>Patient appointment requests</CardTitle>
+        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>
+          Requests patients send from their portal will show up here live once Firebase is connected.
+        </div>
+      </Card>
+    );
+  }
+
+  if (loading) return <LoadingState label="Loading patient requests…" />;
+
+  const pending = requests.filter(r => r.status === 'pending');
+  const resolved = requests.filter(r => r.status !== 'pending').slice(0, 3);
+
+  return (
+    <Card style={{ marginBottom: '14px' }}>
+      <CardTitle>Patient appointment requests {pending.length > 0 && <Pill label={`${pending.length} pending`} color={t.brand} bg={t.brandL} />}</CardTitle>
+      {pending.length === 0 && resolved.length === 0 && (
+        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No requests yet — they'll appear here as soon as a patient asks for one from their portal.</div>
+      )}
+      {pending.map(r => (
+        <RowItem key={r.id} style={{ background: t.brandL, borderColor: withAlpha(t.brand, .2) }}>
+          <Ava initials={initialsOf(r.patientName || 'Patient')} bg={t.brandL} color={t.brand} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{r.patientName}</div>
+            <div style={{ fontSize: '11.5px', color: t.muted }}>Wants: {r.preferredWhen}{r.reason ? ` · ${r.reason}` : ''}</div>
+          </div>
+          <Btn small onClick={() => respond(r.id, 'confirmed')}><Check size={12} /> Confirm</Btn>
+          <Btn small onClick={() => respond(r.id, 'declined')}>Decline</Btn>
+        </RowItem>
+      ))}
+      {resolved.map(r => (
+        <RowItem key={r.id}>
+          <Ava initials={initialsOf(r.patientName || 'Patient')} bg={t.bgRow} color={t.muted} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{r.patientName}</div>
+            <div style={{ fontSize: '11.5px', color: t.muted }}>Wanted: {r.preferredWhen}</div>
+          </div>
+          <Pill label={r.status === 'confirmed' ? 'Confirmed' : 'Declined'} color={r.status === 'confirmed' ? t.green : t.muted} bg={r.status === 'confirmed' ? t.greenL : t.bgRow} />
+        </RowItem>
+      ))}
+    </Card>
+  );
+}
+
 function Recall() {
   const t = useTheme();
   return (
@@ -910,6 +977,7 @@ function Recall() {
         <StatCard label="Recalled this month" value="34" color={t.green} accent={t.accentGreen} sub="↑ 38% conversion rate" />
         <StatCard label="Recall revenue" value="$6,120" color={t.brand} accent={t.accentBlue} sub="From recalled patients" />
       </div>
+      <PatientRequests />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
         <Card>
           <CardTitle>Recall sequence — auto-touch</CardTitle>
