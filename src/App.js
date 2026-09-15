@@ -12,7 +12,7 @@ import {
   TrendingUp, Settings as SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
   ChevronRight, ChevronDown, Phone, Hand, Zap, CalendarPlus, Sparkles, LogOut,
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
-  X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2,
+  X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -151,27 +151,50 @@ function useGhlFetch(fetchFn) {
 
 // ─── ROLES & PERMISSIONS ───────────────────────────────────
 const ROLES = ['Owner', 'Office Manager', 'Front Desk', 'Biller'];
+const EDITABLE_ROLES = ROLES.filter(r => r !== 'Owner');
 
-const ROLE_TAB_RULES = {
-  'Owner': null,
-  'Office Manager': { hide: ['billing', 'payments'] },
-  'Front Desk': { only: ['inbox', 'calendar', 'patients', 'eligibility'] },
-  'Biller': { only: ['billing', 'payments', 'reports'] },
+const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'billing', 'payments', 'reports', 'activitylog', 'settings'];
+
+const TAB_LABELS = {
+  overview: 'Overview', inbox: 'Inbox', campaigns: 'Campaigns', recall: 'Recall', calendar: 'Calendar',
+  waitlist: 'Waitlist', patients: 'Patients', portal: 'Patient Portal', eligibility: 'Eligibility',
+  reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', billing: 'Billing',
+  payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
 };
 
-const ROLE_DEFAULT_TAB = {
-  'Owner': 'overview',
-  'Office Manager': 'overview',
-  'Front Desk': 'inbox',
-  'Biller': 'billing',
+function buildPermissions(onTabs) {
+  return Object.fromEntries(ALL_TABS.map(tab => [tab, onTabs.includes(tab)]));
+}
+
+// Editable by the Owner at runtime via Settings → Team & Permissions. This is only the
+// first-load default — the source of truth once the app is running is the rolePermissions
+// state in App().
+const DEFAULT_ROLE_PERMISSIONS = {
+  'Office Manager': buildPermissions(ALL_TABS.filter(tab => tab !== 'billing' && tab !== 'payments')),
+  'Front Desk': buildPermissions(['inbox', 'calendar', 'patients', 'eligibility']),
+  'Biller': buildPermissions(['billing', 'payments', 'reports']),
 };
 
-function isTabVisible(tab, role) {
-  const rule = ROLE_TAB_RULES[role];
-  if (!rule) return true;
-  if (rule.only) return rule.only.includes(tab);
-  if (rule.hide) return !rule.hide.includes(tab);
-  return true;
+function isTabVisible(tab, role, rolePermissions) {
+  if (role === 'Owner') return true;
+  const perms = rolePermissions[role];
+  return !!(perms && perms[tab]);
+}
+
+function firstVisibleTab(role, rolePermissions) {
+  if (role === 'Owner') return 'overview';
+  const perms = rolePermissions[role] || {};
+  return ALL_TABS.find(tab => perms[tab]) || 'overview';
+}
+
+function roleColor(role, t) {
+  switch (role) {
+    case 'Owner': return { color: t.purple, bg: t.purpleL };
+    case 'Office Manager': return { color: t.brand, bg: t.brandL };
+    case 'Front Desk': return { color: t.green, bg: t.greenL };
+    case 'Biller': return { color: t.amber, bg: t.amberL };
+    default: return { color: t.red, bg: t.redL };
+  }
 }
 
 const MAIN_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist'];
@@ -180,23 +203,32 @@ const BILLINGSEC_TABS = ['billing', 'payments'];
 const ANALYTICS_TABS = ['reports', 'settings', 'activitylog'];
 
 const STAFF_MEMBERS = [
-  { id: 'u1', name: 'Dr. Rivera', email: 'drrivera@brightsmiles.com', role: 'Owner', lastLogin: 'Just now' },
-  { id: 'u2', name: 'Nina Torres', email: 'nina@brightsmiles.com', role: 'Office Manager', lastLogin: '2h ago' },
-  { id: 'u3', name: 'Casey Byrd', email: 'casey@brightsmiles.com', role: 'Front Desk', lastLogin: 'Yesterday' },
-  { id: 'u4', name: 'Priya Shah', email: 'priya@brightsmiles.com', role: 'Biller', lastLogin: '3 days ago' },
+  { id: 'u1', name: 'Dr. Rivera', email: 'drrivera@brightsmiles.com', role: 'Owner', lastLogin: 'Just now', status: 'Active' },
+  { id: 'u2', name: 'Nina Torres', email: 'nina@brightsmiles.com', role: 'Office Manager', lastLogin: '2h ago', status: 'Active' },
+  { id: 'u3', name: 'Sarah Byrd', email: 'sarah@brightsmiles.com', role: 'Front Desk', lastLogin: 'Yesterday', status: 'Active' },
+  { id: 'u4', name: 'James Coleman', email: 'james@brightsmiles.com', role: 'Biller', lastLogin: '3 days ago', status: 'Active' },
+];
+
+const ACTION_TYPES = [
+  { key: 'All', label: 'All actions' },
+  { key: 'message', label: 'Messages' },
+  { key: 'appointment', label: 'Appointments' },
+  { key: 'claim', label: 'Claims' },
+  { key: 'record', label: 'Patient records' },
+  { key: 'login', label: 'Logins' },
 ];
 
 const ACTIVITY_LOG = [
-  { id: 1, ts: '2026-09-15T09:14:00', user: 'Dr. Rivera', role: 'Owner', action: 'Logged in', patient: null },
-  { id: 2, ts: '2026-09-15T09:20:00', user: 'Casey Byrd', role: 'Front Desk', action: 'Viewed patient record', patient: 'Maria Chen' },
-  { id: 3, ts: '2026-09-15T09:32:00', user: 'Nina Torres', role: 'Office Manager', action: 'Sent message', patient: 'James Lee' },
-  { id: 4, ts: '2026-09-15T10:05:00', user: 'Casey Byrd', role: 'Front Desk', action: 'Booked appointment', patient: 'Sarah Malone' },
-  { id: 5, ts: '2026-09-15T10:41:00', user: 'Priya Shah', role: 'Biller', action: 'Submitted claim', patient: 'David Kim' },
-  { id: 6, ts: '2026-09-14T16:12:00', user: 'Dr. Rivera', role: 'Owner', action: 'Logged in', patient: null },
-  { id: 7, ts: '2026-09-14T15:03:00', user: 'Priya Shah', role: 'Biller', action: 'Submitted claim', patient: 'Angela Ruiz' },
-  { id: 8, ts: '2026-09-14T11:47:00', user: 'Nina Torres', role: 'Office Manager', action: 'Viewed patient record', patient: 'Tom Alvarez' },
-  { id: 9, ts: '2026-09-13T14:22:00', user: 'Casey Byrd', role: 'Front Desk', action: 'Sent message', patient: 'Maria Chen' },
-  { id: 10, ts: '2026-09-13T08:00:00', user: 'Dr. Rivera', role: 'Owner', action: 'Logged in', patient: null },
+  { id: 1, ts: '2026-09-15T09:14:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'message', action: 'Sent message to Maria Chen', patient: 'Maria Chen', suspicious: false },
+  { id: 2, ts: '2026-09-15T09:30:00', user: 'Dr. Rivera', role: 'Owner', type: 'claim', action: 'Submitted claim D2740 for James Lee', patient: 'James Lee', suspicious: false },
+  { id: 3, ts: '2026-09-15T10:02:00', user: 'James Coleman', role: 'Biller', type: 'claim', action: 'Resubmitted denied claim for Robert Park', patient: 'Robert Park', suspicious: false },
+  { id: 4, ts: '2026-09-15T10:05:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'appointment', action: 'Booked appointment for Sarah Malone', patient: 'Sarah Malone', suspicious: false },
+  { id: 5, ts: '2026-09-15T10:41:00', user: 'Nina Torres', role: 'Office Manager', type: 'record', action: 'Viewed patient record', patient: 'Tom Alvarez', suspicious: false },
+  { id: 6, ts: '2026-09-15T11:45:00', user: 'Unknown device', role: 'Unknown', type: 'login', action: 'Login attempt flagged', patient: null, suspicious: true },
+  { id: 7, ts: '2026-09-14T16:12:00', user: 'Dr. Rivera', role: 'Owner', type: 'login', action: 'Logged in', patient: null, suspicious: false },
+  { id: 8, ts: '2026-09-14T15:03:00', user: 'James Coleman', role: 'Biller', type: 'claim', action: 'Submitted claim for Angela Ruiz', patient: 'Angela Ruiz', suspicious: false },
+  { id: 9, ts: '2026-09-13T14:22:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'message', action: 'Sent message to Maria Chen', patient: 'Maria Chen', suspicious: false },
+  { id: 10, ts: '2026-09-13T08:00:00', user: 'Dr. Rivera', role: 'Owner', type: 'login', action: 'Logged in', patient: null, suspicious: false },
 ];
 
 function App() {
@@ -209,9 +241,14 @@ function App() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [patientQuery, setPatientQuery] = useState('');
   const [userRole, setUserRole] = useState('Owner');
+  const [rolePermissions, setRolePermissions] = useState(DEFAULT_ROLE_PERMISSIONS);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const currentUser = { name: 'Dr. Rivera', role: userRole };
+
+  function updateRolePermissions(role, perms) {
+    setRolePermissions(rp => ({ ...rp, [role]: perms }));
+  }
   const t = mode === 'dark' ? dark : light;
   const showFull = !collapsed || sidebarHover;
   const suppressHoverRef = useRef(false);
@@ -251,9 +288,9 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!isTabVisible(activeTab, userRole)) setActiveTab(ROLE_DEFAULT_TAB[userRole] || 'overview');
+    if (!isTabVisible(activeTab, userRole, rolePermissions)) setActiveTab(firstVisibleTab(userRole, rolePermissions));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userRole]);
+  }, [userRole, rolePermissions]);
 
   const { data: contactsData, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useGhlFetch(getContacts);
   const [demoContacts, setDemoContacts] = useState(DEMO_CONTACTS);
@@ -272,6 +309,11 @@ function App() {
     { Icon: MessageSquare, text: 'New message from Maria Chen', time: '18m ago', color: t.brand },
     { Icon: Star, text: 'New 5-star review from Sarah M.', time: '1h ago', color: t.accentAmber },
   ];
+
+  function gate(tab, element) {
+    if (activeTab !== tab) return null;
+    return isTabVisible(tab, userRole, rolePermissions) ? element : <AccessRestricted tab={tab} />;
+  }
 
   return (
     <ThemeContext.Provider value={t}>
@@ -339,27 +381,27 @@ function App() {
         </div>
 
         <nav style={{ padding: showFull ? '8px 12px' : '8px 8px', flex: 1, overflowY: 'auto' }}>
-          {MAIN_TABS.some(tb => isTabVisible(tb, userRole)) && <NavSection label="Main" collapsed={!showFull} />}
-          {isTabVisible('overview', userRole) && <NavItem label="Overview" Icon={LayoutDashboard} tab="overview" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('inbox', userRole) && <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={setActiveTab} badge="4" badgeColor={t.red} collapsed={!showFull} />}
-          {isTabVisible('campaigns', userRole) && <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('recall', userRole) && <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={setActiveTab} badge="89" badgeColor={t.amber} collapsed={!showFull} />}
-          {isTabVisible('calendar', userRole) && <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('waitlist', userRole) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={setActiveTab} badge="12" badgeColor={t.teal} collapsed={!showFull} />}
-          {PRACTICE_TABS.some(tb => isTabVisible(tb, userRole)) && <NavSection label="Practice" collapsed={!showFull} />}
-          {isTabVisible('patients', userRole) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('portal', userRole) && <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('eligibility', userRole) && <NavItem label="Eligibility" Icon={Shield} tab="eligibility" active={activeTab} onClick={setActiveTab} badge="3" badgeColor={t.amber} collapsed={!showFull} />}
-          {isTabVisible('reviews', userRole) && <NavItem label="Reviews" Icon={Star} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('surveys', userRole) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('aifrontdesk', userRole) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
-          {BILLINGSEC_TABS.some(tb => isTabVisible(tb, userRole)) && <NavSection label="Billing" collapsed={!showFull} />}
-          {isTabVisible('billing', userRole) && <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />}
-          {isTabVisible('payments', userRole) && <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {ANALYTICS_TABS.some(tb => isTabVisible(tb, userRole)) && <NavSection label="Analytics" collapsed={!showFull} />}
-          {isTabVisible('reports', userRole) && <NavItem label="Reports" Icon={TrendingUp} tab="reports" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('activitylog', userRole) && <NavItem label="Activity Log" Icon={Activity} tab="activitylog" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('settings', userRole) && <NavItem label="Settings" Icon={SettingsIcon} tab="settings" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {MAIN_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Main" collapsed={!showFull} />}
+          {isTabVisible('overview', userRole, rolePermissions) && <NavItem label="Overview" Icon={LayoutDashboard} tab="overview" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('inbox', userRole, rolePermissions) && <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={setActiveTab} badge="4" badgeColor={t.red} collapsed={!showFull} />}
+          {isTabVisible('campaigns', userRole, rolePermissions) && <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('recall', userRole, rolePermissions) && <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={setActiveTab} badge="89" badgeColor={t.amber} collapsed={!showFull} />}
+          {isTabVisible('calendar', userRole, rolePermissions) && <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('waitlist', userRole, rolePermissions) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={setActiveTab} badge="12" badgeColor={t.teal} collapsed={!showFull} />}
+          {PRACTICE_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Practice" collapsed={!showFull} />}
+          {isTabVisible('patients', userRole, rolePermissions) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('portal', userRole, rolePermissions) && <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('eligibility', userRole, rolePermissions) && <NavItem label="Eligibility" Icon={Shield} tab="eligibility" active={activeTab} onClick={setActiveTab} badge="3" badgeColor={t.amber} collapsed={!showFull} />}
+          {isTabVisible('reviews', userRole, rolePermissions) && <NavItem label="Reviews" Icon={Star} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('surveys', userRole, rolePermissions) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('aifrontdesk', userRole, rolePermissions) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
+          {BILLINGSEC_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Billing" collapsed={!showFull} />}
+          {isTabVisible('billing', userRole, rolePermissions) && <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />}
+          {isTabVisible('payments', userRole, rolePermissions) && <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {ANALYTICS_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Analytics" collapsed={!showFull} />}
+          {isTabVisible('reports', userRole, rolePermissions) && <NavItem label="Reports" Icon={TrendingUp} tab="reports" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('activitylog', userRole, rolePermissions) && <NavItem label="Activity Log" Icon={Activity} tab="activitylog" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('settings', userRole, rolePermissions) && <NavItem label="Settings" Icon={SettingsIcon} tab="settings" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
         </nav>
 
         <div style={{ padding: showFull ? '12px 16px' : '12px 0', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: showFull ? 'space-between' : 'center', gap: '10px' }}>
@@ -457,7 +499,7 @@ function App() {
                 <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>{initialsOf(currentUser.name)}</div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, lineHeight: 1.25 }}>{currentUser.name}</div>
-                  <div style={{ fontSize: '10.5px', color: t.muted, lineHeight: 1.25 }}>{currentUser.role}</div>
+                  <span style={{ fontSize: '9.5px', fontWeight: '600', padding: '1px 7px', borderRadius: '20px', display: 'inline-block', marginTop: '2px', background: roleColor(currentUser.role, t).bg, color: roleColor(currentUser.role, t).color }}>{currentUser.role}</span>
                 </div>
                 <ChevronDown size={14} color={t.muted} />
               </button>
@@ -489,23 +531,23 @@ function App() {
 
         {/* PAGE CONTENT */}
         <div key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
-          {activeTab === 'overview' && <Overview setActiveTab={setActiveTab} userRole={userRole} />}
-          {activeTab === 'inbox' && <Inbox contacts={contacts} userRole={userRole} />}
-          {activeTab === 'campaigns' && <Campaigns userRole={userRole} />}
-          {activeTab === 'recall' && <Recall userRole={userRole} />}
-          {activeTab === 'patients' && <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />}
-          {activeTab === 'billing' && <Billing userRole={userRole} />}
-          {activeTab === 'payments' && <Payments userRole={userRole} />}
-          {activeTab === 'reports' && <Reports userRole={userRole} />}
-          {activeTab === 'settings' && <Settings userRole={userRole} onRoleChange={setUserRole} />}
-          {activeTab === 'activitylog' && <ActivityLog userRole={userRole} />}
-          {activeTab === 'aifrontdesk' && <AIFrontDesk userRole={userRole} />}
-          {activeTab === 'reviews' && <Reviews userRole={userRole} />}
-          {activeTab === 'surveys' && <Surveys userRole={userRole} />}
-          {activeTab === 'eligibility' && <Eligibility userRole={userRole} />}
-          {activeTab === 'portal' && <Portal userRole={userRole} />}
-          {activeTab === 'waitlist' && <Waitlist userRole={userRole} />}
-          {activeTab === 'calendar' && <Calendar userRole={userRole} />}
+          {gate('overview', <Overview setActiveTab={setActiveTab} userRole={userRole} />)}
+          {gate('inbox', <Inbox contacts={contacts} userRole={userRole} />)}
+          {gate('campaigns', <Campaigns userRole={userRole} />)}
+          {gate('recall', <Recall userRole={userRole} />)}
+          {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />)}
+          {gate('billing', <Billing userRole={userRole} />)}
+          {gate('payments', <Payments userRole={userRole} />)}
+          {gate('reports', <Reports userRole={userRole} />)}
+          {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} />)}
+          {gate('activitylog', <ActivityLog userRole={userRole} />)}
+          {gate('aifrontdesk', <AIFrontDesk userRole={userRole} />)}
+          {gate('reviews', <Reviews userRole={userRole} />)}
+          {gate('surveys', <Surveys userRole={userRole} />)}
+          {gate('eligibility', <Eligibility userRole={userRole} />)}
+          {gate('portal', <Portal userRole={userRole} />)}
+          {gate('waitlist', <Waitlist userRole={userRole} />)}
+          {gate('calendar', <Calendar userRole={userRole} />)}
         </div>
       </div>
     </div>
@@ -677,6 +719,51 @@ function DetailRow({ label, value }) {
     <div style={{ marginBottom: '14px' }}>
       <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '3px' }}>{label}</div>
       <div style={{ fontSize: '13.5px', color: t.ink2 }}>{value || '—'}</div>
+    </div>
+  );
+}
+
+function ToggleSwitch({ checked, onChange }) {
+  const t = useTheme();
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      role="switch"
+      aria-checked={checked}
+      style={{ width: '38px', height: '22px', borderRadius: '20px', border: 'none', cursor: 'pointer', background: checked ? t.brand : t.border, position: 'relative', flexShrink: 0, padding: 0 }}
+    >
+      <span style={{ position: 'absolute', top: '2px', left: checked ? '18px' : '2px', width: '18px', height: '18px', borderRadius: '50%', background: 'white', transition: 'left .15s ease', boxShadow: '0 1px 3px rgba(0,0,0,.3)' }} />
+    </button>
+  );
+}
+
+function Modal({ title, onClose, children }) {
+  const t = useTheme();
+  return (
+    <>
+      <div onClick={onClose} className="px-panel-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 300 }} />
+      <div className="px-expand" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '420px', maxWidth: '92vw', maxHeight: '86vh', overflowY: 'auto', background: t.bgCard, borderRadius: '16px', border: `1px solid ${t.border}`, boxShadow: '0 20px 60px rgba(0,0,0,.25)', zIndex: 301 }}>
+        <div style={{ padding: '18px 20px', borderBottom: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: t.bgCard }}>
+          <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
+          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ padding: '20px' }}>{children}</div>
+      </div>
+    </>
+  );
+}
+
+function AccessRestricted({ tab }) {
+  const t = useTheme();
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '90px 24px', textAlign: 'center' }}>
+      <div style={{ width: '56px', height: '56px', borderRadius: '16px', background: t.redL, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' }}>
+        <Lock size={24} color={t.red} />
+      </div>
+      <div style={{ fontSize: '16px', fontWeight: '700', color: t.ink, marginBottom: '6px' }}>Access restricted</div>
+      <div style={{ fontSize: '13px', color: t.muted, maxWidth: '360px' }}>Your role doesn't have permission to view {TAB_LABELS[tab] || 'this page'}. Ask an Owner to update your permissions in Settings.</div>
     </div>
   );
 }
@@ -2348,14 +2435,21 @@ const INTEGRATIONS = [
   { id: 'availity', name: 'Availity', sub: 'Eligibility verification', connected: false },
 ];
 
-function Settings({ userRole, onRoleChange }) {
+function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange }) {
   const t = useTheme();
   const [saved, setSaved] = useState(false);
   const [connectNotice, setConnectNotice] = useState('');
   const [staff, setStaff] = useState(STAFF_MEMBERS);
-  const [showInvite, setShowInvite] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'Front Desk' });
   const [inviteNotice, setInviteNotice] = useState('');
+  const [editRoleStaff, setEditRoleStaff] = useState(null);
+  const [editRoleValue, setEditRoleValue] = useState('');
+  const [permEditorRole, setPermEditorRole] = useState(null);
+  const [draftPerms, setDraftPerms] = useState({});
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
+  const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   function saveChanges() {
     setSaved(true);
@@ -2374,10 +2468,34 @@ function Settings({ userRole, onRoleChange }) {
 
   function sendInvite() {
     if (!inviteForm.name.trim() || !inviteForm.email.trim()) return;
-    setStaff(list => [...list, { id: `u-new-${Date.now()}`, name: inviteForm.name.trim(), email: inviteForm.email.trim(), role: inviteForm.role, lastLogin: 'Never' }]);
-    setInviteNotice(`Invite sent to ${inviteForm.email.trim()} — they'll show up as "Never" logged in until they accept.`);
+    setStaff(list => [...list, { id: `u-new-${Date.now()}`, name: inviteForm.name.trim(), email: inviteForm.email.trim(), role: inviteForm.role, lastLogin: 'Never', status: 'Invited' }]);
+    setInviteNotice(`Invite sent to ${inviteForm.email.trim()} — they'll show up as "Invited" until they accept.`);
     setInviteForm({ name: '', email: '', role: 'Front Desk' });
-    setShowInvite(false);
+    setShowInviteModal(false);
+  }
+
+  function openEditRole(s) {
+    setEditRoleStaff(s);
+    setEditRoleValue(s.role);
+  }
+
+  function saveEditRole() {
+    setStaff(list => list.map(s => s.id === editRoleStaff.id ? { ...s, role: editRoleValue } : s));
+    setEditRoleStaff(null);
+  }
+
+  function openPermEditor(role) {
+    setPermEditorRole(role);
+    setDraftPerms({ ...(rolePermissions[role] || {}) });
+  }
+
+  function togglePerm(tab) {
+    setDraftPerms(d => ({ ...d, [tab]: !d[tab] }));
+  }
+
+  function savePerms() {
+    onUpdatePermissions(permEditorRole, draftPerms);
+    setPermEditorRole(null);
   }
 
   return (
@@ -2387,8 +2505,8 @@ function Settings({ userRole, onRoleChange }) {
           <CardTitle>Practice details</CardTitle>
           {[['Practice name', 'Bright Smiles Dental'], ['Phone number', '(813) 555-0142'], ['Email', 'hello@brightsmiles.com'], ['Address', '4210 W Bay Ave, Tampa FL 33616'], ['NPI number', '1234567890']].map(([label, val], i) => (
             <div key={i} style={{ marginBottom: '13px' }}>
-              <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>{label}</label>
-              <input defaultValue={val} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }} />
+              <label style={labelStyle}>{label}</label>
+              <input defaultValue={val} style={{ ...inputStyle, background: t.bgRow }} />
             </div>
           ))}
           <Btn primary onClick={saveChanges}>{saved ? <Check size={14} /> : null}{saved ? 'Saved' : 'Save changes'}</Btn>
@@ -2407,81 +2525,164 @@ function Settings({ userRole, onRoleChange }) {
         </Card>
       </div>
 
+      <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, marginBottom: '10px' }}>Team &amp; Permissions</div>
+
       <Card style={{ marginBottom: '14px' }}>
         <CardTitle>
-          Team
-          <Btn small primary onClick={() => setShowInvite(s => !s)}><UserPlus size={13} /> Invite staff member</Btn>
+          Team members
+          <Btn small primary onClick={() => setShowInviteModal(true)}><UserPlus size={13} /> Invite staff member</Btn>
         </CardTitle>
-        {showInvite && (
-          <div style={{ padding: '14px', background: t.bgRow, borderRadius: '10px', marginBottom: '12px', border: `1px solid ${t.border2}` }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-              <input value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))} placeholder="Full name" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }} />
-              <input value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="Email address" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }} />
-              <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))} style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Btn primary small onClick={sendInvite}>Send invite</Btn>
-              <Btn small onClick={() => setShowInvite(false)}>Cancel</Btn>
-            </div>
-          </div>
-        )}
         {inviteNotice && (
           <div style={{ marginBottom: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{inviteNotice}</div>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.2fr 40px', gap: '8px', padding: '0 13px 8px', fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>
-          <div>Name</div><div>Role</div><div>Last login</div><div />
+        <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.9fr 1.1fr 0.9fr 0.9fr 1.4fr', gap: '8px', padding: '0 13px 8px', fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>
+          <div>Name</div><div>Email</div><div>Role</div><div>Last login</div><div>Status</div><div>Actions</div>
         </div>
-        {staff.map(s => (
-          <div key={s.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 1.2fr 40px', gap: '8px', alignItems: 'center', padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: t.bgRow }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-              <Ava initials={initialsOf(s.name)} bg={t.brandL} color={t.brand} />
-              <div style={{ minWidth: 0 }}>
+        {staff.map(s => {
+          const rc = roleColor(s.role, t);
+          const isOwner = s.role === 'Owner';
+          return (
+            <div key={s.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.9fr 1.1fr 0.9fr 0.9fr 1.4fr', gap: '8px', alignItems: 'center', padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: t.bgRow }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                <Ava initials={initialsOf(s.name)} bg={t.brandL} color={t.brand} />
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
-                <div style={{ fontSize: '11px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.email}</div>
+              </div>
+              <div style={{ fontSize: '12.5px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.email}</div>
+              <div><Pill label={s.role} color={rc.color} bg={rc.bg} /></div>
+              <div style={{ fontSize: '12.5px', color: t.muted }}>{s.lastLogin}</div>
+              <div><Pill label={s.status} color={s.status === 'Active' ? t.green : t.amber} bg={s.status === 'Active' ? t.greenL : t.amberL} /></div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button onClick={() => !isOwner && openEditRole(s)} disabled={isOwner} title={isOwner ? "Owner role can't be edited" : 'Edit role'} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: isOwner ? t.border : t.muted, cursor: isOwner ? 'default' : 'pointer', borderRadius: '8px' }}>
+                  <Pencil size={13} />
+                </button>
+                <button onClick={() => !isOwner && removeStaff(s.id)} disabled={isOwner} title={isOwner ? "Owner can't be removed" : 'Remove'} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: isOwner ? t.border : t.muted, cursor: isOwner ? 'default' : 'pointer', borderRadius: '8px' }}>
+                  <Trash2 size={13} />
+                </button>
               </div>
             </div>
-            <div style={{ fontSize: '12.5px', color: t.ink2 }}>{s.role}</div>
-            <div style={{ fontSize: '12.5px', color: t.muted }}>{s.lastLogin}</div>
-            <button onClick={() => removeStaff(s.id)} title="Remove" style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
-              <Trash2 size={14} />
-            </button>
-          </div>
-        ))}
+          );
+        })}
+      </Card>
+
+      <Card style={{ marginBottom: '14px' }}>
+        <CardTitle>Role permissions</CardTitle>
+        <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '12px' }}>The Owner role always has full access and can't be edited. Customize exactly which tabs each other role can see.</div>
+        {EDITABLE_ROLES.map(role => {
+          const perms = rolePermissions[role] || {};
+          const onCount = ALL_TABS.filter(tab => perms[tab]).length;
+          const rc = roleColor(role, t);
+          return (
+            <div key={role} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', background: t.bgRow }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Pill label={role} color={rc.color} bg={rc.bg} />
+                <span style={{ fontSize: '12px', color: t.muted }}>{onCount} of {ALL_TABS.length} tabs visible</span>
+              </div>
+              <Btn small onClick={() => openPermEditor(role)}>Edit permissions</Btn>
+            </div>
+          );
+        })}
       </Card>
 
       <Card>
         <CardTitle>Demo: role switcher</CardTitle>
-        <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '12px' }}>No real auth yet — flip roles here to preview what the sidebar and tabs look like for each one.</div>
+        <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '12px' }}>No real auth yet — flip roles here to preview exactly what each role is currently permitted to see.</div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           {ROLES.map(r => (
             <Btn key={r} small primary={r === userRole} onClick={() => onRoleChange && onRoleChange(r)}>{r}</Btn>
           ))}
         </div>
       </Card>
+
+      {showInviteModal && (
+        <Modal title="Invite staff member" onClose={() => setShowInviteModal(false)}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Full name</label>
+            <input value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))} placeholder="Jordan Blake" style={inputStyle} />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Email address</label>
+            <input value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="jordan@brightsmiles.com" style={inputStyle} />
+          </div>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={labelStyle}>Role</label>
+            <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))} style={inputStyle}>
+              {EDITABLE_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn primary onClick={sendInvite}>Send invite</Btn>
+            <Btn onClick={() => setShowInviteModal(false)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {editRoleStaff && (
+        <Modal title={`Edit role — ${editRoleStaff.name}`} onClose={() => setEditRoleStaff(null)}>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={labelStyle}>Role</label>
+            <select value={editRoleValue} onChange={e => setEditRoleValue(e.target.value)} style={inputStyle}>
+              {EDITABLE_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn primary onClick={saveEditRole}>Save</Btn>
+            <Btn onClick={() => setEditRoleStaff(null)}>Cancel</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {permEditorRole && (
+        <SlidePanel title={`Edit permissions — ${permEditorRole}`} subtitle="Toggle which tabs this role can see in the sidebar" onClose={() => setPermEditorRole(null)}>
+          {ALL_TABS.map(tab => (
+            <div key={tab} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 2px', borderBottom: `1px solid ${t.border2}` }}>
+              <span style={{ fontSize: '13px', color: t.ink2 }}>{TAB_LABELS[tab]}</span>
+              <ToggleSwitch checked={!!draftPerms[tab]} onChange={() => togglePerm(tab)} />
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '18px' }}>
+            <Btn primary onClick={savePerms}>Save permissions</Btn>
+            <Btn onClick={() => setPermEditorRole(null)}>Cancel</Btn>
+          </div>
+        </SlidePanel>
+      )}
     </div>
   );
 }
 
 // ─── ACTIVITY LOG ──────────────────────────────────────────
+function FilterPillGroup({ options, value, onChange }) {
+  const t = useTheme();
+  return (
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+      {options.map(opt => {
+        const key = typeof opt === 'string' ? opt : opt.key;
+        const label = typeof opt === 'string' ? opt : opt.label;
+        const active = value === key;
+        return (
+          <button
+            key={key}
+            onClick={() => onChange(key)}
+            style={{ padding: '6px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', borderWidth: '1px', borderStyle: 'solid', borderColor: active ? 'transparent' : t.border, background: active ? t.brand : t.bgCard, color: active ? 'white' : t.mid }}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ActivityLog() {
   const t = useTheme();
-  const [userFilter, setUserFilter] = useState('All');
   const [roleFilter, setRoleFilter] = useState('All');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [typeFilter, setTypeFilter] = useState('All');
 
-  const users = ['All', ...Array.from(new Set(ACTIVITY_LOG.map(a => a.user)))];
-  const roles = ['All', ...ROLES];
-  const selectStyle = { padding: '8px 11px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
-  const filterLabelStyle = { fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '5px', display: 'block' };
+  const roleOptions = ['All', ...ROLES, 'Unknown'];
+  const suspiciousCount = ACTIVITY_LOG.filter(a => a.suspicious).length;
 
   const filtered = ACTIVITY_LOG
-    .filter(a => (userFilter === 'All' || a.user === userFilter))
     .filter(a => (roleFilter === 'All' || a.role === roleFilter))
-    .filter(a => (!fromDate || a.ts.slice(0, 10) >= fromDate))
-    .filter(a => (!toDate || a.ts.slice(0, 10) <= toDate))
+    .filter(a => (typeFilter === 'All' || a.type === typeFilter))
     .sort((a, b) => new Date(b.ts) - new Date(a.ts));
 
   function formatTs(ts) {
@@ -2505,29 +2706,27 @@ function ActivityLog() {
 
   return (
     <div>
+      {suspiciousCount > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: t.redL, border: `1px solid ${withAlpha(t.red, .25)}`, borderRadius: '12px', marginBottom: '14px' }}>
+          <AlertTriangle size={18} color={t.red} style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: '13px', color: t.red, fontWeight: '500' }}>
+            {suspiciousCount} suspicious login attempt{suspiciousCount === 1 ? '' : 's'} flagged below — review before dismissing.
+          </div>
+        </div>
+      )}
       <Card style={{ marginBottom: '14px' }}>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div>
-            <label style={filterLabelStyle}>User</label>
-            <select value={userFilter} onChange={e => setUserFilter(e.target.value)} style={selectStyle}>
-              {users.map(u => <option key={u} value={u}>{u}</option>)}
-            </select>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '6px' }}>Filter by role</div>
+              <FilterPillGroup options={roleOptions} value={roleFilter} onChange={setRoleFilter} />
+            </div>
+            <Btn small onClick={exportCsv}><Download size={13} /> Export CSV</Btn>
           </div>
           <div>
-            <label style={filterLabelStyle}>Role</label>
-            <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} style={selectStyle}>
-              {roles.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '6px' }}>Filter by action type</div>
+            <FilterPillGroup options={ACTION_TYPES} value={typeFilter} onChange={setTypeFilter} />
           </div>
-          <div>
-            <label style={filterLabelStyle}>From</label>
-            <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} style={selectStyle} />
-          </div>
-          <div>
-            <label style={filterLabelStyle}>To</label>
-            <input type="date" value={toDate} onChange={e => setToDate(e.target.value)} style={selectStyle} />
-          </div>
-          <Btn small onClick={exportCsv} style={{ marginLeft: 'auto' }}><Download size={13} /> Export CSV</Btn>
         </div>
       </Card>
       <Card>
@@ -2536,16 +2735,22 @@ function ActivityLog() {
           <span style={{ fontSize: '12px', color: t.muted, fontWeight: '500' }}>{filtered.length} event{filtered.length === 1 ? '' : 's'}</span>
         </CardTitle>
         {filtered.length === 0 && <div style={{ fontSize: '13px', color: t.muted, textAlign: 'center', padding: '28px 0' }}>No activity matches these filters.</div>}
-        {filtered.map(a => (
-          <RowItem key={a.id}>
-            <div style={{ width: '128px', flexShrink: 0, fontSize: '12px', color: t.muted }}>{formatTs(a.ts)}</div>
-            <Ava initials={initialsOf(a.user)} bg={t.brandL} color={t.brand} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{a.action}{a.patient ? ` · ${a.patient}` : ''}</div>
-              <div style={{ fontSize: '11.5px', color: t.muted }}>{a.user} · {a.role}</div>
-            </div>
-          </RowItem>
-        ))}
+        {filtered.map(a => {
+          const rc = roleColor(a.role, t);
+          return (
+            <RowItem key={a.id} style={a.suspicious ? { background: t.redL, borderColor: withAlpha(t.red, .2) } : undefined}>
+              <div style={{ width: '128px', flexShrink: 0, fontSize: '12px', color: t.muted }}>{formatTs(a.ts)}</div>
+              <Ava initials={initialsOf(a.user)} bg={a.suspicious ? t.redL : t.brandL} color={a.suspicious ? t.red : t.brand} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{a.action}{a.patient ? ` · ${a.patient}` : ''}</div>
+                <div style={{ fontSize: '11.5px', color: t.muted, display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
+                  {a.user} <Pill label={a.role} color={rc.color} bg={rc.bg} />
+                </div>
+              </div>
+              {a.suspicious && <AlertTriangle size={16} color={t.red} style={{ flexShrink: 0 }} />}
+            </RowItem>
+          );
+        })}
       </Card>
     </div>
   );
