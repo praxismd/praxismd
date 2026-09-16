@@ -26,6 +26,7 @@ const C = {
   redL: '#FEF2F2',
   amber: '#D97706',
   amberL: '#FFFBEB',
+  trim: '#0B1220',
 };
 
 function withAlpha(hex, alpha) {
@@ -266,7 +267,9 @@ function NavBar({ onOpenDemo }) {
   }
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: withAlpha('#FFFFFF', .92), backdropFilter: 'blur(8px)', borderBottom: `1px solid ${C.border}` }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100 }}>
+      <div style={{ height: '3px', background: C.trim }} />
+      <div style={{ background: withAlpha('#FFFFFF', .92), backdropFilter: 'blur(8px)', borderBottom: `1px solid ${C.trim}` }}>
       <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '14px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '13px' }}>Px</div>
@@ -307,6 +310,7 @@ function NavBar({ onOpenDemo }) {
           </button>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -665,9 +669,9 @@ function Landing() {
       </div>
 
       {/* FOOTER */}
-      <div id="contact" style={{ background: C.bgAlt, borderTop: `1px solid ${C.border}`, padding: '60px 26px 0' }}>
+      <div id="contact" style={{ background: C.bgAlt, borderTop: `1px solid ${C.border}`, padding: '60px 26px 44px' }}>
         <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
-          <div className="px-footer-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(4, 1fr)', gap: '32px', paddingBottom: '44px' }}>
+          <div className="px-footer-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(4, 1fr)', gap: '32px' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '12px' }}>
                 <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '12px' }}>Px</div>
@@ -688,11 +692,13 @@ function Landing() {
               </div>
             ))}
           </div>
-          <div style={{ borderTop: `1px solid ${C.border}`, padding: '20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ fontSize: '12px', color: C.muted }}>© 2026 PraxisMD. All content on this page is for demonstration purposes.</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: C.muted, fontWeight: '600' }}>
-              <Shield size={13} color={C.green} /> HIPAA Compliant · SOC 2 Type II
-            </div>
+        </div>
+      </div>
+      <div style={{ background: C.trim, padding: '16px 26px' }}>
+        <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+          <div style={{ fontSize: '12px', color: withAlpha('#FFFFFF', .6) }}>© 2026 PraxisMD. All content on this page is for demonstration purposes.</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: withAlpha('#FFFFFF', .75), fontWeight: '600' }}>
+            <Shield size={13} color="#4ADE80" /> HIPAA Compliant · SOC 2 Type II
           </div>
         </div>
       </div>

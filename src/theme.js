@@ -11,8 +11,8 @@ export const light = {
   muted: '#A6947F',
   border: '#F0E2D1',
   border2: '#F7ECDF',
-  brand: '#F2734A',
-  brandL: '#FFE8DA',
+  brand: '#2563EB',
+  brandL: '#EAF1FE',
   green: '#0F7B54',
   greenL: '#ECFDF5',
   amber: '#92400E',
@@ -50,8 +50,8 @@ export const dark = {
   muted: '#8C7A6A',
   border: '#3A2C22',
   border2: '#2A2019',
-  brand: '#FF8B5E',
-  brandL: '#3D2417',
+  brand: '#5B8DEF',
+  brandL: '#16233D',
   green: '#10B981',
   greenL: '#052E16',
   amber: '#F59E0B',
@@ -82,4 +82,45 @@ export function withAlpha(hex, alpha) {
   const g = parseInt(h.substring(2, 4), 16);
   const b = parseInt(h.substring(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  return { r: parseInt(h.substring(0, 2), 16), g: parseInt(h.substring(2, 4), 16), b: parseInt(h.substring(4, 6), 16) };
+}
+
+function rgbToHex(r, g, b) {
+  return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+
+// Mix `hex` toward `target` by `amount` (0 = hex, 1 = target). Used to derive
+// a light/dark tint of a brand color for its "L" (soft background) variant.
+function mix(hex, target, amount) {
+  const a = hexToRgb(hex), b = hexToRgb(target);
+  return rgbToHex(a.r + (b.r - a.r) * amount, a.g + (b.g - a.g) * amount, a.b + (b.b - a.b) * amount);
+}
+
+export const BRAND_PRESETS = [
+  { name: 'Ocean', hex: '#2563EB' },
+  { name: 'Forest', hex: '#0F7B54' },
+  { name: 'Slate', hex: '#3B4F6B' },
+  { name: 'Plum', hex: '#6D28D9' },
+  { name: 'Crimson', hex: '#9B1C1C' },
+  { name: 'Midnight', hex: '#1E3A5C' },
+];
+
+export const DEFAULT_BRAND = '#2563EB';
+
+// Applies a chosen brand color on top of the base light/dark palette. Every
+// other token (backgrounds, ink, semantic colors) stays exactly as defined
+// above — only `brand`/`brandL` are swapped, so the change cascades to every
+// place in the app that already reads t.brand / t.brandL rather than needing
+// per-component changes.
+export function getTheme(mode, brandHex) {
+  const base = mode === 'dark' ? dark : light;
+  const hex = /^#[0-9A-Fa-f]{6}$/.test(brandHex || '') ? brandHex : DEFAULT_BRAND;
+  if (mode === 'dark') {
+    return { ...base, brand: mix(hex, '#FFFFFF', 0.2), brandL: mix(hex, '#000000', 0.78) };
+  }
+  return { ...base, brand: hex, brandL: mix(hex, '#FFFFFF', 0.88) };
 }
