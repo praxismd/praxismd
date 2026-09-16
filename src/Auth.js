@@ -294,13 +294,6 @@ function Auth() {
             {mode === 'forgot' && "We'll email you a link to reset it"}
           </div>
 
-          {/* TEMP DEBUG — remove once the api-key-not-valid issue is confirmed fixed.
-              Firebase's web apiKey isn't a real secret (safe to display by design),
-              so this is safe to leave visible while diagnosing. */}
-          <div style={{ background: '#fffbe6', color: '#8a6d00', border: '1px solid #f0d878', borderRadius: '10px', padding: '10px 12px', fontSize: '11px', fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: '16px' }}>
-            DEBUG apiKey: {JSON.stringify(process.env.REACT_APP_FIREBASE_API_KEY)} (length: {(process.env.REACT_APP_FIREBASE_API_KEY || '').length})
-          </div>
-
           {error && (
             <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '16px' }}>{error}</div>
           )}
