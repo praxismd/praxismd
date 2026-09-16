@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
-import { light, dark, withAlpha } from './theme';
+import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, sendMessage, isGhlConfigured } from './api/ghl';
 import { createPaymentLink, isStripeConfigured } from './api/stripe';
@@ -13,7 +13,7 @@ import {
   ChevronRight, ChevronDown, Zap, Sparkles, LogOut,
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
-  Paperclip, Image as ImageIcon, ArrowLeft,
+  Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -177,6 +177,117 @@ function suggestReplyFor(convoId) {
   return AI_REPLY_SUGGESTIONS[hash % AI_REPLY_SUGGESTIONS.length];
 }
 
+// ─── NOTIFICATIONS ─────────────────────────────────────────
+const NOTIF_TYPE_META = {
+  message: { color: 'brand' },
+  recall: { color: 'amber' },
+  claim: { color: 'red' },
+  review: { color: 'orange' },
+  security: { color: 'purple' },
+};
+const NOTIF_SEED = [
+  { id: 'n1', type: 'message', Icon: MessageSquare, text: 'New message from Maria Chen', time: '18m ago', tab: 'inbox' },
+  { id: 'n2', type: 'recall', Icon: RotateCcw, text: '3 patients are overdue for recall', time: '32m ago', tab: 'recall' },
+  { id: 'n3', type: 'claim', Icon: AlertTriangle, text: 'Denied claim needs attention — Robert Park', time: '1h ago', tab: 'billing' },
+  { id: 'n4', type: 'review', Icon: Star, text: 'New 5-star review from Sarah M.', time: '2h ago', tab: 'reviews' },
+  { id: 'n5', type: 'security', Icon: Lock, text: 'Suspicious login attempt flagged on an unknown device', time: '3h ago', tab: 'activitylog' },
+];
+
+// ─── GLOBAL SEARCH MODAL ───────────────────────────────────
+function GlobalSearchModal({ open, onClose, contacts, query, setQuery, setActiveTab }) {
+  const t = useTheme();
+
+  useEffect(() => {
+    if (!open) return;
+    function onKeyDown(e) { if (e.key === 'Escape') onClose(); }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const q = query.trim().toLowerCase();
+  const patientResults = q ? (contacts || []).filter(p => p.name.toLowerCase().includes(q)).slice(0, 5) : [];
+  const campaignResults = q ? CAMPAIGNS_DATA.filter(c => c.name.toLowerCase().includes(q)).slice(0, 5) : [];
+  const quickActions = q ? ALL_TABS.filter(tab => TAB_LABELS[tab].toLowerCase().includes(q)).slice(0, 6) : [];
+  const noResults = q && patientResults.length === 0 && campaignResults.length === 0 && quickActions.length === 0;
+
+  function go(tab) { setActiveTab(tab); onClose(); }
+
+  const sectionLabelStyle = { fontSize: '10.5px', fontWeight: '700', color: t.muted, textTransform: 'uppercase', letterSpacing: '.5px', padding: '10px 4px 6px' };
+  const rowStyle = { display: 'flex', alignItems: 'center', gap: '11px', padding: '9px 8px', borderRadius: '9px', cursor: 'pointer' };
+
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,15,20,.5)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh' }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '560px', maxWidth: '92vw', maxHeight: '66vh', background: t.bgCard, borderRadius: '16px', boxShadow: '0 24px 60px rgba(0,0,0,.35)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '15px 16px', borderBottom: `1px solid ${t.border2}`, flexShrink: 0 }}>
+          <Search size={16} color={t.muted} />
+          <input
+            autoFocus
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Search patients, campaigns..."
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: '15px', fontFamily: 'inherit', background: 'transparent', color: t.ink2 }}
+          />
+          <span style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, border: `1px solid ${t.border}`, borderRadius: '5px', padding: '2px 6px', flexShrink: 0 }}>Esc</span>
+        </div>
+        <div style={{ overflowY: 'auto', padding: '6px 12px 14px' }}>
+          {!q && <div style={{ padding: '30px 10px', textAlign: 'center', color: t.muted, fontSize: '13px' }}>Start typing to search patients, campaigns, or jump to a tab.</div>}
+          {noResults && <div style={{ padding: '30px 10px', textAlign: 'center', color: t.muted, fontSize: '13px' }}>No results for "{query}"</div>}
+
+          {patientResults.length > 0 && (
+            <div>
+              <div style={sectionLabelStyle}>Patients</div>
+              {patientResults.map(p => (
+                <div key={p.id} className="px-row" onClick={() => go('patients')} style={rowStyle}>
+                  <Ava initials={initialsOf(p.name)} bg={t.brandL} color={t.brand} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div>
+                    <div style={{ fontSize: '11px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.email}</div>
+                  </div>
+                  <Pill label={p.tag || 'Active'} color={t.brand} bg={t.brandL} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {campaignResults.length > 0 && (
+            <div>
+              <div style={sectionLabelStyle}>Campaigns</div>
+              {campaignResults.map((c, i) => (
+                <div key={i} className="px-row" onClick={() => go('campaigns')} style={rowStyle}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Megaphone size={14} color={t.brand} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{c.name}</div>
+                    <div style={{ fontSize: '11px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.sub}</div>
+                  </div>
+                  <Pill label={c.pill} color={t[c.pillColor] || t.brand} bg={t[`${c.pillColor}L`] || t.brandL} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {quickActions.length > 0 && (
+            <div>
+              <div style={sectionLabelStyle}>Quick actions</div>
+              {quickActions.map(tab => (
+                <div key={tab} className="px-row" onClick={() => go(tab)} style={rowStyle}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: t.bgRow, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <ArrowRight size={14} color={t.mid} />
+                  </div>
+                  <div style={{ fontSize: '13px', color: t.ink2 }}>Go to {TAB_LABELS[tab]}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Fetches once on mount (and whenever refetch() is called). Skips the call
 // entirely — no spinner, no error — when GHL isn't configured, since that's
 // an expected, common state here, not a failure.
@@ -263,12 +374,15 @@ const STAFF_MEMBERS = [
 ];
 
 const ACTION_TYPES = [
-  { key: 'All', label: 'All actions' },
+  { key: 'All', label: 'All' },
   { key: 'message', label: 'Messages' },
   { key: 'appointment', label: 'Appointments' },
-  { key: 'claim', label: 'Claims' },
+  { key: 'claim', label: 'Billing' },
+  { key: 'payment', label: 'Payments' },
+  { key: 'login', label: 'Security' },
+  { key: 'campaign', label: 'Campaigns' },
   { key: 'record', label: 'Patient records' },
-  { key: 'login', label: 'Logins' },
+  { key: 'recall', label: 'Recalls' },
 ];
 
 const ACTIVITY_LOG = [
@@ -278,10 +392,17 @@ const ACTIVITY_LOG = [
   { id: 4, ts: '2026-09-15T10:05:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'appointment', action: 'Booked appointment for Sarah Malone', patient: 'Sarah Malone', suspicious: false },
   { id: 5, ts: '2026-09-15T10:41:00', user: 'Nina Torres', role: 'Office Manager', type: 'record', action: 'Viewed patient record', patient: 'Tom Alvarez', suspicious: false },
   { id: 6, ts: '2026-09-15T11:45:00', user: 'Unknown device', role: 'Unknown', type: 'login', action: 'Login attempt flagged', patient: null, suspicious: true },
-  { id: 7, ts: '2026-09-14T16:12:00', user: 'Dr. Rivera', role: 'Owner', type: 'login', action: 'Logged in', patient: null, suspicious: false },
-  { id: 8, ts: '2026-09-14T15:03:00', user: 'James Coleman', role: 'Biller', type: 'claim', action: 'Submitted claim for Angela Ruiz', patient: 'Angela Ruiz', suspicious: false },
-  { id: 9, ts: '2026-09-13T14:22:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'message', action: 'Sent message to Maria Chen', patient: 'Maria Chen', suspicious: false },
-  { id: 10, ts: '2026-09-13T08:00:00', user: 'Dr. Rivera', role: 'Owner', type: 'login', action: 'Logged in', patient: null, suspicious: false },
+  { id: 7, ts: '2026-09-15T12:10:00', user: 'Nina Torres', role: 'Office Manager', type: 'campaign', action: 'Launched "6-month reactivation" campaign', patient: null, suspicious: false },
+  { id: 8, ts: '2026-09-15T13:20:00', user: 'James Coleman', role: 'Biller', type: 'payment', action: 'Collected payment of $340', patient: 'Mike Brown', suspicious: false },
+  { id: 9, ts: '2026-09-15T14:05:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'recall', action: 'Sent recall reminder', patient: 'Priya Patel', suspicious: false },
+  { id: 10, ts: '2026-09-15T14:48:00', user: 'Nina Torres', role: 'Office Manager', type: 'appointment', action: 'Rescheduled appointment for David Wong', patient: 'David Wong', suspicious: false },
+  { id: 11, ts: '2026-09-14T16:12:00', user: 'Dr. Rivera', role: 'Owner', type: 'login', action: 'Logged in', patient: null, suspicious: false },
+  { id: 12, ts: '2026-09-14T15:03:00', user: 'James Coleman', role: 'Biller', type: 'claim', action: 'Submitted claim for Angela Ruiz', patient: 'Angela Ruiz', suspicious: false },
+  { id: 13, ts: '2026-09-14T11:30:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'record', action: 'Viewed patient record', patient: 'Jordan Ellis', suspicious: false },
+  { id: 14, ts: '2026-09-14T09:55:00', user: 'Nina Torres', role: 'Office Manager', type: 'payment', action: 'Collected payment of $1,200', patient: 'James Lee', suspicious: false },
+  { id: 15, ts: '2026-09-13T14:22:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'message', action: 'Sent message to Maria Chen', patient: 'Maria Chen', suspicious: false },
+  { id: 16, ts: '2026-09-13T10:15:00', user: 'Dr. Rivera', role: 'Owner', type: 'campaign', action: 'Launched "Post-visit review request" campaign', patient: null, suspicious: false },
+  { id: 17, ts: '2026-09-13T08:00:00', user: 'Dr. Rivera', role: 'Owner', type: 'login', action: 'Logged in', patient: null, suspicious: false },
 ];
 
 function App() {
@@ -290,9 +411,11 @@ function App() {
   const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [mode, setMode] = useState(getInitialMode);
+  const [brandColor, setBrandColor] = useState(() => (typeof window !== 'undefined' && window.localStorage.getItem('praxismd-brand-color')) || DEFAULT_BRAND);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarHover, setSidebarHover] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifReadIds, setNotifReadIds] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [patientQuery, setPatientQuery] = useState('');
   const [userRole, setUserRole] = useState('Owner');
@@ -306,7 +429,7 @@ function App() {
   function updateRolePermissions(role, perms) {
     setRolePermissions(rp => ({ ...rp, [role]: perms }));
   }
-  const t = mode === 'dark' ? dark : light;
+  const t = getTheme(mode, brandColor);
   const showFull = !collapsed || sidebarHover;
   const suppressHoverRef = useRef(false);
 
@@ -325,7 +448,6 @@ function App() {
   }
 
   const notifRef = useRef(null);
-  const searchRef = useRef(null);
   const userMenuRef = useRef(null);
 
   useEffect(() => {
@@ -335,13 +457,27 @@ function App() {
   }, [mode, t.bgPage]);
 
   useEffect(() => {
+    window.localStorage.setItem('praxismd-brand-color', brandColor);
+  }, [brandColor]);
+
+  useEffect(() => {
     function onDocClick(e) {
       if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
-      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) { setUserMenuOpen(false); setSwitchOpen(false); }
     }
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(o => !o);
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
   useEffect(() => {
@@ -372,15 +508,25 @@ function App() {
     setDemoContacts(cs => [{ id: `p-new-${Date.now()}`, tag: null, dateAdded: new Date().toLocaleDateString(), ...patient }, ...cs]);
   }
 
-  const searchMatches = patientQuery.trim()
-    ? contacts.filter(p => p.name.toLowerCase().includes(patientQuery.trim().toLowerCase()))
-    : [];
+  const notifColorMap = { brand: t.brand, amber: t.amber, red: t.red, orange: t.orange, purple: t.purple };
+  const notifBgMap = { brand: t.brandL, amber: t.amberL, red: t.redL, orange: t.orangeL, purple: t.purpleL };
+  const notifications = NOTIF_SEED.map(n => ({
+    ...n,
+    color: notifColorMap[NOTIF_TYPE_META[n.type].color],
+    bg: notifBgMap[NOTIF_TYPE_META[n.type].color],
+    read: notifReadIds.includes(n.id),
+  }));
+  const unreadNotifCount = notifications.filter(n => !n.read).length;
 
-  const notifications = [
-    { Icon: AlertTriangle, text: 'Insurance eligibility issue for James Lee', time: '12m ago', color: t.amber },
-    { Icon: MessageSquare, text: 'New message from Maria Chen', time: '18m ago', color: t.brand },
-    { Icon: Star, text: 'New 5-star review from Sarah M.', time: '1h ago', color: t.accentAmber },
-  ];
+  function markAllNotifsRead() {
+    setNotifReadIds(NOTIF_SEED.map(n => n.id));
+  }
+
+  function openNotif(n) {
+    setNotifReadIds(ids => ids.includes(n.id) ? ids : [...ids, n.id]);
+    setActiveTab(n.tab);
+    setNotifOpen(false);
+  }
 
   function gate(tab, element) {
     if (activeTab !== tab) return null;
@@ -535,31 +681,15 @@ function App() {
             <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · {practiceDisplayName}</div>
           </div>
 
-          <div ref={searchRef} style={{ position: 'relative', flex: 1, maxWidth: '360px' }}>
-            <Search size={15} color={t.muted} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-            <input
-              value={patientQuery}
-              onChange={e => { setPatientQuery(e.target.value); setSearchOpen(true); }}
-              onFocus={() => setSearchOpen(true)}
-              placeholder="Search patients by name..."
-              style={{ width: '100%', padding: '8px 12px 8px 34px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '13px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }}
-            />
-            {searchOpen && patientQuery.trim() && (
-              <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '10px', boxShadow: '0 10px 30px rgba(0,0,0,.18)', overflow: 'hidden', zIndex: 100 }}>
-                {searchMatches.length > 0 ? searchMatches.map((p, i) => (
-                  <div
-                    key={i}
-                    className="px-row"
-                    onClick={() => { setActiveTab('patients'); setSearchOpen(false); }}
-                    style={{ padding: '10px 13px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '10px', borderBottom: i < searchMatches.length - 1 ? `1px solid ${t.border2}` : 'none' }}
-                  >
-                    <Ava initials={initialsOf(p.name)} bg={t.brandL} color={t.brand} />
-                    <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.phone}{p.tag ? ` · ${p.tag}` : ''}</div></div>
-                  </div>
-                )) : <div style={{ padding: '14px', fontSize: '13px', color: t.muted, textAlign: 'center' }}>{isGhlConfigured ? 'No patients found' : 'Connect GoHighLevel to search patients'}</div>}
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '260px', padding: '8px 10px 8px 12px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            <Search size={15} color={t.muted} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1, textAlign: 'left', fontSize: '13px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Search patients, campaigns...</span>
+            <span style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, border: `1px solid ${t.border}`, borderRadius: '5px', padding: '1px 5px', flexShrink: 0 }}>Ctrl K</span>
+          </button>
 
           <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
             <button
@@ -575,17 +705,31 @@ function App() {
               <button onClick={() => setNotifOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 15px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '13px', cursor: 'pointer', color: t.mid, position: 'relative' }}>
                 <Bell size={15} />
                 Notifications
-                <span style={{ position: 'absolute', top: '7px', right: '10px', width: '7px', height: '7px', borderRadius: '50%', background: t.red }} />
+                {unreadNotifCount > 0 && (
+                  <span style={{ position: 'absolute', top: '-6px', right: '-6px', minWidth: '17px', height: '17px', padding: '0 4px', borderRadius: '9px', background: t.red, color: 'white', fontSize: '10px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadNotifCount}</span>
+                )}
               </button>
               {notifOpen && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: '300px', background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,.18)', overflow: 'hidden', zIndex: 100 }}>
-                  <div style={{ padding: '12px 14px', borderBottom: `1px solid ${t.border2}`, fontSize: '13px', fontWeight: '600', color: t.ink }}>Notifications</div>
+                <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, width: '320px', background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '12px', boxShadow: '0 10px 30px rgba(0,0,0,.18)', overflow: 'hidden', zIndex: 100 }}>
+                  <div style={{ padding: '12px 14px', borderBottom: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: t.ink }}>Notifications</span>
+                    {unreadNotifCount > 0 && (
+                      <button onClick={markAllNotifsRead} style={{ border: 'none', background: 'transparent', color: t.brand, fontSize: '11.5px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}>Mark all read</button>
+                    )}
+                  </div>
                   {notifications.map((n, i) => (
-                    <div key={i} className="px-row" style={{ display: 'flex', gap: '10px', padding: '11px 14px', borderBottom: i < notifications.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
-                      <n.Icon size={16} color={n.color} style={{ flexShrink: 0, marginTop: '2px' }} />
-                      <div><div style={{ fontSize: '12.5px', color: t.ink2 }}>{n.text}</div><div style={{ fontSize: '11px', color: t.muted, marginTop: '2px' }}>{n.time}</div></div>
+                    <div key={n.id} className="px-row" onClick={() => openNotif(n)} style={{ display: 'flex', gap: '10px', padding: '11px 14px', borderBottom: `1px solid ${t.border2}`, cursor: 'pointer', background: n.read ? 'transparent' : t.bgRow }}>
+                      <div style={{ width: '30px', height: '30px', borderRadius: '9px', background: n.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <n.Icon size={14} color={n.color} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: '12.5px', color: t.ink2, fontWeight: n.read ? '400' : '600' }}>{n.text}</div>
+                        <div style={{ fontSize: '11px', color: t.muted, marginTop: '2px' }}>{n.time}</div>
+                      </div>
+                      {!n.read && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: t.brand, flexShrink: 0, marginTop: '4px' }} />}
                     </div>
                   ))}
+                  <button onClick={() => { setActiveTab('activitylog'); setNotifOpen(false); }} style={{ display: 'block', width: '100%', padding: '11px 14px', border: 'none', background: 'transparent', color: t.brand, fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', textAlign: 'center', fontFamily: 'inherit' }}>View all notifications</button>
                 </div>
               )}
             </div>
@@ -642,7 +786,7 @@ function App() {
           {gate('billing', <Billing userRole={userRole} />)}
           {gate('payments', <Payments userRole={userRole} />)}
           {gate('reports', <Reports userRole={userRole} />)}
-          {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} />)}
+          {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} brandColor={brandColor} onBrandColorChange={setBrandColor} />)}
           {gate('activitylog', <ActivityLog userRole={userRole} />)}
           {gate('aifrontdesk', <AIFrontDesk userRole={userRole} />)}
           {gate('reviews', <Reviews userRole={userRole} />)}
@@ -653,6 +797,15 @@ function App() {
           {gate('calendar', <Calendar userRole={userRole} />)}
         </div>
       </div>
+
+      <GlobalSearchModal
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        contacts={contacts}
+        query={patientQuery}
+        setQuery={setPatientQuery}
+        setActiveTab={setActiveTab}
+      />
     </div>
     </ThemeContext.Provider>
   );
@@ -2737,10 +2890,11 @@ const INTEGRATIONS = [
   { id: 'availity', name: 'Availity', sub: 'Eligibility verification', connected: false },
 ];
 
-function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange }) {
+function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange, brandColor, onBrandColorChange }) {
   const t = useTheme();
   const [saved, setSaved] = useState(false);
   const [connectNotice, setConnectNotice] = useState('');
+  const [customHex, setCustomHex] = useState(brandColor || DEFAULT_BRAND);
   const [staff, setStaff] = useState(STAFF_MEMBERS);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'Front Desk' });
@@ -2827,6 +2981,47 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
         </Card>
       </div>
 
+      <Card style={{ marginBottom: '14px' }}>
+        <CardTitle>Appearance</CardTitle>
+        <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '14px' }}>Pick a brand color — it applies across the sidebar, buttons, accents, and badges, in both light and dark mode.</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '16px' }}>
+          {BRAND_PRESETS.map(preset => {
+            const active = brandColor?.toUpperCase() === preset.hex.toUpperCase();
+            return (
+              <button
+                key={preset.name}
+                type="button"
+                onClick={() => onBrandColorChange && onBrandColorChange(preset.hex)}
+                className="px-row"
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 13px', borderRadius: '10px', border: active ? `2px solid ${preset.hex}` : `1px solid ${t.border}`, background: t.bgRow, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+              >
+                <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: preset.hex, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {active && <Check size={13} color="white" />}
+                </span>
+                <span style={{ fontSize: '12.5px', fontWeight: '500', color: t.ink2 }}>{preset.name}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Palette size={15} color={t.muted} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '12.5px', color: t.mid, flexShrink: 0 }}>Custom color</span>
+          <input
+            value={customHex}
+            onChange={e => setCustomHex(e.target.value)}
+            placeholder="#2563EB"
+            style={{ ...inputStyle, maxWidth: '120px' }}
+          />
+          <input
+            type="color"
+            value={/^#[0-9A-Fa-f]{6}$/.test(customHex) ? customHex : '#2563EB'}
+            onChange={e => setCustomHex(e.target.value)}
+            style={{ width: '36px', height: '36px', border: `1px solid ${t.border}`, borderRadius: '8px', padding: '2px', background: t.bgCard, cursor: 'pointer' }}
+          />
+          <Btn small primary onClick={() => /^#[0-9A-Fa-f]{6}$/.test(customHex) && onBrandColorChange && onBrandColorChange(customHex)}>Apply</Btn>
+        </div>
+      </Card>
+
       <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, marginBottom: '10px' }}>Team &amp; Permissions</div>
 
       <Card style={{ marginBottom: '14px' }}>
@@ -2879,7 +3074,12 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                 <Pill label={role} color={rc.color} bg={rc.bg} />
                 <span style={{ fontSize: '12px', color: t.muted }}>{onCount} of {ALL_TABS.length} tabs visible</span>
               </div>
-              <Btn small onClick={() => openPermEditor(role)}>Edit permissions</Btn>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => onRoleChange && onRoleChange(role)} title={`Preview as ${role}`} style={{ width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${t.border}`, background: t.bgCard, color: t.mid, cursor: 'pointer', borderRadius: '8px' }}>
+                  <Eye size={14} />
+                </button>
+                <Btn small onClick={() => openPermEditor(role)}>Edit permissions</Btn>
+              </div>
             </div>
           );
         })}
@@ -2978,6 +3178,9 @@ function ActivityLog() {
   const t = useTheme();
   const [roleFilter, setRoleFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const roleOptions = ['All', ...ROLES, 'Unknown'];
   const suspiciousCount = ACTIVITY_LOG.filter(a => a.suspicious).length;
@@ -2985,6 +3188,13 @@ function ActivityLog() {
   const filtered = ACTIVITY_LOG
     .filter(a => (roleFilter === 'All' || a.role === roleFilter))
     .filter(a => (typeFilter === 'All' || a.type === typeFilter))
+    .filter(a => !dateFrom || a.ts.slice(0, 10) >= dateFrom)
+    .filter(a => !dateTo || a.ts.slice(0, 10) <= dateTo)
+    .filter(a => {
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      return a.user.toLowerCase().includes(q) || a.action.toLowerCase().includes(q) || (a.patient || '').toLowerCase().includes(q);
+    })
     .sort((a, b) => new Date(b.ts) - new Date(a.ts));
 
   function formatTs(ts) {
@@ -3019,11 +3229,25 @@ function ActivityLog() {
       <Card style={{ marginBottom: '14px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '6px' }}>Filter by role</div>
-              <FilterPillGroup options={roleOptions} value={roleFilter} onChange={setRoleFilter} />
+            <div style={{ position: 'relative', flex: 1, minWidth: '220px', maxWidth: '320px' }}>
+              <Search size={14} color={t.muted} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search by user or action…"
+                style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12.5px', color: t.ink2, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+              />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '7px 9px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
+              <span style={{ fontSize: '12px', color: t.muted }}>to</span>
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '7px 9px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
             </div>
             <Btn small onClick={exportCsv}><Download size={13} /> Export CSV</Btn>
+          </div>
+          <div>
+            <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '6px' }}>Filter by role</div>
+            <FilterPillGroup options={roleOptions} value={roleFilter} onChange={setRoleFilter} />
           </div>
           <div>
             <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '6px' }}>Filter by action type</div>
