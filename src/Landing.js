@@ -1,11 +1,40 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { light, withAlpha } from './theme';
 import {
   Check, X, ArrowRight, RotateCcw, Bot, ClipboardList, Receipt, Shield,
-  Smile, CreditCard, Contact, Sparkles, Star,
+  Smile, CreditCard, Contact, Sparkles, Star, Menu, TrendingDown, PhoneOff,
+  FileWarning, Megaphone, Activity, Quote,
 } from 'lucide-react';
 
-const t = light;
+// Self-contained palette — the landing page is always light mode and never
+// imports the dashboard's theme (the dashboard's brand color is orange;
+// the marketing site's brand color is blue, by design).
+const C = {
+  bg: '#FFFFFF',
+  bgAlt: '#F8FAFC',
+  ink: '#0F172A',
+  ink2: '#1E293B',
+  mid: '#475569',
+  muted: '#94A3B8',
+  border: '#E2E8F0',
+  brand: '#2563EB',
+  brandDark: '#1D4ED8',
+  brandL: '#EFF6FF',
+  green: '#16A34A',
+  greenL: '#F0FDF4',
+  red: '#DC2626',
+  redL: '#FEF2F2',
+  amber: '#D97706',
+  amberL: '#FFFBEB',
+};
+
+function withAlpha(hex, alpha) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 // Plain `href="#id"` anchors would normally let the browser scroll to the
 // element natively, but HashRouter reads everything after `#` as a route to
@@ -17,32 +46,83 @@ function scrollToId(id) {
   };
 }
 
-const PRICING = [
+const inputStyle = {
+  width: '100%', padding: '11px 13px', borderRadius: '10px', border: `1px solid ${C.border}`,
+  fontSize: '13.5px', fontFamily: 'inherit', outline: 'none', color: C.ink2, boxSizing: 'border-box',
+};
+
+// ─── DATA ──────────────────────────────────────────────────
+const PROBLEM_CARDS = [
+  { Icon: TrendingDown, title: 'Dead leads', cost: '$2,400/mo', desc: 'New patient inquiries go cold because no one follows up fast enough — or at all.' },
+  { Icon: PhoneOff, title: 'Missed calls', cost: '$1,800/mo', desc: 'Every ring your front desk can’t answer is a patient who books somewhere else.' },
+  { Icon: FileWarning, title: 'Billing errors', cost: '$3,200/mo', desc: 'Denied claims and eligibility mistakes quietly eat into revenue you’ve already earned.' },
+];
+
+const SOLUTION_LAYERS = [
+  { n: '01', Icon: RotateCcw, title: 'Patient reactivation', desc: 'Automated multi-touch sequences win back lapsed patients without your team lifting a finger. Every dead lead gets worked, every time.', label: 'Included in all plans' },
+  { n: '02', Icon: Bot, title: 'AI front desk', desc: 'An AI receptionist answers every call, triages urgency, and books directly into your calendar — 24/7, with zero missed calls.', label: 'Included in all plans' },
+  { n: '03', Icon: Receipt, title: 'Billing automation', desc: 'ERA auto-posting and denial management work your claims automatically, so errors get caught and fixed before they cost you.', label: 'Pro plan' },
+];
+
+const FEATURES_9 = [
+  { Icon: ClipboardList, title: 'Smart Waitlist', desc: 'Cancelled slots automatically text the next patient in line and fill themselves in minutes.' },
+  { Icon: Shield, title: 'Insurance Eligibility', desc: 'Every appointment is auto-checked against insurance before the patient walks in the door.' },
+  { Icon: Contact, title: 'Patient Portal', desc: 'Patients complete forms, sign documents, and message your team from their phone.' },
+  { Icon: Star, title: 'Review Automation', desc: 'Automated review requests turn happy visits into 5-star ratings, on autopilot.' },
+  { Icon: Smile, title: 'NPS Surveys', desc: 'Catch unhappy patients early with automated satisfaction surveys and recovery workflows.' },
+  { Icon: RotateCcw, title: 'Recall System', desc: 'Multi-touch recall sequences bring overdue patients back without manual follow-up.' },
+  { Icon: Megaphone, title: 'Custom Campaigns', desc: 'Build targeted email and SMS campaigns for any segment of your patient list.' },
+  { Icon: CreditCard, title: 'Payment Plans', desc: 'Stripe-powered payment plans with automatic retry on failed charges.' },
+  { Icon: Activity, title: 'Activity Log', desc: 'A full audit trail of every action taken across your practice, for compliance and accountability.' },
+];
+
+const COMPETITOR_COLUMNS = [
+  { name: 'PraxisMD', price: null, highlight: true },
+  { name: 'Weave', price: '$399' },
+  { name: 'Podium', price: '$289' },
+  { name: 'RevenueWell', price: '$189' },
+  { name: 'NexHealth', price: null },
+];
+
+const COMPARISON_ROWS = [
+  { feature: 'Patient reactivation', wins: [true, false, false, false, false] },
+  { feature: 'AI front desk calls', wins: [true, false, false, false, false] },
+  { feature: 'Billing automation', wins: [true, false, false, false, false] },
+  { feature: 'Smart waitlist', wins: [true, false, false, false, false] },
+  { feature: 'Insurance eligibility', wins: [true, false, false, false, true] },
+  { feature: 'NPS surveys', wins: [true, true, false, false, false] },
+  { feature: 'Payment plans', wins: [true, false, false, false, true] },
+];
+
+const STARTING_PRICE_ROW = ['$299/mo', '$399/mo', '$289/mo', '$189/mo', 'Custom pricing'];
+
+const PRICING_PLANS = [
   {
-    name: 'Starter', popular: false,
+    name: 'Starter', price: '$299', popular: false,
     blurb: 'For solo practices getting started with automation.',
     features: [
       'Up to 500 active patients',
       'Two-way texting & email',
       'Online booking & reminders',
-      'Automated review requests',
+      'Patient reactivation sequences',
+      'Smart waitlist',
       'Basic reporting',
     ],
   },
   {
-    name: 'Growth', popular: true,
-    blurb: 'The most popular plan — built to grow your patient base.',
+    name: 'Growth', price: '$499', popular: false,
+    blurb: 'For growing practices that want more automation.',
     features: [
       'Everything in Starter',
-      'Patient reactivation sequences',
-      'Smart waitlist auto-fill',
       'Insurance eligibility verification',
       'NPS surveys & detractor recovery',
+      'Custom campaigns',
+      'Review automation',
       'Priority support',
     ],
   },
   {
-    name: 'Pro', popular: false,
+    name: 'Pro', price: '$999', popular: true,
     blurb: 'For multi-provider practices that want it fully automated.',
     features: [
       'Everything in Growth',
@@ -50,177 +130,502 @@ const PRICING = [
       'Billing automation + ERA auto-posting',
       'Payment plans via Stripe with auto-retry',
       'Patient portal & e-signatures',
+      'Activity log & audit trail',
       'Dedicated success manager',
     ],
   },
 ];
 
-const COMPETITORS = ['PraxisMD', 'Weave', 'RevenueWell', 'NexHealth', 'Podium'];
-
-const COMPARISON = [
-  { feature: 'Patient reactivation sequences', wins: [true, false, false, false, false] },
-  { feature: 'Billing automation & denial management', wins: [true, false, false, false, false] },
-  { feature: 'AI front desk (answers & books calls)', wins: [true, false, false, false, false] },
-  { feature: 'Smart waitlist auto-fill', wins: [true, false, false, false, false] },
-  { feature: 'Insurance eligibility verification', wins: [true, true, false, false, false] },
-  { feature: 'Two-way texting', wins: [true, true, true, true, true] },
-  { feature: 'Online booking & reminders', wins: [true, true, true, true, false] },
+// TODO: replace with real customer testimonials before launch — these are
+// placeholder quotes for demonstration purposes only.
+const TESTIMONIALS = [
+  { quote: 'PraxisMD paid for itself in the first two weeks — we reactivated 11 patients we’d completely written off.', name: 'Dr. Lauren Ferris', practice: 'Ferris Family Dental', location: 'Austin, TX', stars: 5 },
+  { quote: 'The AI front desk alone saves my team six hours a week. We haven’t missed a call since we turned it on.', name: 'Marcus Webb', practice: 'Coastal Dental Group', location: 'Charleston, SC', stars: 5 },
+  { quote: 'We finally have a real handle on denied claims. Our collections are up almost 20% in three months.', name: 'Dr. Priya Nair', practice: 'Nair Orthodontics', location: 'San Jose, CA', stars: 5 },
 ];
 
-const FEATURES = [
-  { Icon: RotateCcw, title: 'Patient reactivation', desc: '6-month automated multi-touch sequences bring lapsed patients back — no manual follow-up.' },
-  { Icon: Bot, title: 'AI front desk', desc: 'An AI receptionist that actually answers calls, triages urgency, and books appointments.' },
-  { Icon: ClipboardList, title: 'Smart waitlist', desc: 'Cancelled slots auto-text the next patient in line and fill themselves in minutes.' },
-  { Icon: Receipt, title: 'Billing automation', desc: 'ERA auto-posting and denial management, so claims get worked without the busywork.' },
-  { Icon: Shield, title: 'Eligibility verification', desc: 'Every appointment is auto-checked against insurance before the patient walks in.' },
-  { Icon: Smile, title: 'NPS & detractor recovery', desc: 'Catch unhappy patients early with automated surveys and recovery workflows.' },
-  { Icon: CreditCard, title: 'Payment plans', desc: 'Stripe-powered plans with automatic retry on failed payments — no chasing balances.' },
-  { Icon: Contact, title: 'Patient portal', desc: 'E-forms and document signing patients can complete from their phone, before they arrive.' },
+const FOOTER_COLUMNS = [
+  { title: 'Product', links: ['Features', 'Pricing', 'Compare', 'Book a demo'] },
+  { title: 'Company', links: ['About', 'Careers', 'Blog', 'Contact'] },
+  { title: 'Resources', links: ['Help center', 'API docs', 'System status', 'Case studies'] },
+  { title: 'Legal', links: ['Privacy policy', 'Terms of service', 'BAA', 'Security'] },
 ];
 
-function NavBar() {
+// ─── SCROLL-REVEAL WRAPPER ─────────────────────────────────
+function Reveal({ children, style }) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    }, { threshold: 0.12 });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div style={{ position: 'sticky', top: 0, zIndex: 50, background: withAlpha(t.bgSidebar, .92), backdropFilter: 'blur(8px)', borderBottom: `1px solid ${t.border}` }}>
+    <div
+      ref={ref}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(28px)',
+        transition: 'opacity .7s ease, transform .7s ease',
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── DEMO MODAL ────────────────────────────────────────────
+function DemoModal({ open, onClose }) {
+  const [form, setForm] = useState({ name: '', practice: '', email: '', phone: '' });
+  const [submitted, setSubmitted] = useState(false);
+
+  if (!open) return null;
+
+  function handleChange(field) {
+    return (e) => setForm(f => ({ ...f, [field]: e.target.value }));
+  }
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setSubmitted(true);
+  }
+
+  function handleClose() {
+    onClose();
+    setTimeout(() => {
+      setSubmitted(false);
+      setForm({ name: '', practice: '', email: '', phone: '' });
+    }, 250);
+  }
+
+  return (
+    <div
+      onClick={handleClose}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: C.bg, borderRadius: '18px', padding: '32px', maxWidth: '440px', width: '100%', boxShadow: '0 30px 70px rgba(15,23,42,.3)', position: 'relative' }}
+      >
+        <button type="button" onClick={handleClose} style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px', display: 'flex' }}>
+          <X size={18} color={C.muted} />
+        </button>
+        {submitted ? (
+          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+            <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: C.greenL, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <Check size={24} color={C.green} />
+            </div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: C.ink, marginBottom: '8px' }}>Thanks — we’ll be in touch!</div>
+            <div style={{ fontSize: '13.5px', color: C.mid, lineHeight: 1.6 }}>
+              Someone from our team will reach out within one business day to schedule your walkthrough.
+            </div>
+          </div>
+        ) : (
+          <>
+            <div style={{ fontSize: '20px', fontWeight: '700', color: C.ink, marginBottom: '6px' }}>Book a demo</div>
+            <div style={{ fontSize: '13.5px', color: C.mid, marginBottom: '22px' }}>See PraxisMD on a 20-minute walkthrough with our team.</div>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <input required value={form.name} onChange={handleChange('name')} placeholder="Your name" style={inputStyle} />
+              <input required value={form.practice} onChange={handleChange('practice')} placeholder="Practice name" style={inputStyle} />
+              <input required type="email" value={form.email} onChange={handleChange('email')} placeholder="Email address" style={inputStyle} />
+              <input required type="tel" value={form.phone} onChange={handleChange('phone')} placeholder="Phone number" style={inputStyle} />
+              <button type="submit" className="px-btn" style={{ marginTop: '6px', padding: '13px', borderRadius: '10px', border: 'none', background: C.brand, color: 'white', fontSize: '14.5px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
+                Request my demo
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── NAVBAR ────────────────────────────────────────────────
+function NavBar({ onOpenDemo }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const links = [
+    ['Features', 'features'],
+    ['Pricing', 'pricing'],
+    ['Compare', 'compare'],
+    ['Contact', 'contact'],
+  ];
+
+  function go(id) {
+    return () => { scrollToId(id)(); setMobileOpen(false); };
+  }
+
+  return (
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, background: withAlpha('#FFFFFF', .92), backdropFilter: 'blur(8px)', borderBottom: `1px solid ${C.border}` }}>
       <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '14px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '13px' }}>Px</div>
-          <span style={{ fontSize: '18px', fontWeight: '700', color: t.ink }}>PraxisMD</span>
+          <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '13px' }}>Px</div>
+          <span style={{ fontSize: '18px', fontWeight: '700', color: C.ink }}>PraxisMD</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '28px', fontSize: '13.5px', fontWeight: '500', color: t.mid }}>
-          <button type="button" onClick={scrollToId('features')} style={{ color: 'inherit', background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', cursor: 'pointer', textDecoration: 'none' }}>Features</button>
-          <button type="button" onClick={scrollToId('pricing')} style={{ color: 'inherit', background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', cursor: 'pointer', textDecoration: 'none' }}>Pricing</button>
-          <button type="button" onClick={scrollToId('compare')} style={{ color: 'inherit', background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', cursor: 'pointer', textDecoration: 'none' }}>Compare</button>
+
+        <div className="px-nav-links" style={{ display: 'flex', alignItems: 'center', gap: '28px', fontSize: '13.5px', fontWeight: '500', color: C.mid }}>
+          {links.map(([label, id]) => (
+            <button key={id} type="button" onClick={go(id)} style={{ color: 'inherit', background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', cursor: 'pointer' }}>{label}</button>
+          ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Link to="/login" style={{ color: t.mid, textDecoration: 'none', fontSize: '13.5px', fontWeight: '500', whiteSpace: 'nowrap' }}>Sign in</Link>
-          <button type="button" onClick={scrollToId('demo')} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', fontFamily: 'inherit', textDecoration: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }}>
-            Book a Demo
+
+        <div className="px-nav-links" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <Link to="/login" style={{ color: C.mid, textDecoration: 'none', fontSize: '13.5px', fontWeight: '500', whiteSpace: 'nowrap' }}>Sign in</Link>
+          <button type="button" onClick={onOpenDemo} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '10px', border: 'none', background: C.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', fontFamily: 'inherit', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+            Book a demo
           </button>
+        </div>
+
+        <button
+          type="button"
+          className="px-nav-hamburger"
+          onClick={() => setMobileOpen(o => !o)}
+          style={{ display: 'none', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
+        >
+          {mobileOpen ? <X size={22} color={C.ink} /> : <Menu size={22} color={C.ink} />}
+        </button>
+      </div>
+
+      {mobileOpen && (
+        <div className="px-nav-hamburger" style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '10px 26px 18px', borderTop: `1px solid ${C.border}` }}>
+          {links.map(([label, id]) => (
+            <button key={id} type="button" onClick={go(id)} style={{ textAlign: 'left', padding: '11px 4px', border: 'none', background: 'transparent', fontSize: '14.5px', fontWeight: '500', color: C.ink2, cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>
+          ))}
+          <Link to="/login" onClick={() => setMobileOpen(false)} style={{ padding: '11px 4px', color: C.mid, textDecoration: 'none', fontSize: '14.5px', fontWeight: '500' }}>Sign in</Link>
+          <button type="button" onClick={() => { setMobileOpen(false); onOpenDemo(); }} className="px-btn" style={{ marginTop: '8px', padding: '12px', borderRadius: '10px', border: 'none', background: C.brand, color: 'white', fontSize: '14px', fontWeight: '700', fontFamily: 'inherit', cursor: 'pointer' }}>
+            Book a demo
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionLabel({ children }) {
+  return <div style={{ fontSize: '11px', fontWeight: '700', color: C.brand, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', textAlign: 'center' }}>{children}</div>;
+}
+
+// ─── HERO DASHBOARD MOCKUP ─────────────────────────────────
+function HeroMockup() {
+  const stats = [
+    ['Revenue', '$8,400', C.green],
+    ['Appts', '4', C.brand],
+    ['Messages', '4', C.red],
+    ['Alerts', '3', C.amber],
+  ];
+  const navItems = [['Overview', true], ['Inbox', false], ['Campaigns', false], ['Recall', false], ['Patients', false]];
+
+  return (
+    <div style={{ marginTop: '56px', maxWidth: '900px', marginLeft: 'auto', marginRight: 'auto' }}>
+      <div style={{ background: '#1E293B', borderRadius: '14px 14px 0 0', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#F59E0B' }} />
+          <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#22C55E' }} />
+        </div>
+        <div style={{ flex: 1, maxWidth: '280px', margin: '0 auto', background: 'rgba(255,255,255,.08)', borderRadius: '6px', padding: '4px 12px', fontSize: '11.5px', color: 'rgba(255,255,255,.6)', textAlign: 'center' }}>
+          praxismd.health
+        </div>
+      </div>
+      <div className="px-hero-mockup" style={{ background: '#fff', borderRadius: '0 0 14px 14px', border: `1px solid ${C.border}`, borderTop: 'none', padding: '20px', boxShadow: '0 40px 80px -20px rgba(15,23,42,.35)', transform: 'perspective(1400px) rotateX(4deg) scale(0.99)', transformOrigin: 'top center' }}>
+        <div style={{ display: 'flex', gap: '14px' }}>
+          <div className="px-hero-mockup-sidebar" style={{ width: '110px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {navItems.map(([label, active], i) => (
+              <div key={i} style={{ padding: '7px 10px', borderRadius: '7px', fontSize: '10.5px', fontWeight: '600', color: active ? '#F2734A' : '#94A3B8', background: active ? '#FFE8DA' : 'transparent' }}>{label}</div>
+            ))}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
+              {stats.map(([label, val, color], i) => (
+                <div key={i} style={{ background: '#F8FAFC', borderRadius: '8px', padding: '10px' }}>
+                  <div style={{ fontSize: '9px', color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>{label}</div>
+                  <div style={{ fontSize: '15px', fontWeight: '800', color }}>{val}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ background: '#F8FAFC', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{ height: '9px', borderRadius: '4px', background: '#E2E8F0', width: `${88 - i * 14}%` }} />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function SectionLabel({ children }) {
-  return <div style={{ fontSize: '11px', fontWeight: '700', color: t.brand, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', textAlign: 'center' }}>{children}</div>;
-}
-
+// ─── MAIN ──────────────────────────────────────────────────
 function Landing() {
+  const [demoOpen, setDemoOpen] = useState(false);
+  const openDemo = () => setDemoOpen(true);
+
   return (
-    <div style={{ fontFamily: 'Inter, sans-serif', background: t.bgPage, color: t.ink2, minHeight: '100vh' }}>
+    <div style={{ fontFamily: 'Inter, sans-serif', background: C.bg, color: C.ink2, minHeight: '100vh' }}>
       <style>{`
+        html { scroll-behavior: smooth; }
         .px-btn { transition: transform .08s ease, box-shadow .15s ease; }
         .px-btn:active { transform: scale(0.97); }
         .px-pcard { transition: transform .15s ease, box-shadow .15s ease; }
         .px-pcard:hover { transform: translateY(-3px); box-shadow: 0 14px 32px rgba(0,0,0,.10); }
         .px-fcard { transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
-        .px-fcard:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.07); border-color: ${withAlpha(t.brand, .3)}; }
+        .px-fcard:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.07); border-color: ${withAlpha(C.brand, .3)}; }
+        .px-problem-card { transition: transform .15s ease, box-shadow .15s ease; }
+        .px-problem-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.06); }
+        .px-tcard { transition: transform .15s ease, box-shadow .15s ease; }
+        .px-tcard:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.06); }
+        .px-hero-mockup { transition: transform .4s ease; }
+        .px-hero-mockup:hover { transform: perspective(1400px) rotateX(0deg) scale(1); }
+        .px-footer-link { transition: color .12s ease; }
+        .px-footer-link:hover { color: ${C.ink} !important; }
+        .px-nav-hamburger { display: none; }
+        @media (max-width: 760px) {
+          .px-nav-links { display: none !important; }
+          .px-nav-hamburger { display: flex !important; }
+        }
         @media (max-width: 900px) {
           .px-pricing-grid { grid-template-columns: 1fr !important; }
           .px-features-grid { grid-template-columns: 1fr 1fr !important; }
+          .px-problem-grid { grid-template-columns: 1fr !important; }
+          .px-solution-grid { grid-template-columns: 1fr !important; }
+          .px-testimonial-grid { grid-template-columns: 1fr !important; }
+          .px-footer-grid { grid-template-columns: 1fr 1fr !important; }
           .px-hero-headline { font-size: 34px !important; }
+          .px-hero-mockup-sidebar { display: none !important; }
+          .px-social-proof { flex-direction: column !important; }
         }
         @media (max-width: 560px) {
           .px-features-grid { grid-template-columns: 1fr !important; }
           .px-compare-table { font-size: 11.5px !important; }
+          .px-footer-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
 
-      <NavBar />
+      <NavBar onOpenDemo={openDemo} />
+      <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
 
       {/* HERO */}
-      <div style={{ maxWidth: '840px', margin: '0 auto', padding: '84px 26px 64px', textAlign: 'center' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '20px', background: t.brandL, color: t.brand, fontSize: '12px', fontWeight: '600', marginBottom: '22px' }}>
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '150px 26px 80px', textAlign: 'center' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '20px', background: C.brandL, color: C.brand, fontSize: '12px', fontWeight: '600', marginBottom: '22px' }}>
           <Sparkles size={13} /> Built for dental &amp; medical practices
         </div>
-        <h1 className="px-hero-headline" style={{ fontSize: '46px', fontWeight: '800', letterSpacing: '-1.2px', lineHeight: '1.12', color: t.ink, margin: '0 0 18px' }}>
-          The only practice platform that brings patients <span style={{ color: t.brand }}>back</span> — and gets you <span style={{ color: t.green }}>paid</span>.
+        <h1 className="px-hero-headline" style={{ fontSize: '44px', fontWeight: '800', letterSpacing: '-1.2px', lineHeight: '1.15', color: C.ink, margin: '0 0 20px' }}>
+          The only platform that reactivates your patients, runs your front desk, and handles your billing. All for less than what you pay for Weave.
         </h1>
-        <p style={{ fontSize: '17px', color: t.mid, lineHeight: '1.6', margin: '0 auto 32px', maxWidth: '620px' }}>
-          PraxisMD combines patient reactivation, an AI front desk, and billing automation in one dashboard —
+        <p style={{ fontSize: '17px', color: C.mid, lineHeight: '1.6', margin: '0 auto 32px', maxWidth: '640px' }}>
+          PraxisMD combines patient reactivation, an AI front desk, and billing automation into one platform —
           so your team spends less time chasing patients and paperwork, and more time in the chair.
         </p>
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button type="button" onClick={scrollToId('demo')} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', border: 'none', background: t.brand, color: 'white', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit', textDecoration: 'none', cursor: 'pointer' }}>
-            Book a Demo <ArrowRight size={16} />
+          <button type="button" onClick={openDemo} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', border: 'none', background: C.brand, color: 'white', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit', cursor: 'pointer' }}>
+            Book a demo <ArrowRight size={16} />
           </button>
-          <button type="button" onClick={scrollToId('pricing')} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '15px', fontWeight: '600', fontFamily: 'inherit', textDecoration: 'none', cursor: 'pointer' }}>
-            See pricing
+          <button type="button" onClick={scrollToId('solution')} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', border: `1px solid ${C.border}`, background: C.bg, color: C.ink2, fontSize: '15px', fontWeight: '600', fontFamily: 'inherit', cursor: 'pointer' }}>
+            See how it works
           </button>
         </div>
-        <div style={{ marginTop: '18px', fontSize: '12.5px', color: t.muted }}>No credit card required · Cancel anytime</div>
-      </div>
 
-      {/* FEATURES */}
-      <div id="features" style={{ maxWidth: '1160px', margin: '0 auto', padding: '20px 26px 80px' }}>
-        <SectionLabel>What makes PraxisMD different</SectionLabel>
-        <h2 style={{ fontSize: '30px', fontWeight: '700', color: t.ink, textAlign: 'center', margin: '0 0 12px', letterSpacing: '-.5px' }}>
-          Everything competitors are missing
-        </h2>
-        <p style={{ fontSize: '14.5px', color: t.mid, textAlign: 'center', maxWidth: '560px', margin: '0 auto 44px' }}>
-          Weave, RevenueWell, and NexHealth handle messaging and scheduling. None of them bring patients back
-          or automate your billing. PraxisMD does both.
-        </p>
-        <div className="px-features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px' }}>
-          {FEATURES.map(({ Icon, title, desc }, i) => (
-            <div key={i} className="px-fcard" style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '14px', padding: '22px 20px' }}>
-              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                <Icon size={18} color={t.brand} />
-              </div>
-              <div style={{ fontSize: '14.5px', fontWeight: '600', color: t.ink2, marginBottom: '6px' }}>{title}</div>
-              <div style={{ fontSize: '12.5px', color: t.mid, lineHeight: '1.55' }}>{desc}</div>
+        <div className="px-social-proof" style={{ display: 'flex', justifyContent: 'center', gap: '32px', marginTop: '44px', flexWrap: 'wrap' }}>
+          {[
+            '5-15 patients reactivated in first 30 days',
+            'Zero missed calls with AI front desk',
+            '15-30% more claims collected',
+          ].map((stat, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: C.ink2 }}>
+              <Check size={15} color={C.green} style={{ flexShrink: 0 }} />
+              {stat}
             </div>
           ))}
         </div>
+
+        <HeroMockup />
+      </div>
+
+      {/* PROBLEM */}
+      <div id="problem" style={{ background: C.bgAlt, padding: '80px 26px' }}>
+        <Reveal style={{ maxWidth: '1080px', margin: '0 auto' }}>
+          <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 44px', letterSpacing: '-.5px', lineHeight: 1.3 }}>
+            Your practice is leaving money on the table. Every. Single. Month.
+          </h2>
+          <div className="px-problem-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+            {PROBLEM_CARDS.map(({ Icon, title, cost, desc }, i) => (
+              <div key={i} className="px-problem-card" style={{ background: C.bg, borderRadius: '16px', padding: '26px 22px', border: `1px solid ${C.border}`, borderTop: `4px solid ${C.red}` }}>
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: C.redL, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
+                  <Icon size={19} color={C.red} />
+                </div>
+                <div style={{ fontSize: '15.5px', fontWeight: '700', color: C.ink, marginBottom: '4px' }}>{title}</div>
+                <div style={{ fontSize: '22px', fontWeight: '800', color: C.red, marginBottom: '10px' }}>{cost}</div>
+                <div style={{ fontSize: '13px', color: C.mid, lineHeight: '1.6' }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+      </div>
+
+      {/* SOLUTION */}
+      <div id="solution" style={{ padding: '80px 26px' }}>
+        <Reveal style={{ maxWidth: '1080px', margin: '0 auto' }}>
+          <SectionLabel>The fix</SectionLabel>
+          <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 44px', letterSpacing: '-.5px' }}>
+            PraxisMD fixes all three. Automatically.
+          </h2>
+          <div className="px-solution-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+            {SOLUTION_LAYERS.map(({ n, Icon, title, desc, label }, i) => (
+              <div key={i} style={{ background: C.bgAlt, borderRadius: '16px', padding: '26px 22px', border: `1px solid ${C.border}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: C.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={19} color={C.brand} />
+                  </div>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: C.muted, letterSpacing: '.5px' }}>LAYER {n}</div>
+                </div>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: C.ink, marginBottom: '8px' }}>{title}</div>
+                <div style={{ fontSize: '13px', color: C.mid, lineHeight: '1.6', marginBottom: '16px' }}>{desc}</div>
+                <div style={{ display: 'inline-flex', padding: '4px 11px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', background: label === 'Pro plan' ? C.amberL : C.greenL, color: label === 'Pro plan' ? C.amber : C.green }}>
+                  {label}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+      </div>
+
+      {/* FEATURES */}
+      <div id="features" style={{ background: C.bgAlt, padding: '80px 26px' }}>
+        <Reveal style={{ maxWidth: '1080px', margin: '0 auto' }}>
+          <SectionLabel>Everything included</SectionLabel>
+          <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 12px', letterSpacing: '-.5px' }}>
+            Everything your practice needs. Nothing it doesn’t.
+          </h2>
+          <p style={{ fontSize: '14.5px', color: C.mid, textAlign: 'center', maxWidth: '560px', margin: '0 auto 44px' }}>
+            One platform instead of five different tools that don’t talk to each other.
+          </p>
+          <div className="px-features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+            {FEATURES_9.map(({ Icon, title, desc }, i) => (
+              <div key={i} className="px-fcard" style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: '14px', padding: '22px 20px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: C.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                  <Icon size={18} color={C.brand} />
+                </div>
+                <div style={{ fontSize: '14.5px', fontWeight: '600', color: C.ink2, marginBottom: '6px' }}>{title}</div>
+                <div style={{ fontSize: '12.5px', color: C.mid, lineHeight: '1.55' }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+      </div>
+
+      {/* COMPARISON */}
+      <div id="compare" style={{ padding: '80px 26px' }}>
+        <Reveal style={{ maxWidth: '1040px', margin: '0 auto' }}>
+          <SectionLabel>How we compare</SectionLabel>
+          <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 44px', letterSpacing: '-.5px' }}>
+            How PraxisMD compares
+          </h2>
+          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: '16px', overflow: 'hidden', overflowX: 'auto' }}>
+            <table className="px-compare-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '620px' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '16px 18px', fontSize: '11.5px', fontWeight: '600', color: C.muted, textTransform: 'uppercase', letterSpacing: '.4px', background: C.bgAlt, borderBottom: `1px solid ${C.border}` }}>Feature</th>
+                  {COMPETITOR_COLUMNS.map((c, i) => (
+                    <th key={i} style={{
+                      textAlign: 'center', padding: '14px 12px', fontSize: '12.5px', fontWeight: '700',
+                      color: c.highlight ? 'white' : C.mid,
+                      background: c.highlight ? C.brand : C.bgAlt,
+                      borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap',
+                    }}>
+                      <div>{c.name}</div>
+                      {c.price && <div style={{ fontSize: '10.5px', fontWeight: '500', opacity: .8, marginTop: '2px' }}>{c.price}/mo</div>}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARISON_ROWS.map((row, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '13px 18px', color: C.ink2, fontWeight: '500' }}>{row.feature}</td>
+                    {row.wins.map((win, j) => (
+                      <td key={j} style={{ textAlign: 'center', padding: '13px 12px', background: COMPETITOR_COLUMNS[j].highlight ? withAlpha(C.brand, .06) : 'transparent' }}>
+                        {win
+                          ? <Check size={16} color={C.green} style={{ display: 'inline-block' }} />
+                          : <X size={16} color={C.muted} style={{ display: 'inline-block', opacity: .5 }} />}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                <tr>
+                  <td style={{ padding: '13px 18px', color: C.ink, fontWeight: '700' }}>Starting price</td>
+                  {STARTING_PRICE_ROW.map((price, j) => (
+                    <td key={j} style={{ textAlign: 'center', padding: '13px 12px', fontWeight: '700', color: COMPETITOR_COLUMNS[j].highlight ? C.brand : C.ink2, background: COMPETITOR_COLUMNS[j].highlight ? withAlpha(C.brand, .06) : 'transparent' }}>
+                      {price}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Reveal>
       </div>
 
       {/* PRICING */}
-      <div id="pricing" style={{ background: t.bgSidebar, borderTop: `1px solid ${t.border}`, borderBottom: `1px solid ${t.border}`, padding: '80px 26px' }}>
-        <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
+      <div id="pricing" style={{ background: C.bgAlt, padding: '80px 26px' }}>
+        <Reveal style={{ maxWidth: '1080px', margin: '0 auto' }}>
           <SectionLabel>Pricing</SectionLabel>
-          <h2 style={{ fontSize: '30px', fontWeight: '700', color: t.ink, textAlign: 'center', margin: '0 0 12px', letterSpacing: '-.5px' }}>
-            Simple plans that pay for themselves
+          <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 12px', letterSpacing: '-.5px' }}>
+            Simple pricing. No hidden fees. No long term contracts.
           </h2>
-          <p style={{ fontSize: '14.5px', color: t.mid, textAlign: 'center', maxWidth: '520px', margin: '0 auto 44px' }}>
+          <p style={{ fontSize: '14.5px', color: C.mid, textAlign: 'center', maxWidth: '520px', margin: '0 auto 44px' }}>
             Most practices recover their subscription cost in reactivated appointments within the first month.
           </p>
           <div className="px-pricing-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', alignItems: 'start' }}>
-            {PRICING.map((plan, i) => (
+            {PRICING_PLANS.map((plan, i) => (
               <div
                 key={i}
                 className="px-pcard"
                 style={{
-                  background: t.bgCard, borderRadius: '16px', padding: '28px 24px',
-                  border: plan.popular ? `2px solid ${t.brand}` : `1px solid ${t.border}`,
-                  position: 'relative', boxShadow: plan.popular ? `0 12px 30px ${withAlpha(t.brand, .12)}` : 'none',
+                  background: C.bg, borderRadius: '16px', padding: '28px 24px',
+                  border: plan.popular ? `2px solid ${C.brand}` : `1px solid ${C.border}`,
+                  position: 'relative', boxShadow: plan.popular ? `0 12px 30px ${withAlpha(C.brand, .12)}` : 'none',
                 }}
               >
                 {plan.popular && (
-                  <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 12px', borderRadius: '20px', background: t.brand, color: 'white', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                  <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 12px', borderRadius: '20px', background: C.brand, color: 'white', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>
                     <Star size={11} fill="white" /> MOST POPULAR
                   </div>
                 )}
-                <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, marginBottom: '4px' }}>{plan.name}</div>
-                <div style={{ fontSize: '12.5px', color: t.mid, marginBottom: '22px', minHeight: '36px' }}>{plan.blurb}</div>
-                <a
-                  href={`mailto:sales@praxismd.com?subject=${encodeURIComponent(`Pricing inquiry — ${plan.name} plan`)}`}
+                <div style={{ fontSize: '15px', fontWeight: '700', color: C.ink, marginBottom: '4px' }}>{plan.name}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '30px', fontWeight: '800', color: C.ink }}>{plan.price}</span>
+                  <span style={{ fontSize: '13px', color: C.muted }}>/mo</span>
+                </div>
+                <div style={{ fontSize: '12.5px', color: C.mid, marginBottom: '22px', minHeight: '36px' }}>{plan.blurb}</div>
+                <button
+                  type="button"
+                  onClick={openDemo}
                   className="px-btn"
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%',
-                    padding: '11px', borderRadius: '10px', marginBottom: '22px', textDecoration: 'none',
-                    fontSize: '13.5px', fontWeight: '600',
-                    background: plan.popular ? t.brand : t.bgRow,
-                    color: plan.popular ? 'white' : t.ink2,
-                    border: plan.popular ? 'none' : `1px solid ${t.border}`,
+                    padding: '11px', borderRadius: '10px', marginBottom: '22px',
+                    fontSize: '13.5px', fontWeight: '600', fontFamily: 'inherit', cursor: 'pointer',
+                    background: plan.popular ? C.brand : C.bgAlt,
+                    color: plan.popular ? 'white' : C.ink2,
+                    border: plan.popular ? 'none' : `1px solid ${C.border}`,
                   }}
                 >
-                  Inquire about pricing
-                </a>
+                  Get started
+                </button>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {plan.features.map((f, j) => (
-                    <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', fontSize: '13px', color: t.mid }}>
-                      <Check size={15} color={t.green} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', fontSize: '13px', color: C.mid }}>
+                      <Check size={15} color={C.green} style={{ flexShrink: 0, marginTop: '2px' }} />
                       <span>{f}</span>
                     </div>
                   ))}
@@ -228,77 +633,68 @@ function Landing() {
               </div>
             ))}
           </div>
-        </div>
+          <div style={{ textAlign: 'center', fontSize: '12.5px', color: C.muted, marginTop: '36px' }}>
+            All plans include a signed BAA, HIPAA-compliant infrastructure, and free data migration onboarding — no setup fees, cancel anytime.
+          </div>
+        </Reveal>
       </div>
 
-      {/* COMPARISON */}
-      <div id="compare" style={{ maxWidth: '1000px', margin: '0 auto', padding: '80px 26px' }}>
-        <SectionLabel>How we compare</SectionLabel>
-        <h2 style={{ fontSize: '30px', fontWeight: '700', color: t.ink, textAlign: 'center', margin: '0 0 12px', letterSpacing: '-.5px' }}>
-          See what the competition leaves out
-        </h2>
-        <p style={{ fontSize: '14.5px', color: t.mid, textAlign: 'center', maxWidth: '560px', margin: '0 auto 40px' }}>
-          PraxisMD is the only platform built around getting patients back in the chair and getting claims paid —
-          not just messaging.
-        </p>
-        <div style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '16px', overflow: 'hidden', overflowX: 'auto' }}>
-          <table className="px-compare-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '560px' }}>
-            <thead>
-              <tr style={{ background: t.bgRow }}>
-                <th style={{ textAlign: 'left', padding: '14px 18px', fontSize: '11.5px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', borderBottom: `1px solid ${t.border}` }}>Feature</th>
-                {COMPETITORS.map((c, i) => (
-                  <th key={i} style={{
-                    textAlign: 'center', padding: '14px 12px', fontSize: '12.5px', fontWeight: '700',
-                    color: i === 0 ? t.brand : t.mid, borderBottom: `1px solid ${t.border}`, whiteSpace: 'nowrap',
-                  }}>{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {COMPARISON.map((row, i) => (
-                <tr key={i} style={{ borderBottom: i < COMPARISON.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
-                  <td style={{ padding: '13px 18px', color: t.ink2, fontWeight: '500' }}>{row.feature}</td>
-                  {row.wins.map((win, j) => (
-                    <td key={j} style={{ textAlign: 'center', padding: '13px 12px', background: j === 0 && win ? withAlpha(t.accentGreen, .08) : 'transparent' }}>
-                      {win
-                        ? <Check size={16} color={t.green} style={{ display: 'inline-block' }} />
-                        : <X size={16} color={t.muted} style={{ display: 'inline-block', opacity: .5 }} />}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* CTA */}
-      <div id="demo" style={{ background: `linear-gradient(120deg, ${t.brand}, ${t.teal})`, padding: '70px 26px' }}>
-        <div style={{ maxWidth: '620px', margin: '0 auto', textAlign: 'center' }}>
-          <h2 style={{ fontSize: '28px', fontWeight: '700', color: 'white', margin: '0 0 12px', letterSpacing: '-.5px' }}>
-            See PraxisMD on your own schedule
+      {/* TESTIMONIALS */}
+      <div id="testimonials" style={{ padding: '80px 26px' }}>
+        <Reveal style={{ maxWidth: '1080px', margin: '0 auto' }}>
+          <SectionLabel>Testimonials</SectionLabel>
+          <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 44px', letterSpacing: '-.5px' }}>
+            What practices are saying
           </h2>
-          <p style={{ fontSize: '14.5px', color: withAlpha('#FFFFFF', .85), margin: '0 0 28px', lineHeight: '1.6' }}>
-            Book a 20-minute walkthrough with our team — we'll show you exactly how much revenue reactivation
-            could recover for your practice.
-          </p>
-          <a
-            href="mailto:demo@praxismd.com?subject=Book%20a%20PraxisMD%20demo"
-            className="px-btn"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '14px 28px', borderRadius: '12px', background: 'white', color: t.brand, fontSize: '15px', fontWeight: '700', textDecoration: 'none' }}
-          >
-            Book a Demo <ArrowRight size={16} />
-          </a>
-        </div>
+          <div className="px-testimonial-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
+            {TESTIMONIALS.map((tItem, i) => (
+              <div key={i} className="px-tcard" style={{ background: C.bgAlt, borderRadius: '16px', padding: '24px 22px', border: `1px solid ${C.border}` }}>
+                <Quote size={22} color={withAlpha(C.brand, .35)} style={{ marginBottom: '12px' }} />
+                <div style={{ fontSize: '13.5px', color: C.ink2, lineHeight: '1.6', marginBottom: '18px' }}>“{tItem.quote}”</div>
+                <div style={{ display: 'flex', gap: '2px', marginBottom: '10px' }}>
+                  {Array.from({ length: tItem.stars }).map((_, s) => (
+                    <Star key={s} size={13} color={C.amber} fill={C.amber} />
+                  ))}
+                </div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: C.ink }}>{tItem.name}</div>
+                <div style={{ fontSize: '12px', color: C.muted }}>{tItem.practice} · {tItem.location}</div>
+              </div>
+            ))}
+          </div>
+        </Reveal>
       </div>
 
       {/* FOOTER */}
-      <div style={{ padding: '32px 26px', textAlign: 'center', fontSize: '12px', color: t.muted }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginBottom: '8px' }}>
-          <div style={{ width: '22px', height: '22px', borderRadius: '6px', background: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '10px' }}>Px</div>
-          <span style={{ fontWeight: '600', color: t.mid }}>PraxisMD</span>
+      <div id="contact" style={{ background: C.bgAlt, borderTop: `1px solid ${C.border}`, padding: '60px 26px 0' }}>
+        <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
+          <div className="px-footer-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(4, 1fr)', gap: '32px', paddingBottom: '44px' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '12px' }}>
+                <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '12px' }}>Px</div>
+                <span style={{ fontSize: '16px', fontWeight: '700', color: C.ink }}>PraxisMD</span>
+              </div>
+              <div style={{ fontSize: '13px', color: C.mid, lineHeight: '1.6', maxWidth: '240px' }}>
+                Patient reactivation, an AI front desk, and billing automation — all in one platform.
+              </div>
+            </div>
+            {FOOTER_COLUMNS.map((col, i) => (
+              <div key={i}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: C.ink, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '14px' }}>{col.title}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {col.links.map((link, j) => (
+                    <span key={j} className="px-footer-link" style={{ fontSize: '13px', color: C.mid, cursor: 'pointer' }}>{link}</span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ borderTop: `1px solid ${C.border}`, padding: '20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ fontSize: '12px', color: C.muted }}>© 2026 PraxisMD. All content on this page is for demonstration purposes.</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: C.muted, fontWeight: '600' }}>
+              <Shield size={13} color={C.green} /> HIPAA Compliant · SOC 2 Type II
+            </div>
+          </div>
         </div>
-        © 2026 PraxisMD. All content on this page is for demonstration purposes.
       </div>
     </div>
   );
