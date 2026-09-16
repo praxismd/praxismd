@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { light, dark, withAlpha } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, sendMessage, isGhlConfigured } from './api/ghl';
@@ -234,6 +234,7 @@ const ACTIVITY_LOG = [
 function App() {
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
+  const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [mode, setMode] = useState(getInitialMode);
   const [collapsed, setCollapsed] = useState(false);
@@ -245,7 +246,9 @@ function App() {
   const [rolePermissions, setRolePermissions] = useState(DEFAULT_ROLE_PERMISSIONS);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
-  const currentUser = { name: 'Dr. Rivera', role: userRole };
+  const ownerDisplayName = profile?.ownerName || (profile?.email ? profile.email.split('@')[0] : 'Owner');
+  const practiceDisplayName = profile?.practiceName || 'Your Practice';
+  const currentUser = { name: ownerDisplayName, role: userRole };
 
   function updateRolePermissions(role, perms) {
     setRolePermissions(rp => ({ ...rp, [role]: perms }));
@@ -295,9 +298,14 @@ function App() {
 
   useEffect(() => {
     if (!isFirebaseConfigured) { setAuthChecked(true); return; }
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) { navigate('/login'); return; }
-      setAuthChecked(true);
+      try {
+        const snap = await getDoc(doc(db, 'practices', user.uid));
+        setProfile(snap.exists() ? { email: user.email, ...snap.data() } : { email: user.email });
+      } finally {
+        setAuthChecked(true);
+      }
     });
     return unsub;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -414,7 +422,7 @@ function App() {
               </button>
             )}
           </div>
-          {showFull && <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '6px' }}>Bright Smiles Dental</div>}
+          {showFull && <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '6px' }}>{practiceDisplayName}</div>}
           {!showFull && (
             <button onClick={toggleCollapsed} title="Expand sidebar" style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: '12px', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', padding: '4px 0' }}>
               <Menu size={16} />
@@ -448,10 +456,10 @@ function App() {
 
         <div style={{ padding: showFull ? '12px 16px' : '12px 0', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: showFull ? 'space-between' : 'center', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>DR</div>
+            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>{initialsOf(ownerDisplayName)}</div>
             {showFull && (
               <div>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Dr. Rivera</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{ownerDisplayName}</div>
                 <div style={{ fontSize: '11px', color: t.muted }}>{userRole}</div>
               </div>
             )}
@@ -470,8 +478,8 @@ function App() {
         {/* TOPBAR */}
         <div style={{ height: '64px', background: t.bgSidebar, borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: '24px', padding: '0 26px', position: 'sticky', top: 0, zIndex: 50 }}>
           <div style={{ flexShrink: 0 }}>
-            <div style={{ fontSize: '16px', fontWeight: '600', color: t.ink }}>{getPageTitle(activeTab)}</div>
-            <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>Sunday, September 13 · Bright Smiles Dental</div>
+            <div style={{ fontSize: '16px', fontWeight: '600', color: t.ink }}>{getPageTitle(activeTab, ownerDisplayName)}</div>
+            <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · {practiceDisplayName}</div>
           </div>
 
           <div ref={searchRef} style={{ position: 'relative', flex: 1, maxWidth: '360px' }}>
@@ -598,9 +606,9 @@ function App() {
 }
 
 // ─── HELPERS ───────────────────────────────────────────────
-function getPageTitle(tab) {
+function getPageTitle(tab, ownerName) {
   const titles = {
-    overview: 'Good morning, Dr. Rivera',
+    overview: `Good morning, ${ownerName || 'there'}`,
     inbox: 'Inbox',
     campaigns: 'Campaigns',
     recall: 'Recall & Scheduling',
