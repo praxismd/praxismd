@@ -1157,6 +1157,21 @@ function Overview({ setActiveTab }) {
 // connected, otherwise DEMO_CONVERSATIONS) — both normalized to the same
 // { id, source, name, channel, unread, messages[] } shape so the list and
 // thread view don't need to branch on where a conversation came from.
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function Inbox({ contacts }) {
   const t = useTheme();
   const { data, loading, error, refetch } = useGhlFetch(getConversations);
@@ -1170,8 +1185,14 @@ function Inbox({ contacts }) {
   const [aiLoadingId, setAiLoadingId] = useState(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
-  const [attachNotice, setAttachNotice] = useState('');
+  const [attachError, setAttachError] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState(null);
+  const [attachmentOverlay, setAttachmentOverlay] = useState({});
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
   const [isMobileView, setIsMobileView] = useState(typeof window !== 'undefined' && window.innerWidth < 860);
+  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
   const contactList = contacts || [];
 
   useEffect(() => {
@@ -1234,6 +1255,8 @@ function Inbox({ contacts }) {
     setSelectedId(c.id);
     setDraft('');
     setSendError('');
+    setPendingAttachment(null);
+    setAttachError('');
     if (c.source === 'portal') {
       c.messages.filter(m => m.sender === 'patient' && !m.read).forEach(m => {
         updateDoc(doc(db, 'patientMessages', m.docId), { read: true });
@@ -1244,8 +1267,16 @@ function Inbox({ contacts }) {
   }
 
   async function handleSend() {
-    if (!selected || !draft.trim()) return;
+    if (!selected || (!draft.trim() && !pendingAttachment)) return;
     const text = draft.trim();
+    const attachment = pendingAttachment;
+
+    if (attachment) {
+      setAttachmentOverlay(o => ({ ...o, [selected.id]: [...(o[selected.id] || []), { sender: 'staff', attachment, time: 'Just now' }] }));
+      setPendingAttachment(null);
+    }
+    if (!text) return;
+
     if (selected.source === 'portal') {
       setSending(true);
       try {
@@ -1282,6 +1313,30 @@ function Inbox({ contacts }) {
     }
   }
 
+  async function handleFilePicked(file, kind) {
+    if (!file) return;
+    setAttachError('');
+    if (file.size > 8 * 1024 * 1024) {
+      setAttachError('That file is too large for this demo (max 8MB).');
+      return;
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setPendingAttachment({ name: file.name, size: file.size, mime: file.type, kind, dataUrl });
+    } catch {
+      setAttachError('Could not read that file — try another one.');
+    }
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (!selected) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    handleFilePicked(file, file.type.startsWith('image/') ? 'image' : 'file');
+  }
+
   function handleAiSuggest() {
     if (!selected) return;
     setAiLoadingId(selected.id);
@@ -1293,14 +1348,10 @@ function Inbox({ contacts }) {
     }, 600);
   }
 
-  function handleAttachClick(kind) {
-    setAttachNotice(`${kind} attachments aren't wired up yet — this is a UI preview.`);
-    setTimeout(() => setAttachNotice(''), 3000);
-  }
-
   const showList = !isMobileView || !selected;
   const showDetail = !isMobileView || !!selected;
   const suggestion = selected ? aiSuggestions[selected.id] : null;
+  const displayMessages = selected ? [...selected.messages, ...(attachmentOverlay[selected.id] || [])] : [];
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 108px)', minHeight: '520px', background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '16px', overflow: 'hidden' }}>
@@ -1369,7 +1420,17 @@ function Inbox({ contacts }) {
       )}
 
       {showDetail && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <div
+          onDragOver={e => { e.preventDefault(); if (selected) setIsDragOver(true); }}
+          onDragLeave={() => setIsDragOver(false)}
+          onDrop={handleDrop}
+          style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative', border: isDragOver ? `2px dashed ${t.brand}` : '2px dashed transparent', borderRadius: isDragOver ? '10px' : 0, transition: 'border-color .12s ease' }}
+        >
+          {isDragOver && (
+            <div style={{ position: 'absolute', inset: 0, background: withAlpha(t.brand, .06), zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+              <div style={{ padding: '10px 18px', borderRadius: '10px', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600' }}>Drop to attach</div>
+            </div>
+          )}
           {!selected ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', color: t.muted }}>
               <MessageSquare size={36} color={t.border} />
@@ -1391,9 +1452,33 @@ function Inbox({ contacts }) {
               </div>
 
               <div style={{ flex: 1, overflowY: 'auto', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px', background: t.bgPage }}>
-                {selected.messages.map((m, i) => (
+                {displayMessages.map((m, i) => (
                   <div key={i} style={{ alignSelf: m.sender === 'staff' ? 'flex-end' : 'flex-start', maxWidth: '70%' }}>
-                    <div style={{ padding: '10px 13px', borderRadius: '14px', fontSize: '13px', lineHeight: 1.45, background: m.sender === 'staff' ? t.brand : t.bgCard, color: m.sender === 'staff' ? 'white' : t.ink2, border: m.sender === 'staff' ? 'none' : `1px solid ${t.border}` }}>{m.text}</div>
+                    {m.attachment ? (
+                      m.attachment.kind === 'image' ? (
+                        <img
+                          src={m.attachment.dataUrl}
+                          alt={m.attachment.name}
+                          onClick={() => setLightboxSrc(m.attachment.dataUrl)}
+                          style={{ maxWidth: '220px', maxHeight: '220px', borderRadius: '12px', cursor: 'pointer', display: 'block', border: `1px solid ${t.border}` }}
+                        />
+                      ) : (
+                        <a
+                          href={m.attachment.dataUrl}
+                          download={m.attachment.name}
+                          style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 13px', borderRadius: '12px', background: m.sender === 'staff' ? t.brandL : t.bgCard, border: `1px solid ${t.border}`, textDecoration: 'none', minWidth: '200px' }}
+                        >
+                          <Paperclip size={16} color={t.brand} style={{ flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '12.5px', fontWeight: '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.attachment.name}</div>
+                            <div style={{ fontSize: '10.5px', color: t.muted }}>{formatFileSize(m.attachment.size)}</div>
+                          </div>
+                          <Download size={14} color={t.brand} style={{ flexShrink: 0 }} />
+                        </a>
+                      )
+                    ) : (
+                      <div style={{ padding: '10px 13px', borderRadius: '14px', fontSize: '13px', lineHeight: 1.45, background: m.sender === 'staff' ? t.brand : t.bgCard, color: m.sender === 'staff' ? 'white' : t.ink2, border: m.sender === 'staff' ? 'none' : `1px solid ${t.border}` }}>{m.text}</div>
+                    )}
                     {m.time && <div style={{ fontSize: '10px', color: t.muted, marginTop: '3px', textAlign: m.sender === 'staff' ? 'right' : 'left' }}>{m.time}</div>}
                   </div>
                 ))}
@@ -1402,11 +1487,33 @@ function Inbox({ contacts }) {
               {sendError && (
                 <div style={{ margin: '0 18px', background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '9px 12px', fontSize: '12px' }}>{sendError}</div>
               )}
-              {attachNotice && (
-                <div style={{ margin: '10px 18px 0', background: t.amberL, color: t.amber, borderRadius: '10px', padding: '8px 12px', fontSize: '11.5px' }}>{attachNotice}</div>
+              {attachError && (
+                <div style={{ margin: '10px 18px 0', background: t.redL, color: t.red, borderRadius: '10px', padding: '8px 12px', fontSize: '11.5px' }}>{attachError}</div>
               )}
 
               <div style={{ padding: '14px 18px', borderTop: `1px solid ${t.border2}` }}>
+                <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }} onChange={e => { handleFilePicked(e.target.files?.[0], 'file'); e.target.value = ''; }} />
+                <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => { handleFilePicked(e.target.files?.[0], 'image'); e.target.value = ''; }} />
+
+                {pendingAttachment && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '9px', padding: '7px 10px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgRow, maxWidth: '320px' }}>
+                    {pendingAttachment.kind === 'image' ? (
+                      <img src={pendingAttachment.dataUrl} alt="" style={{ width: '30px', height: '30px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: '30px', height: '30px', borderRadius: '6px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Paperclip size={14} color={t.brand} />
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '12px', fontWeight: '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pendingAttachment.name}</div>
+                      <div style={{ fontSize: '10.5px', color: t.muted }}>{formatFileSize(pendingAttachment.size)}</div>
+                    </div>
+                    <button type="button" onClick={() => setPendingAttachment(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', display: 'flex', color: t.muted, flexShrink: 0 }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
                 {suggestion && (
                   <button
                     type="button"
@@ -1418,10 +1525,10 @@ function Inbox({ contacts }) {
                   </button>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <button type="button" onClick={() => handleAttachClick('File')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '7px', display: 'flex', color: t.muted, flexShrink: 0 }}>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} title="Attach file" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '7px', display: 'flex', color: t.muted, flexShrink: 0 }}>
                     <Paperclip size={16} />
                   </button>
-                  <button type="button" onClick={() => handleAttachClick('Image')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '7px', display: 'flex', color: t.muted, flexShrink: 0 }}>
+                  <button type="button" onClick={() => imageInputRef.current?.click()} title="Attach image" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '7px', display: 'flex', color: t.muted, flexShrink: 0 }}>
                     <ImageIcon size={16} />
                   </button>
                   <button type="button" onClick={handleAiSuggest} disabled={aiLoadingId === selected.id} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '7px', display: 'flex', color: t.brand, flexShrink: 0 }} title="AI suggest reply">
@@ -1433,13 +1540,22 @@ function Inbox({ contacts }) {
                     placeholder="Type a reply…"
                     style={{ flex: 1, padding: '10px 13px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, minWidth: 0 }}
                   />
-                  <Btn small primary onClick={handleSend} disabled={sending || !draft.trim()}>
+                  <Btn small primary onClick={handleSend} disabled={sending || (!draft.trim() && !pendingAttachment)}>
                     {sending ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} Send
                   </Btn>
                 </div>
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {lightboxSrc && (
+        <div onClick={() => setLightboxSrc(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', cursor: 'zoom-out' }}>
+          <img src={lightboxSrc} alt="" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '10px', boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} />
+          <button type="button" onClick={() => setLightboxSrc(null)} style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,.15)', borderRadius: '10px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+            <X size={18} color="white" />
+          </button>
         </div>
       )}
     </div>
