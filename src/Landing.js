@@ -80,7 +80,6 @@ function NavBar() {
           <a href="#features" style={{ color: 'inherit', textDecoration: 'none' }}>Features</a>
           <a href="#pricing" style={{ color: 'inherit', textDecoration: 'none' }}>Pricing</a>
           <a href="#compare" style={{ color: 'inherit', textDecoration: 'none' }}>Compare</a>
-          <Link to="/dashboard" style={{ color: 'inherit', textDecoration: 'none' }}>View dashboard demo</Link>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <Link to="/login" style={{ color: t.mid, textDecoration: 'none', fontSize: '13.5px', fontWeight: '500', whiteSpace: 'nowrap' }}>Sign in</Link>

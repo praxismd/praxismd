@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { signOut } from 'firebase/auth';
+import { useNavigate, Link } from 'react-router-dom';
+import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { light, dark, withAlpha } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
@@ -233,6 +233,7 @@ const ACTIVITY_LOG = [
 
 function App() {
   const navigate = useNavigate();
+  const [authChecked, setAuthChecked] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [mode, setMode] = useState(getInitialMode);
   const [collapsed, setCollapsed] = useState(false);
@@ -292,6 +293,16 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole, rolePermissions]);
 
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setAuthChecked(true); return; }
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) { navigate('/login'); return; }
+      setAuthChecked(true);
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { data: contactsData, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useGhlFetch(getContacts);
   const [demoContacts, setDemoContacts] = useState(DEMO_CONTACTS);
   const contacts = isGhlConfigured ? (contactsData || []).map(mapContact) : demoContacts;
@@ -313,6 +324,37 @@ function App() {
   function gate(tab, element) {
     if (activeTab !== tab) return null;
     return isTabVisible(tab, userRole, rolePermissions) ? element : <AccessRestricted tab={tab} />;
+  }
+
+  if (!isFirebaseConfigured) {
+    return (
+      <div style={{ fontFamily: 'Inter, sans-serif', minHeight: '100vh', background: t.bgPage, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+        <div style={{ width: '100%', maxWidth: '440px' }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '9px', textDecoration: 'none', marginBottom: '26px' }}>
+            <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '13px' }}>Px</div>
+            <span style={{ fontSize: '19px', fontWeight: '700', color: t.ink }}>PraxisMD</span>
+          </Link>
+          <div style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '16px', padding: '30px', boxShadow: '0 10px 30px rgba(0,0,0,.06)', textAlign: 'center' }}>
+            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: t.amberL, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <AlertTriangle size={20} color={t.amber} />
+            </div>
+            <div style={{ fontSize: '17px', fontWeight: '700', color: t.ink, marginBottom: '8px' }}>Firebase isn't configured yet</div>
+            <div style={{ fontSize: '13px', color: t.mid, lineHeight: '1.6' }}>
+              The staff dashboard needs a signed-in user. Set up your Firebase project (see <code style={{ background: t.bgRow, padding: '1px 5px', borderRadius: '4px' }}>.env.example</code>) and sign in first.
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authChecked) {
+    return (
+      <div style={{ fontFamily: 'Inter, sans-serif', minHeight: '100vh', background: t.bgPage, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Loader2 size={22} color={t.brand} className="px-spin" />
+        <style>{`@keyframes pxSpin { to { transform: rotate(360deg); } } .px-spin { animation: pxSpin .7s linear infinite; }`}</style>
+      </div>
+    );
   }
 
   return (
