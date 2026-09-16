@@ -68,6 +68,7 @@ function Auth() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [ownerName, setOwnerName] = useState('');
   const [practiceName, setPracticeName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -120,6 +121,7 @@ function Auth() {
     if (!snap.exists()) {
       await setDoc(ref, {
         ownerEmail: user.email,
+        ownerName: extra.ownerName || '',
         practiceName: extra.practiceName || '',
         phone: extra.phone || '',
         address: extra.address || '',
@@ -178,6 +180,9 @@ function Auth() {
         setError('Full name is required.');
         return;
       }
+    } else if (!ownerName.trim()) {
+      setError('Your name is required.');
+      return;
     } else if (!practiceName.trim()) {
       setError('Practice name is required.');
       return;
@@ -189,7 +194,7 @@ function Auth() {
         await ensurePatientDoc(cred.user, { name: patientName, phone: patientPhone, dob: patientDob });
         navigate('/patient');
       } else {
-        await ensurePracticeDoc(cred.user, { practiceName, phone, address, pmSoftware });
+        await ensurePracticeDoc(cred.user, { ownerName, practiceName, phone, address, pmSoftware });
         navigate('/onboarding');
       }
     } catch (err) {
@@ -204,7 +209,7 @@ function Auth() {
     setLoading(true);
     try {
       const cred = await signInWithPopup(auth, googleProvider);
-      const isNew = await ensurePracticeDoc(cred.user);
+      const isNew = await ensurePracticeDoc(cred.user, { ownerName: cred.user.displayName || '' });
       navigate(isNew ? '/onboarding' : '/dashboard');
     } catch (err) {
       setError(friendlyError(err.code));
@@ -289,13 +294,6 @@ function Auth() {
             {mode === 'forgot' && "We'll email you a link to reset it"}
           </div>
 
-          {/* TEMP DEBUG — remove once the api-key-not-valid issue is confirmed fixed.
-              Firebase's web apiKey isn't a real secret (safe to display by design),
-              so this is safe to leave visible while diagnosing. */}
-          <div style={{ background: '#fffbe6', color: '#8a6d00', border: '1px solid #f0d878', borderRadius: '10px', padding: '10px 12px', fontSize: '11px', fontFamily: 'monospace', wordBreak: 'break-all', marginBottom: '16px' }}>
-            DEBUG apiKey: {JSON.stringify(process.env.REACT_APP_FIREBASE_API_KEY)} (length: {(process.env.REACT_APP_FIREBASE_API_KEY || '').length})
-          </div>
-
           {error && (
             <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '16px' }}>{error}</div>
           )}
@@ -314,6 +312,12 @@ function Auth() {
             </form>
           ) : (
             <form onSubmit={mode === 'login' ? handleLogin : handleSignup}>
+              {mode === 'signup' && role === 'staff' && (
+                <Field label="Your name">
+                  <input required value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Dr. Rivera" style={inputStyle} />
+                </Field>
+              )}
+
               {mode === 'signup' && role === 'staff' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <Field label="Practice name">
