@@ -10,9 +10,10 @@ import {
   LayoutDashboard, Inbox as InboxIcon, Megaphone, RotateCcw, Calendar as CalendarIcon,
   ClipboardList, Users, Contact, Shield, Star, Smile, Bot, Receipt, CreditCard,
   TrendingUp, Settings as SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
-  ChevronRight, ChevronDown, Phone, Hand, Zap, CalendarPlus, Sparkles, LogOut,
+  ChevronRight, ChevronDown, Zap, Sparkles, LogOut,
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
+  Paperclip, Image as ImageIcon, ArrowLeft,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -88,13 +89,16 @@ function mapContact(c) {
 
 function mapConversation(c) {
   const name = c.contactName || c.fullName || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown';
+  const lastMessage = c.lastMessageBody || '(no message preview)';
+  const time = c.dateUpdated ? new Date(c.dateUpdated).toLocaleString() : '';
   return {
     id: c.id,
+    source: 'crm',
     contactId: c.contactId,
     name,
-    lastMessage: c.lastMessageBody || '(no message preview)',
-    time: c.dateUpdated ? new Date(c.dateUpdated).toLocaleString() : '',
+    channel: c.lastMessageType === 'Email' ? 'Email' : c.lastMessageType === 'Call' ? 'Calls' : 'SMS',
     unread: Boolean(c.unreadCount),
+    messages: [{ sender: 'patient', text: lastMessage, time }],
   };
 }
 
@@ -116,13 +120,62 @@ const DEMO_CONTACTS = [
 ];
 
 const DEMO_CONVERSATIONS = [
-  { id: 'c1', contactId: 'p1', name: 'Maria Chen', lastMessage: 'Yes, 2:30pm on Thursday works great for me — thank you!', time: 'Today, 9:14 AM', unread: true },
-  { id: 'c2', contactId: 'p2', name: 'David Wong', lastMessage: 'Can I get an appointment reminder text instead of email?', time: 'Today, 8:02 AM', unread: true },
-  { id: 'c3', contactId: 'p8', name: 'Mike Brown', lastMessage: 'My card on file was declined — can you resend the payment link?', time: 'Yesterday, 4:47 PM', unread: false },
-  { id: 'c4', contactId: 'p7', name: 'Patricia Green', lastMessage: 'Thanks for the reminder, see you at 1:30!', time: 'Yesterday, 11:20 AM', unread: false },
-  { id: 'c5', contactId: 'p10', name: 'Jordan Ellis', lastMessage: 'Still interested but need to check my schedule for next week.', time: 'Sep 12, 3:10 PM', unread: false },
-  { id: 'c6', contactId: null, name: 'Unknown Caller', lastMessage: 'Hi, I saw your ad and wanted to ask about new patient specials.', time: 'Sep 11, 6:45 PM', unread: true },
+  {
+    id: 'c1', source: 'crm', contactId: 'p1', name: 'Maria Chen', channel: 'SMS', unread: true,
+    messages: [
+      { sender: 'patient', text: 'Hi, do you have anything open this week for a cleaning?', time: 'Yesterday, 2:00 PM' },
+      { sender: 'staff', text: 'Yes! We have Thursday at 2:30pm open — want that?', time: 'Yesterday, 2:22 PM' },
+      { sender: 'patient', text: 'Yes, 2:30pm on Thursday works great for me — thank you!', time: 'Today, 9:14 AM' },
+    ],
+  },
+  {
+    id: 'c2', source: 'crm', contactId: 'p2', name: 'David Wong', channel: 'SMS', unread: true,
+    messages: [
+      { sender: 'patient', text: 'Can I get an appointment reminder text instead of email?', time: 'Today, 8:02 AM' },
+    ],
+  },
+  {
+    id: 'c3', source: 'crm', contactId: 'p8', name: 'Mike Brown', channel: 'Email', unread: false,
+    messages: [
+      { sender: 'patient', text: 'My card on file was declined — can you resend the payment link?', time: 'Yesterday, 4:47 PM' },
+      { sender: 'staff', text: 'Just resent it to your email on file — let us know if it still fails!', time: 'Yesterday, 5:10 PM' },
+    ],
+  },
+  {
+    id: 'c4', source: 'crm', contactId: 'p7', name: 'Patricia Green', channel: 'SMS', unread: false,
+    messages: [
+      { sender: 'staff', text: 'Reminder: your cleaning is tomorrow at 1:30pm.', time: 'Yesterday, 9:00 AM' },
+      { sender: 'patient', text: 'Thanks for the reminder, see you at 1:30!', time: 'Yesterday, 11:20 AM' },
+    ],
+  },
+  {
+    id: 'c5', source: 'crm', contactId: 'p10', name: 'Jordan Ellis', channel: 'Email', unread: false,
+    messages: [
+      { sender: 'staff', text: 'We have a few openings next week if you would like to come back in.', time: 'Sep 12, 1:00 PM' },
+      { sender: 'patient', text: 'Still interested but need to check my schedule for next week.', time: 'Sep 12, 3:10 PM' },
+    ],
+  },
+  {
+    id: 'c6', source: 'crm', contactId: null, name: 'Unknown Caller', channel: 'Calls', unread: true,
+    messages: [
+      { sender: 'patient', text: 'Voicemail: "Hi, I saw your ad and wanted to ask about new patient specials."', time: 'Sep 11, 6:45 PM' },
+    ],
+  },
 ];
+
+// Small deterministic pool of canned replies to simulate an AI-drafted
+// response — same pattern as the AI-draft buttons elsewhere in the app.
+const AI_REPLY_SUGGESTIONS = [
+  "Thanks for reaching out! I've got that taken care of on our end — let us know if anything changes.",
+  "Happy to help with that. I'll follow up shortly once it's set.",
+  "Great question — let me check on that and get back to you within the hour.",
+  "We'd love to have you back in — I can hold a spot for you this week if you'd like.",
+];
+function suggestReplyFor(convoId) {
+  let hash = 0;
+  for (let i = 0; i < convoId.length; i++) hash = (hash * 31 + convoId.charCodeAt(i)) >>> 0;
+  return AI_REPLY_SUGGESTIONS[hash % AI_REPLY_SUGGESTIONS.length];
+}
 
 // Fetches once on mount (and whenever refetch() is called). Skips the call
 // entirely — no spinner, no error — when GHL isn't configured, since that's
@@ -819,326 +872,423 @@ function AccessRestricted({ tab }) {
 }
 
 // ─── OVERVIEW ──────────────────────────────────────────────
+function BigStatCard({ label, value, color, accent, sub, icon: ValueIcon }) {
+  const t = useTheme();
+  const display = useCountUp(value);
+  return (
+    <div className="px-card" style={{ background: t.bgCard, borderRadius: '16px', padding: '24px', border: `1px solid ${t.border}`, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: 0, right: 0, width: '150px', height: '150px', background: `radial-gradient(circle at top right, ${withAlpha(accent, .14)}, transparent 70%)`, pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: `linear-gradient(90deg, ${accent}, ${color})` }} />
+      <div style={{ fontSize: '11.5px', color: t.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '12px', position: 'relative' }}>{label}</div>
+      <div style={{ fontSize: '32px', fontWeight: '700', color, letterSpacing: '-0.8px', display: 'flex', alignItems: 'center', gap: '9px', position: 'relative' }}>
+        {display}{ValueIcon && <ValueIcon size={22} color={color} fill={color} />}
+      </div>
+      <div style={{ fontSize: '12.5px', color: t.muted, marginTop: '10px', position: 'relative' }}>{sub}</div>
+    </div>
+  );
+}
+
+const GLANCE_CHIPS = [
+  { text: '3 patients overdue for recall', tab: 'recall', color: 'amber' },
+  { text: '1 denied claim needs attention', tab: 'billing', color: 'red' },
+  { text: '4 appointments confirmed today', tab: 'calendar', color: 'green' },
+];
+
+const QUICK_ACTIONS = [
+  { label: 'New campaign', Icon: Megaphone, tab: 'campaigns', color: 'brand' },
+  { label: 'Send recall', Icon: RotateCcw, tab: 'recall', color: 'teal' },
+  { label: 'Request payment', Icon: CreditCard, tab: 'payments', color: 'green' },
+  { label: 'View reports', Icon: TrendingUp, tab: 'reports', color: 'purple' },
+];
+
+const TODAY_SCHEDULE = [
+  { time: '9:00 AM', name: 'Sarah Martinez', procedure: 'Cleaning · 60 min', status: 'Confirmed', color: 'green' },
+  { time: '10:30 AM', name: 'James Lee', procedure: 'Crown fitting · 90 min', status: 'Pending', color: 'amber' },
+  { time: '2:00 PM', name: 'Amy Kim', procedure: 'Whitening · 45 min', status: 'Confirmed', color: 'green' },
+  { time: '4:00 PM', name: 'Robert Park', procedure: 'Emergency · tooth pain', status: 'Urgent', color: 'red' },
+];
+
+const OVERVIEW_MESSAGES = [
+  { name: 'Maria Chen', msg: "Yes I'd like to book the cleaning for next week", time: '2m ago' },
+  { name: 'David Wong', msg: 'Can I reschedule my 3pm appointment?', time: '18m ago' },
+  { name: 'Unknown Caller', msg: 'Hi, I saw your ad and wanted to ask about new patient specials.', time: '2h ago' },
+];
+
 function Overview({ setActiveTab }) {
   const t = useTheme();
+  const colorMap = { brand: t.brand, teal: t.teal, green: t.green, purple: t.purple, amber: t.amber, red: t.red };
+
   return (
     <div>
-      <div style={{ background: `linear-gradient(120deg, ${withAlpha(t.brand, .12)}, ${withAlpha(t.teal, .08)})`, border: `1px solid ${t.border}`, borderRadius: '14px', padding: '16px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
-        <div>
-          <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '4px' }}>Today at a glance</div>
-          <div style={{ fontSize: '13px', color: t.ink2, display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: '600' }}>Sunday, September 13, 2026</span>
-            <span>☀️ 72°F</span>
-            <span style={{ color: t.muted }}>·</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Sparkles size={14} color={t.teal} /> 3 patients are due for recall today — send bulk recall?</span>
-          </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '18px' }}>
+        <BigStatCard label="Revenue recovered" value="$8,400" color={t.green} accent={t.accentGreen} sub="↑ 14 patients reactivated" />
+        <BigStatCard label="Appointments today" value="4" color={t.brand} accent={t.accentBlue} sub="1 needs confirmation" />
+        <BigStatCard label="Open messages" value="4" color={t.red} accent={t.accentRed} sub="Needs reply today" />
+        <BigStatCard label="Unread alerts" value="3" color={t.amber} accent={t.accentAmber} sub="Across billing & recall" />
+      </div>
+
+      <div style={{ background: `linear-gradient(120deg, ${withAlpha(t.brand, .1)}, ${withAlpha(t.teal, .06)})`, border: `1px solid ${t.border}`, borderRadius: '14px', padding: '18px 20px', marginBottom: '18px' }}>
+        <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><Sparkles size={13} color={t.teal} /> Today at a glance</div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          {GLANCE_CHIPS.map((chip, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveTab(chip.tab)}
+              className="px-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '9px 15px', borderRadius: '20px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: colorMap[chip.color], flexShrink: 0 }} />
+              {chip.text}
+            </button>
+          ))}
         </div>
-        <Btn primary onClick={() => setActiveTab('recall')}><Send size={13} /> Send bulk recall</Btn>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '13px', marginBottom: '20px' }}>
-        <StatCard label="Revenue recovered" value="$8,400" color={t.green} accent={t.accentGreen} sub="↑ 14 patients reactivated" />
-        <StatCard label="Appointments booked" value="31" color={t.brand} accent={t.accentBlue} sub="↑ 8 from campaigns" />
-        <StatCard label="Google rating" value="4.8" icon={Star} color={t.amber} accent={t.accentAmber} sub="↑ 6 new reviews" />
-        <StatCard label="Open messages" value="4" color={t.red} accent={t.accentRed} sub="Needs reply today" />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '13px', marginBottom: '20px' }}>
-        <StatCard label="Claims pending" value="7" color={t.purple} accent={t.accentPurple} sub="$4,200 in queue" />
-        <StatCard label="Recall due" value="89" color={t.teal} accent={t.accentTeal} sub="Overdue 6-month" />
-        <StatCard label="AI calls handled" value="47" color={t.green} accent={t.accentGreen} sub="Today · 0 missed" />
-        <StatCard label="NPS score" value="72" color={t.pink} accent={t.accentPink} sub="↑ 4 pts this month" />
-        <StatCard label="Waitlist filled" value="3" color={t.orange} accent={t.accentOrange} sub="Auto-filled today" />
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.1fr 0.9fr', gap: '14px', marginBottom: '18px', alignItems: 'start' }}>
         <Card>
-          <CardTitle>Active campaigns <span onClick={() => setActiveTab('campaigns')} style={{ fontSize: '12px', color: t.brand, cursor: 'pointer', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>View all <ChevronRight size={12} /></span></CardTitle>
-          <RowItem style={{ background: t.greenL, borderColor: withAlpha(t.accentGreen, .15) }}>
-            <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>6-month reactivation</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>142 patients · Touch 3 of 7</div></div>
-            <Pill label="Live" color={t.green} bg={t.greenL} />
-          </RowItem>
-          <RowItem style={{ background: t.greenL, borderColor: withAlpha(t.accentGreen, .15) }}>
-            <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Post-visit review request</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>Auto-sends after every visit</div></div>
-            <Pill label="Auto" color={t.brand} bg={t.brandL} />
-          </RowItem>
-          <RowItem style={{ background: t.amberL, borderColor: withAlpha(t.accentAmber, .15) }}>
-            <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Annual checkup reminder</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>89 patients · Scheduled Sep 20</div></div>
-            <Pill label="Queued" color={t.amber} bg={t.amberL} />
-          </RowItem>
-        </Card>
-
-        <Card>
-          <CardTitle>Today's appointments</CardTitle>
-          <RowItem><div style={{ fontSize: '11.5px', color: t.muted, width: '50px', flexShrink: 0, fontWeight: '500' }}>9:00 AM</div><Ava initials="SM" bg={t.brandL} color={t.brand} /><div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Sarah Martinez</div><div style={{ fontSize: '11.5px', color: t.muted }}>Cleaning · 60 min</div></div><Pill label="Confirmed" color={t.green} bg={t.greenL} /></RowItem>
-          <RowItem><div style={{ fontSize: '11.5px', color: t.muted, width: '50px', flexShrink: 0, fontWeight: '500' }}>10:30 AM</div><Ava initials="JL" bg={t.amberL} color={t.amber} /><div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>James Lee</div><div style={{ fontSize: '11.5px', color: t.muted }}>Crown fitting · 90 min</div></div><Pill label="Pending" color={t.amber} bg={t.amberL} /></RowItem>
-          <RowItem><div style={{ fontSize: '11.5px', color: t.muted, width: '50px', flexShrink: 0, fontWeight: '500' }}>2:00 PM</div><Ava initials="AK" bg={t.greenL} color={t.green} /><div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Amy Kim</div><div style={{ fontSize: '11.5px', color: t.muted }}>Whitening · 45 min</div></div><Pill label="Confirmed" color={t.green} bg={t.greenL} /></RowItem>
-          <RowItem style={{ background: t.redL, borderColor: withAlpha(t.accentRed, .15) }}><div style={{ fontSize: '11.5px', color: t.muted, width: '50px', flexShrink: 0, fontWeight: '500' }}>4:00 PM</div><Ava initials="RP" bg={t.redL} color={t.red} /><div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Robert Park</div><div style={{ fontSize: '11.5px', color: t.muted }}>Emergency · tooth pain</div></div><Pill label="Urgent" color={t.red} bg={t.redL} /></RowItem>
-        </Card>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-        <Card>
-          <CardTitle>Recent messages <span onClick={() => setActiveTab('inbox')} style={{ fontSize: '12px', color: t.brand, cursor: 'pointer', fontWeight: '500', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>View all <ChevronRight size={12} /></span></CardTitle>
-          {[{ ini: 'MC', bg: t.brandL, c: t.brand, name: 'Maria Chen', msg: "Yes I'd like to book the cleaning for next week", time: '2m ago', unread: true },
-            { ini: 'DW', bg: t.amberL, c: t.amber, name: 'David Wong', msg: 'Can I reschedule my 3pm appointment?', time: '18m ago', unread: true },
-            { ini: 'TN', bg: t.greenL, c: t.green, name: 'Tina Nguyen', msg: 'Thank you! I left you a Google review ⭐', time: '1h ago', unread: false }
-          ].map((m, i) => (
-            <div key={i} className="px-row" style={{ display: 'flex', gap: '11px', padding: '11px 13px', borderRadius: '10px', marginBottom: '6px', background: m.unread ? t.brandL : t.bgRow, border: `1px solid ${m.unread ? withAlpha(t.accentBlue, .15) : t.border2}` }}>
-              <Ava initials={m.ini} bg={m.unread ? m.c : m.bg} color={m.unread ? 'white' : m.c} />
+          <CardTitle>Today's schedule</CardTitle>
+          {TODAY_SCHEDULE.map((a, i) => (
+            <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: t.bgRow }}>
+              <div style={{ fontSize: '11.5px', color: t.muted, width: '58px', flexShrink: 0, fontWeight: '500' }}>{a.time}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</span><span style={{ fontSize: '11px', color: t.muted }}>{m.time}</span></div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{a.name}</div>
+                <div style={{ fontSize: '11.5px', color: t.muted }}>{a.procedure}</div>
+              </div>
+              <Pill label={a.status} color={colorMap[a.color]} bg={withAlpha(colorMap[a.color], .12)} />
+            </div>
+          ))}
+        </Card>
+
+        <Card>
+          <CardTitle>Priority inbox</CardTitle>
+          {OVERVIEW_MESSAGES.map((m, i) => (
+            <div key={i} className="px-row" style={{ display: 'flex', gap: '10px', padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: t.brandL, border: `1px solid ${withAlpha(t.accentBlue, .15)}` }}>
+              <Ava initials={initialsOf(m.name)} bg={t.brand} color="white" />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</span><span style={{ fontSize: '11px', color: t.muted, flexShrink: 0 }}>{m.time}</span></div>
                 <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.msg}</div>
               </div>
             </div>
           ))}
+          <Btn small onClick={() => setActiveTab('inbox')} style={{ width: '100%', justifyContent: 'center', marginTop: '4px' }}>View all messages</Btn>
         </Card>
 
-        <Card>
-          <CardTitle>AI front desk — today</CardTitle>
-          {[[Phone, 'Calls answered', '47', t.brand], [CalendarPlus, 'Appointments booked', '6', t.green], [Bot, 'Messages handled', '23', t.brand], [Hand, 'Escalated to team', '2', t.amber]].map(([Icon, label, val, color], i) => (
-            <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
-              <div style={{ fontSize: '12.5px', color: t.mid, display: 'flex', alignItems: 'center', gap: '8px' }}><Icon size={14} color={t.mid} />{label}</div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color }}>{val}</div>
-            </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {QUICK_ACTIONS.map((qa, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveTab(qa.tab)}
+              className="px-btn px-card"
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 18px', borderRadius: '14px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+            >
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: withAlpha(colorMap[qa.color], .12), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <qa.Icon size={17} color={colorMap[qa.color]} />
+              </div>
+              <span style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2 }}>{qa.label}</span>
+            </button>
           ))}
-          <div style={{ marginTop: '8px', padding: '10px 12px', background: t.greenL, borderRadius: '10px', fontSize: '12px', color: t.green, fontWeight: '500', border: `1px solid ${withAlpha(t.accentGreen, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> AI saved your team ~4.2 hours today</div>
-        </Card>
+        </div>
+      </div>
+
+      <div style={{ padding: '12px 16px', background: t.greenL, borderRadius: '12px', fontSize: '12.5px', color: t.green, fontWeight: '500', border: `1px solid ${withAlpha(t.accentGreen, .15)}`, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Zap size={14} /> AI handled 47 interactions today · saved 4.2 hours
       </div>
     </div>
   );
 }
 
-function PatientMessages() {
+// ─── INBOX ─────────────────────────────────────────────────
+// Two-panel, email-client-style layout. Conversations are a merge of two
+// sources: live patient-portal threads from Firestore (`patientMessages`,
+// grouped by patientUid) and CRM conversations (real GHL data when
+// connected, otherwise DEMO_CONVERSATIONS) — both normalized to the same
+// { id, source, name, channel, unread, messages[] } shape so the list and
+// thread view don't need to branch on where a conversation came from.
+function Inbox({ contacts }) {
   const t = useTheme();
-  const [allMessages, setAllMessages] = useState([]);
-  const [loading, setLoading] = useState(isFirebaseConfigured);
-  const [expandedUid, setExpandedUid] = useState(null);
-  const [reply, setReply] = useState('');
+  const { data, loading, error, refetch } = useGhlFetch(getConversations);
+  const [demoConversations, setDemoConversations] = useState(DEMO_CONVERSATIONS);
+  const [portalThreads, setPortalThreads] = useState([]);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('All');
+  const [selectedId, setSelectedId] = useState(null);
+  const [draft, setDraft] = useState('');
+  const [aiSuggestions, setAiSuggestions] = useState({});
+  const [aiLoadingId, setAiLoadingId] = useState(null);
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const [attachNotice, setAttachNotice] = useState('');
+  const [isMobileView, setIsMobileView] = useState(typeof window !== 'undefined' && window.innerWidth < 860);
+  const contactList = contacts || [];
 
   useEffect(() => {
-    if (!isFirebaseConfigured) { setLoading(false); return; }
+    function onResize() { setIsMobileView(window.innerWidth < 860); }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
     const q = query(collection(db, 'patientMessages'), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, snap => {
-      setAllMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    }, () => setLoading(false));
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const byUid = {};
+      all.forEach(m => { (byUid[m.patientUid] = byUid[m.patientUid] || []).push(m); });
+      const threads = Object.entries(byUid).map(([uid, msgs]) => {
+        const last = msgs[msgs.length - 1];
+        return {
+          id: `portal-${uid}`,
+          source: 'portal',
+          uid,
+          name: last.patientName || 'Patient',
+          channel: 'Portal',
+          unread: msgs.some(m => m.sender === 'patient' && !m.read),
+          sortKey: last.createdAt?.toMillis ? last.createdAt.toMillis() : Date.now(),
+          messages: msgs.map(m => ({
+            sender: m.sender, text: m.text, docId: m.id, read: m.read,
+            time: m.createdAt?.toDate ? m.createdAt.toDate().toLocaleString() : '',
+          })),
+        };
+      }).sort((a, b) => b.sortKey - a.sortKey);
+      setPortalThreads(threads);
+    });
     return unsub;
   }, []);
 
-  const threadsByUid = {};
-  allMessages.forEach(m => {
-    if (!threadsByUid[m.patientUid]) threadsByUid[m.patientUid] = [];
-    threadsByUid[m.patientUid].push(m);
-  });
-  const threadList = Object.entries(threadsByUid).map(([uid, msgs]) => {
-    const last = msgs[msgs.length - 1];
-    const unread = msgs.filter(m => m.sender === 'patient' && !m.read).length;
-    return { uid, patientName: last.patientName, msgs, last, unread };
-  }).sort((a, b) => (b.last.createdAt?.toMillis?.() || 0) - (a.last.createdAt?.toMillis?.() || 0));
+  if (isGhlConfigured && loading) return <LoadingState label="Loading conversations…" />;
+  if (isGhlConfigured && error) return <ErrorState message={error} onRetry={refetch} />;
 
-  async function openThread(thread) {
-    const isExpanding = expandedUid !== thread.uid;
-    setExpandedUid(isExpanding ? thread.uid : null);
-    setReply('');
-    if (isExpanding && thread.unread > 0) {
-      const unreadDocs = thread.msgs.filter(m => m.sender === 'patient' && !m.read);
-      await Promise.all(unreadDocs.map(m => updateDoc(doc(db, 'patientMessages', m.id), { read: true })));
+  const crmConversations = isGhlConfigured ? (data || []).map(mapConversation) : demoConversations;
+  const allConversations = [...portalThreads, ...crmConversations];
+
+  const filtered = allConversations.filter(c => {
+    if (filter === 'Unread' && !c.unread) return false;
+    if (filter === 'SMS' && c.channel !== 'SMS') return false;
+    if (filter === 'Email' && c.channel !== 'Email') return false;
+    if (filter === 'Calls' && c.channel !== 'Calls') return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const last = c.messages[c.messages.length - 1];
+      if (!c.name.toLowerCase().includes(q) && !(last?.text || '').toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const selected = allConversations.find(c => c.id === selectedId) || null;
+  const matchedContact = selected && selected.contactId ? contactList.find(c => c.id === selected.contactId) : null;
+
+  function selectConversation(c) {
+    setSelectedId(c.id);
+    setDraft('');
+    setSendError('');
+    if (c.source === 'portal') {
+      c.messages.filter(m => m.sender === 'patient' && !m.read).forEach(m => {
+        updateDoc(doc(db, 'patientMessages', m.docId), { read: true });
+      });
+    } else if (!isGhlConfigured) {
+      setDemoConversations(cs => cs.map(cc => cc.id === c.id ? { ...cc, unread: false } : cc));
     }
   }
 
-  async function sendReply(thread) {
-    if (!reply.trim()) return;
+  async function handleSend() {
+    if (!selected || !draft.trim()) return;
+    const text = draft.trim();
+    if (selected.source === 'portal') {
+      setSending(true);
+      try {
+        await addDoc(collection(db, 'patientMessages'), {
+          patientUid: selected.uid,
+          patientName: selected.name,
+          sender: 'staff',
+          text,
+          createdAt: serverTimestamp(),
+          read: true,
+        });
+        setDraft('');
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+    if (!isGhlConfigured) {
+      setDemoConversations(cs => cs.map(c => c.id === selected.id
+        ? { ...c, unread: false, messages: [...c.messages, { sender: 'staff', text, time: 'Just now' }] }
+        : c));
+      setDraft('');
+      return;
+    }
     setSending(true);
+    setSendError('');
     try {
-      await addDoc(collection(db, 'patientMessages'), {
-        patientUid: thread.uid,
-        patientName: thread.patientName,
-        sender: 'staff',
-        text: reply.trim(),
-        createdAt: serverTimestamp(),
-        read: true,
-      });
-      setReply('');
+      await sendMessage(selected.contactId, text);
+      setDraft('');
+    } catch (err) {
+      setSendError(err.message || 'Could not send message.');
     } finally {
       setSending(false);
     }
   }
 
-  if (!isFirebaseConfigured) {
-    return (
-      <Card style={{ marginBottom: '14px' }}>
-        <CardTitle>Patient portal messages</CardTitle>
-        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>
-          Messages patients send from their portal will show up here live once Firebase is connected.
-        </div>
-      </Card>
-    );
+  function handleAiSuggest() {
+    if (!selected) return;
+    setAiLoadingId(selected.id);
+    setTimeout(() => {
+      const suggestion = suggestReplyFor(selected.id);
+      setAiSuggestions(s => ({ ...s, [selected.id]: suggestion }));
+      setDraft(suggestion);
+      setAiLoadingId(null);
+    }, 600);
   }
 
-  if (loading) return <LoadingState label="Loading patient messages…" />;
+  function handleAttachClick(kind) {
+    setAttachNotice(`${kind} attachments aren't wired up yet — this is a UI preview.`);
+    setTimeout(() => setAttachNotice(''), 3000);
+  }
 
-  const totalUnread = threadList.reduce((n, th) => n + th.unread, 0);
+  const showList = !isMobileView || !selected;
+  const showDetail = !isMobileView || !!selected;
+  const suggestion = selected ? aiSuggestions[selected.id] : null;
 
   return (
-    <Card style={{ marginBottom: '14px' }}>
-      <CardTitle>Patient portal messages {totalUnread > 0 && <Pill label={`${totalUnread} unread`} color={t.brand} bg={t.brandL} />}</CardTitle>
-      {threadList.length === 0 && (
-        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No patient messages yet — they'll appear here as soon as a patient sends one from their portal.</div>
-      )}
-      {threadList.map(thread => {
-        const isExpanded = expandedUid === thread.uid;
-        return (
-          <div key={thread.uid} style={{ borderBottom: `1px solid ${t.border2}` }}>
-            <div onClick={() => openThread(thread)} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 0', cursor: 'pointer' }}>
-              <Ava initials={initialsOf(thread.patientName || 'Patient')} bg={t.tealL} color={t.teal} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{thread.patientName}</div>
-                <div style={{ fontSize: '11.5px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{thread.last.sender === 'staff' ? 'You: ' : ''}{thread.last.text}</div>
-              </div>
-              {thread.unread > 0 && <Pill label="Unread" color={t.brand} bg={t.brandL} />}
-              <ChevronDown size={14} color={t.muted} style={{ flexShrink: 0, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+    <div style={{ display: 'flex', height: 'calc(100vh - 108px)', minHeight: '520px', background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '16px', overflow: 'hidden' }}>
+      {showList && (
+        <div style={{ width: isMobileView ? '100%' : '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: isMobileView ? 'none' : `1px solid ${t.border}` }}>
+          <div style={{ padding: '14px', borderBottom: `1px solid ${t.border2}` }}>
+            <div style={{ position: 'relative', marginBottom: '10px' }}>
+              <Search size={14} color={t.muted} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search conversations…"
+                style={{ width: '100%', padding: '9px 12px 9px 32px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
+              />
             </div>
-            {isExpanded && (
-              <div className="px-expand" style={{ padding: '0 0 14px' }}>
-                <div style={{ maxHeight: '260px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', background: t.bgRow, borderRadius: '10px', padding: '12px', marginBottom: '10px' }}>
-                  {thread.msgs.map(m => (
-                    <div key={m.id} style={{ alignSelf: m.sender === 'staff' ? 'flex-end' : 'flex-start', maxWidth: '80%' }}>
-                      <div style={{ padding: '8px 11px', borderRadius: '12px', fontSize: '12.5px', background: m.sender === 'staff' ? t.brand : t.bgCard, color: m.sender === 'staff' ? 'white' : t.ink2, border: m.sender === 'staff' ? 'none' : `1px solid ${t.border}` }}>{m.text}</div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {['All', 'Unread', 'SMS', 'Email', 'Calls'].map(label => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setFilter(label)}
+                  style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: filter === label ? 'none' : `1px solid ${t.border}`, background: filter === label ? t.brand : 'transparent', color: filter === label ? 'white' : t.mid, fontFamily: 'inherit' }}
+                >{label}</button>
+              ))}
+            </div>
+          </div>
+
+          {!isGhlConfigured && (
+            <div style={{ padding: '9px 14px', background: t.tealL, fontSize: '11px', color: t.teal, display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={12} /> Demo conversations shown — connect GoHighLevel for real data.
+            </div>
+          )}
+
+          <div style={{ flex: 1, overflowY: 'auto' }}>
+            {filtered.length === 0 && (
+              <div style={{ padding: '32px 16px', textAlign: 'center', color: t.muted, fontSize: '12.5px' }}>No conversations match.</div>
+            )}
+            {filtered.map((c, i) => {
+              const [color, bg] = avatarStyle(t, i);
+              const last = c.messages[c.messages.length - 1];
+              const isSelected = selectedId === c.id;
+              return (
+                <div
+                  key={c.id}
+                  onClick={() => selectConversation(c)}
+                  className="px-row"
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', cursor: 'pointer', borderBottom: `1px solid ${t.border2}`, background: isSelected ? t.bgRow : 'transparent' }}
+                >
+                  <Ava initials={initialsOf(c.name)} bg={bg} color={color} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                      <div style={{ fontSize: '13px', fontWeight: c.unread ? '700' : '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                      <div style={{ fontSize: '10.5px', color: t.muted, flexShrink: 0 }}>{last?.time || ''}</div>
                     </div>
-                  ))}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <div style={{ fontSize: '11.5px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>
+                        {last?.sender === 'staff' ? 'You: ' : ''}{last?.text}
+                      </div>
+                      {c.unread && <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: t.brand, flexShrink: 0 }} />}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {showDetail && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          {!selected ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', color: t.muted }}>
+              <MessageSquare size={36} color={t.border} />
+              <div style={{ fontSize: '13px' }}>Select a conversation to view</div>
+            </div>
+          ) : (
+            <>
+              <div style={{ padding: '14px 18px', borderBottom: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {isMobileView && (
+                  <button type="button" onClick={() => setSelectedId(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', display: 'flex' }}>
+                    <ArrowLeft size={18} color={t.ink2} />
+                  </button>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{selected.name}</div>
+                  <div style={{ fontSize: '11px', color: t.muted }}>{matchedContact?.phone ? `${matchedContact.phone} · ` : ''}{selected.channel}</div>
+                </div>
+                <Pill label={selected.channel} color={t.brand} bg={t.brandL} />
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', padding: '18px', display: 'flex', flexDirection: 'column', gap: '10px', background: t.bgPage }}>
+                {selected.messages.map((m, i) => (
+                  <div key={i} style={{ alignSelf: m.sender === 'staff' ? 'flex-end' : 'flex-start', maxWidth: '70%' }}>
+                    <div style={{ padding: '10px 13px', borderRadius: '14px', fontSize: '13px', lineHeight: 1.45, background: m.sender === 'staff' ? t.brand : t.bgCard, color: m.sender === 'staff' ? 'white' : t.ink2, border: m.sender === 'staff' ? 'none' : `1px solid ${t.border}` }}>{m.text}</div>
+                    {m.time && <div style={{ fontSize: '10px', color: t.muted, marginTop: '3px', textAlign: m.sender === 'staff' ? 'right' : 'left' }}>{m.time}</div>}
+                  </div>
+                ))}
+              </div>
+
+              {sendError && (
+                <div style={{ margin: '0 18px', background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '9px 12px', fontSize: '12px' }}>{sendError}</div>
+              )}
+              {attachNotice && (
+                <div style={{ margin: '10px 18px 0', background: t.amberL, color: t.amber, borderRadius: '10px', padding: '8px 12px', fontSize: '11.5px' }}>{attachNotice}</div>
+              )}
+
+              <div style={{ padding: '14px 18px', borderTop: `1px solid ${t.border2}` }}>
+                {suggestion && (
+                  <button
+                    type="button"
+                    onClick={() => setDraft(suggestion)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '9px', padding: '6px 12px', borderRadius: '20px', border: `1px solid ${withAlpha(t.brand, .25)}`, background: t.brandL, color: t.brand, fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit', maxWidth: '100%' }}
+                  >
+                    <Bot size={12} style={{ flexShrink: 0 }} />
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>AI: {suggestion}</span>
+                  </button>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button type="button" onClick={() => handleAttachClick('File')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '7px', display: 'flex', color: t.muted, flexShrink: 0 }}>
+                    <Paperclip size={16} />
+                  </button>
+                  <button type="button" onClick={() => handleAttachClick('Image')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '7px', display: 'flex', color: t.muted, flexShrink: 0 }}>
+                    <ImageIcon size={16} />
+                  </button>
+                  <button type="button" onClick={handleAiSuggest} disabled={aiLoadingId === selected.id} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '7px', display: 'flex', color: t.brand, flexShrink: 0 }} title="AI suggest reply">
+                    {aiLoadingId === selected.id ? <Loader2 size={16} className="px-spin" /> : <Sparkles size={16} />}
+                  </button>
                   <input
-                    value={reply} onChange={e => setReply(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') sendReply(thread); }}
-                    placeholder="Reply…"
-                    style={{ flex: 1, padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}
+                    value={draft} onChange={e => setDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
+                    placeholder="Type a reply…"
+                    style={{ flex: 1, padding: '10px 13px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, minWidth: 0 }}
                   />
-                  <Btn small primary onClick={() => sendReply(thread)} disabled={sending}>
+                  <Btn small primary onClick={handleSend} disabled={sending || !draft.trim()}>
                     {sending ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} Send
                   </Btn>
                 </div>
               </div>
-            )}
-          </div>
-        );
-      })}
-    </Card>
-  );
-}
-
-// ─── INBOX ─────────────────────────────────────────────────
-function Inbox({ contacts }) {
-  const t = useTheme();
-  const { data, loading, error, refetch } = useGhlFetch(getConversations);
-  const [demoConversations, setDemoConversations] = useState(DEMO_CONVERSATIONS);
-  const [drafts, setDrafts] = useState({});
-  const [sendingId, setSendingId] = useState(null);
-  const [sendError, setSendError] = useState('');
-  const [expandedId, setExpandedId] = useState(null);
-
-  if (isGhlConfigured && loading) return <LoadingState label="Loading conversations…" />;
-  if (isGhlConfigured && error) return <ErrorState message={error} onRetry={refetch} />;
-
-  const conversations = isGhlConfigured ? (data || []).map(mapConversation) : demoConversations;
-  const contactList = contacts || [];
-
-  async function handleSend(convo) {
-    const text = (drafts[convo.id] || '').trim();
-    if (!text) return;
-    if (!isGhlConfigured) {
-      setDemoConversations(cs => cs.map(c => c.id === convo.id ? { ...c, lastMessage: text, time: 'Just now', unread: false } : c));
-      setDrafts(d => ({ ...d, [convo.id]: '' }));
-      return;
-    }
-    setSendingId(convo.id);
-    setSendError('');
-    try {
-      await sendMessage(convo.contactId, text);
-      setDrafts(d => ({ ...d, [convo.id]: '' }));
-    } catch (err) {
-      setSendError(err.message || 'Could not send message.');
-    } finally {
-      setSendingId(null);
-    }
-  }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        {[`All (${conversations.length})`, 'SMS', 'Email', 'Missed calls', 'Voicemail'].map((label, i) => (
-          <span key={i} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: i === 0 ? 'none' : `1px solid ${t.border}`, background: i === 0 ? t.brand : t.bgCard, color: i === 0 ? 'white' : t.mid }}>{label}</span>
-        ))}
-      </div>
-
-      <PatientMessages />
-
-      {!isGhlConfigured && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}>
-          <Sparkles size={13} /> Showing demo conversations — connect GoHighLevel to load real messages.
+            </>
+          )}
         </div>
       )}
-
-      {sendError && (
-        <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '14px' }}>{sendError}</div>
-      )}
-
-      {conversations.length === 0 && (
-        <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No conversations yet.</Card>
-      )}
-
-      {conversations.map((m, i) => {
-        const [color, bg] = avatarStyle(t, i);
-        const isExpanded = expandedId === m.id;
-        const matchedContact = contactList.find(c => c.id === m.contactId);
-        return (
-          <div key={m.id} className="px-card" style={{ background: t.bgCard, borderRadius: '14px', padding: '16px 18px', border: `1px solid ${t.border}`, marginBottom: '10px', borderLeft: `4px solid ${m.unread ? t.accentBlue : t.border}` }}>
-            <div onClick={() => setExpandedId(isExpanded ? null : m.id)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', cursor: 'pointer' }}>
-              <div style={{ display: 'flex', gap: '11px', alignItems: 'center' }}>
-                <Ava initials={initialsOf(m.name)} bg={bg} color={color} />
-                <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{m.time}</div></div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {m.unread && <Pill label="Unread" color={t.brand} bg={t.brandL} />}
-                <ChevronDown size={16} color={t.muted} style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }} />
-              </div>
-            </div>
-            <div style={{ fontSize: '13px', color: t.ink2, padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: isExpanded ? '10px' : 0, whiteSpace: isExpanded ? 'normal' : 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.lastMessage}</div>
-
-            {isExpanded && (
-              <div className="px-expand">
-                {matchedContact ? (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
-                    <div style={{ padding: '9px 11px', background: t.bgRow, borderRadius: '8px' }}>
-                      <div style={{ fontSize: '10px', fontWeight: '600', color: t.muted, textTransform: 'uppercase' }}>Phone</div>
-                      <div style={{ fontSize: '12.5px', color: t.ink2, marginTop: '2px' }}>{matchedContact.phone}</div>
-                    </div>
-                    <div style={{ padding: '9px 11px', background: t.bgRow, borderRadius: '8px' }}>
-                      <div style={{ fontSize: '10px', fontWeight: '600', color: t.muted, textTransform: 'uppercase' }}>Tag</div>
-                      <div style={{ fontSize: '12.5px', color: t.ink2, marginTop: '2px' }}>{matchedContact.tag || '—'}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '12px' }}>No matching contact record found.</div>
-                )}
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    value={drafts[m.id] || ''}
-                    onChange={e => setDrafts(d => ({ ...d, [m.id]: e.target.value }))}
-                    onKeyDown={e => { if (e.key === 'Enter') handleSend(m); }}
-                    placeholder="Type a reply…"
-                    style={{ flex: 1, padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}
-                  />
-                  <Btn small primary onClick={() => handleSend(m)} disabled={sendingId === m.id}>
-                    {sendingId === m.id ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} Send
-                  </Btn>
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 }
