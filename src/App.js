@@ -13,7 +13,7 @@ import {
   ChevronRight, ChevronDown, Zap, Sparkles, LogOut,
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
-  Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight,
+  Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -317,12 +317,12 @@ function useGhlFetch(fetchFn) {
 const ROLES = ['Owner', 'Office Manager', 'Front Desk', 'Biller'];
 const EDITABLE_ROLES = ROLES.filter(r => r !== 'Owner');
 
-const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'billing', 'payments', 'reports', 'activitylog', 'settings'];
+const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'billing', 'payments', 'reports', 'activitylog', 'settings'];
 
 const TAB_LABELS = {
   overview: 'Overview', inbox: 'Inbox', campaigns: 'Campaigns', recall: 'Recall', calendar: 'Calendar',
   waitlist: 'Waitlist', patients: 'Patients', portal: 'Patient Portal', eligibility: 'Eligibility',
-  reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', billing: 'Billing',
+  reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents', billing: 'Billing',
   payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
 };
 
@@ -362,7 +362,7 @@ function roleColor(role, t) {
 }
 
 const MAIN_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist'];
-const PRACTICE_TABS = ['patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk'];
+const PRACTICE_TABS = ['patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents'];
 const BILLINGSEC_TABS = ['billing', 'payments'];
 const ANALYTICS_TABS = ['reports', 'settings', 'activitylog'];
 
@@ -644,6 +644,7 @@ function App() {
           {isTabVisible('reviews', userRole, rolePermissions) && <NavItem label="Reviews" Icon={Star} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('surveys', userRole, rolePermissions) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('aifrontdesk', userRole, rolePermissions) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
+          {isTabVisible('documents', userRole, rolePermissions) && <NavItem label="Documents" Icon={FileArchive} tab="documents" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {BILLINGSEC_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Billing" collapsed={!showFull} />}
           {isTabVisible('billing', userRole, rolePermissions) && <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />}
           {isTabVisible('payments', userRole, rolePermissions) && <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
@@ -793,6 +794,7 @@ function App() {
           {gate('surveys', <Surveys userRole={userRole} />)}
           {gate('eligibility', <Eligibility userRole={userRole} />)}
           {gate('portal', <Portal userRole={userRole} />)}
+          {gate('documents', <Documents contacts={contacts} userRole={userRole} />)}
           {gate('waitlist', <Waitlist userRole={userRole} />)}
           {gate('calendar', <Calendar userRole={userRole} />)}
         </div>
@@ -826,6 +828,7 @@ function getPageTitle(tab, ownerName) {
     reviews: 'Reviews',
     surveys: 'Patient Satisfaction',
     aifrontdesk: 'AI Front Desk',
+    documents: 'Documents',
     billing: 'Billing Automation',
     payments: 'Payments & Plans',
     reports: 'Reports',
@@ -2647,6 +2650,167 @@ function Portal() {
           ))}
         </Card>
       </div>
+    </div>
+  );
+}
+
+// ─── DOCUMENTS ─────────────────────────────────────────────
+const DOCUMENT_CATEGORIES = ['All', 'Referrals', 'Lab Results', 'X-rays', 'Insurance', 'Consent Forms', 'Other'];
+
+const DOCUMENTS_SEED = [
+  { id: 'd1', name: 'Referral Letter — Endodontics Consult', category: 'Referrals', direction: 'received', who: 'Dr. Marcus Alvarez, Bayview Endodontics', date: 'Sep 12, 2026', size: '184 KB' },
+  { id: 'd2', name: 'Referral Letter — Oral Surgery Consult', category: 'Referrals', direction: 'received', who: 'Dr. Elena Cho, Tampa Oral & Maxillofacial', date: 'Aug 28, 2026', size: '210 KB' },
+  { id: 'd3', name: 'Lab Results — Crown Shade Match', category: 'Lab Results', direction: 'received', who: 'Precision Dental Lab', date: 'Sep 10, 2026', size: '96 KB' },
+  { id: 'd4', name: 'Lab Results — Implant Fit Report', category: 'Lab Results', direction: 'received', who: 'Precision Dental Lab', date: 'Sep 3, 2026', size: '142 KB' },
+  { id: 'd5', name: 'Panoramic X-ray', category: 'X-rays', direction: 'sent', who: 'James Lee', date: 'Sep 8, 2026', size: '3.2 MB' },
+  { id: 'd6', name: 'Bitewing X-ray Set', category: 'X-rays', direction: 'sent', who: 'Maria Chen', date: 'Sep 5, 2026', size: '2.8 MB' },
+  { id: 'd7', name: 'Insurance Pre-Authorization', category: 'Insurance', direction: 'sent', who: 'Aetna Dental', date: 'Sep 1, 2026', size: '78 KB' },
+  { id: 'd8', name: 'Insurance EOB', category: 'Insurance', direction: 'received', who: 'Delta Dental', date: 'Aug 30, 2026', size: '64 KB' },
+  { id: 'd9', name: 'Consent Form — Root Canal Treatment', category: 'Consent Forms', direction: 'received', who: 'Sarah Martinez', date: 'Sep 9, 2026', size: '42 KB' },
+  { id: 'd10', name: 'HIPAA Acknowledgment Form', category: 'Consent Forms', direction: 'received', who: 'David Wong', date: 'Aug 25, 2026', size: '38 KB' },
+  { id: 'd11', name: 'Practice Newsletter — September', category: 'Other', direction: 'sent', who: 'All active patients', date: 'Sep 1, 2026', size: '512 KB' },
+];
+
+function Documents({ contacts }) {
+  const t = useTheme();
+  const [documents, setDocuments] = useState(DOCUMENTS_SEED);
+  const [tab, setTab] = useState('received');
+  const [category, setCategory] = useState('All');
+  const [search, setSearch] = useState('');
+  const [showUpload, setShowUpload] = useState(false);
+  const [uploadForm, setUploadForm] = useState({ name: '', category: 'Referrals', recipient: '' });
+  const [uploadProgress, setUploadProgress] = useState(null);
+  const [shareNotice, setShareNotice] = useState('');
+  const contactList = contacts || [];
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
+
+  const filtered = documents
+    .filter(d => d.direction === tab)
+    .filter(d => category === 'All' || d.category === category)
+    .filter(d => {
+      if (!search.trim()) return true;
+      const q = search.trim().toLowerCase();
+      return d.name.toLowerCase().includes(q) || d.who.toLowerCase().includes(q);
+    });
+
+  function handleShare(doc) {
+    setShareNotice(`Share link for "${doc.name}" copied to clipboard (demo).`);
+    setTimeout(() => setShareNotice(''), 3000);
+  }
+
+  function handleUpload() {
+    if (!uploadForm.name.trim()) return;
+    let progress = 0;
+    setUploadProgress(0);
+    const interval = setInterval(() => {
+      progress += 20;
+      setUploadProgress(progress);
+      if (progress >= 100) {
+        clearInterval(interval);
+        setDocuments(docs => [{
+          id: `d-new-${Date.now()}`, name: uploadForm.name.trim(), category: uploadForm.category,
+          direction: 'sent', who: uploadForm.recipient.trim() || 'Unassigned', date: 'Just now', size: '—',
+        }, ...docs]);
+        setTimeout(() => { setShowUpload(false); setUploadProgress(null); setUploadForm({ name: '', category: 'Referrals', recipient: '' }); }, 400);
+      }
+    }, 150);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '14px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {[['received', 'Received'], ['sent', 'Sent']].map(([key, label]) => (
+            <button
+              key={key} type="button" onClick={() => setTab(key)}
+              style={{ padding: '8px 18px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: tab === key ? 'none' : `1px solid ${t.border}`, background: tab === key ? t.brand : t.bgCard, color: tab === key ? 'white' : t.mid, fontFamily: 'inherit' }}
+            >{label}</button>
+          ))}
+        </div>
+        <Btn primary onClick={() => setShowUpload(true)}><Upload size={14} /> Upload document</Btn>
+      </div>
+
+      <div style={{ position: 'relative', marginBottom: '12px', maxWidth: '360px' }}>
+        <Search size={14} color={t.muted} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)' }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or sender…" style={{ ...inputStyle, padding: '9px 12px 9px 32px' }} />
+      </div>
+
+      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
+        {DOCUMENT_CATEGORIES.map(cat => (
+          <button
+            key={cat} type="button" onClick={() => setCategory(cat)}
+            style={{ padding: '6px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: category === cat ? 'none' : `1px solid ${t.border}`, background: category === cat ? t.brand : t.bgCard, color: category === cat ? 'white' : t.mid, fontFamily: 'inherit' }}
+          >{cat}</button>
+        ))}
+      </div>
+
+      {shareNotice && (
+        <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{shareNotice}</div>
+      )}
+
+      <Card>
+        {filtered.length === 0 && <div style={{ fontSize: '13px', color: t.muted, textAlign: 'center', padding: '28px 0' }}>No documents match these filters.</div>}
+        {filtered.map(doc => (
+          <RowItem key={doc.id}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <FileText size={17} color={t.brand} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.name}</div>
+              <div style={{ fontSize: '11.5px', color: t.muted }}>{tab === 'received' ? 'From' : 'To'} {doc.who} · {doc.date} · {doc.size}</div>
+            </div>
+            <Pill label={doc.category} color={t.brand} bg={t.brandL} />
+            <Btn small onClick={() => handleShare(doc)}><Send size={12} /> Share</Btn>
+            <Btn small primary><Download size={12} /> Download</Btn>
+          </RowItem>
+        ))}
+      </Card>
+
+      {showUpload && (
+        <Modal title="Upload document" onClose={() => !uploadProgress && setShowUpload(false)}>
+          {uploadProgress === null ? (
+            <>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={labelStyle}>Document name</label>
+                <input value={uploadForm.name} onChange={e => setUploadForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Lab Results — Bridge Fit" style={inputStyle} />
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={labelStyle}>Category</label>
+                <select value={uploadForm.category} onChange={e => setUploadForm(f => ({ ...f, category: e.target.value }))} style={inputStyle}>
+                  {DOCUMENT_CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={labelStyle}>Recipient patient</label>
+                <input
+                  value={uploadForm.recipient}
+                  onChange={e => setUploadForm(f => ({ ...f, recipient: e.target.value }))}
+                  placeholder="Search patients…"
+                  list="documents-patient-list"
+                  style={inputStyle}
+                />
+                <datalist id="documents-patient-list">
+                  {contactList.map(c => <option key={c.id} value={c.name} />)}
+                </datalist>
+              </div>
+              <div style={{ marginBottom: '18px' }}>
+                <label style={labelStyle}>File</label>
+                <input type="file" style={inputStyle} />
+              </div>
+              <Btn primary onClick={handleUpload}>Upload</Btn>
+            </>
+          ) : (
+            <div style={{ padding: '10px 0' }}>
+              <div style={{ fontSize: '13px', color: t.ink2, marginBottom: '10px' }}>Uploading "{uploadForm.name}"…</div>
+              <div style={{ height: '8px', borderRadius: '5px', background: t.bgRow, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${uploadProgress}%`, background: t.brand, transition: 'width .15s ease' }} />
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }
