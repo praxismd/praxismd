@@ -1713,8 +1713,84 @@ function Payments() {
 }
 
 // ─── AI FRONT DESK ─────────────────────────────────────────
+const CALL_LOG = [
+  {
+    id: 'call1', caller: 'Robert Park', phone: '(813) 555-0118', duration: '3 min', time: 'Today, 4:02 PM',
+    topic: 'Emergency — tooth pain', pill: 'Booked', color: 'green',
+    transcript: [
+      { speaker: 'AI', text: "Thanks for calling Bright Smiles Dental, this is Alex. How can I help you today?" },
+      { speaker: 'Caller', text: "Hi, I have really bad tooth pain on my lower right side, it's been getting worse since last night." },
+      { speaker: 'AI', text: "I'm sorry to hear that — that sounds urgent. Can I get your name and date of birth to pull up your file?" },
+      { speaker: 'Caller', text: 'Robert Park, 04/12/1985.' },
+      { speaker: 'AI', text: "Thanks Robert. I see you're an existing patient. Given the pain level, I'd like to get you in today — I have a 4:00 PM emergency slot open. Does that work?" },
+      { speaker: 'Caller', text: 'Yes, that works, thank you.' },
+      { speaker: 'AI', text: "Great, you're booked for 4:00 PM today with Dr. Rivera. I'm texting you an intake form now — please fill it out before you arrive. See you soon!" },
+    ],
+    actions: ['Verified existing patient record', 'Booked 4:00 PM emergency slot with Dr. Rivera', 'Sent digital intake form via SMS'],
+  },
+  {
+    id: 'call2', caller: 'Unknown', phone: '(813) 555-0199', duration: '2 min', time: 'Today, 2:47 PM',
+    topic: 'Hours inquiry', pill: 'Resolved', color: 'brand',
+    transcript: [
+      { speaker: 'AI', text: "Thanks for calling Bright Smiles Dental, this is Alex. How can I help you today?" },
+      { speaker: 'Caller', text: 'Hey, what are your hours on Saturdays? And do you have parking?' },
+      { speaker: 'AI', text: "We're open Saturdays from 9 AM to 2 PM, and yes — there's free parking right behind the building. Would you like to book a cleaning while I have you?" },
+      { speaker: 'Caller', text: 'Not right now, just checking. Thanks!' },
+      { speaker: 'AI', text: 'No problem, have a great day!' },
+    ],
+    actions: ['Answered hours and parking questions', 'Offered to book a cleaning — declined'],
+  },
+  {
+    id: 'call3', caller: 'Maria Chen', phone: '(813) 555-0142', duration: '4 min', time: 'Today, 1:15 PM',
+    topic: 'Insurance question', pill: 'Escalated', color: 'amber',
+    transcript: [
+      { speaker: 'AI', text: "Thanks for calling Bright Smiles Dental, this is Alex. How can I help you today?" },
+      { speaker: 'Caller', text: "Hi, I wanted to ask if my Delta Dental plan covers a crown, and how much I'd owe out of pocket." },
+      { speaker: 'AI', text: 'I can look up your file, but a detailed benefits breakdown needs a member-specific plan lookup — let me connect you with our front desk team so they can pull your exact coverage.' },
+      { speaker: 'Caller', text: 'Okay, sure.' },
+      { speaker: 'AI', text: "I've flagged this for our staff — someone will call you back within the hour with your exact coverage numbers." },
+    ],
+    actions: ['Identified benefits question requiring plan lookup', 'Escalated to front desk with callback flag'],
+  },
+  {
+    id: 'call4', caller: 'David Wong', phone: '(813) 555-0177', duration: '2 min', time: 'Today, 11:32 AM',
+    topic: 'Reschedule request', pill: 'Rescheduled', color: 'green',
+    transcript: [
+      { speaker: 'AI', text: "Thanks for calling Bright Smiles Dental, this is Alex. How can I help you today?" },
+      { speaker: 'Caller', text: 'I need to move my appointment on Thursday, something came up.' },
+      { speaker: 'AI', text: 'No problem — I see your 10 AM cleaning on Thursday. I have openings Friday at 9 AM or next Monday at 3 PM. Which works better?' },
+      { speaker: 'Caller', text: 'Friday at 9 works.' },
+      { speaker: 'AI', text: "You're all set for Friday at 9 AM. I'll send a confirmation text shortly." },
+    ],
+    actions: ['Found existing Thursday appointment', 'Offered two alternative times', 'Rebooked to Friday 9:00 AM and sent confirmation'],
+  },
+];
+
+const VOICE_SETTINGS_META = [
+  { key: 'autoBook', title: 'Auto-book appointments', sub: 'AI can book without staff approval' },
+  { key: 'emergencyEscalation', title: 'Emergency escalation', sub: 'Keywords that trigger urgent alert to staff' },
+  { key: 'afterHoursSms', title: 'After-hours SMS fallback', sub: 'Texts caller if they call when closed' },
+  { key: 'callRecording', title: 'Call recording', sub: 'Stored 90 days · HIPAA compliant' },
+];
+
 function AIFrontDesk() {
   const t = useTheme();
+  const [selectedCall, setSelectedCall] = useState(null);
+  const [voiceName, setVoiceName] = useState('Alex');
+  const [settings, setSettings] = useState({ autoBook: true, emergencyEscalation: true, afterHoursSms: true, callRecording: true });
+  const [saved, setSaved] = useState(false);
+  const colorMap = { green: t.green, brand: t.brand, amber: t.amber };
+  const bgMap = { green: t.greenL, brand: t.brandL, amber: t.amberL };
+
+  function toggleSetting(key) {
+    setSettings(s => ({ ...s, [key]: !s[key] }));
+  }
+
+  function saveSettings() {
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2200);
+  }
+
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '13px', marginBottom: '16px' }}>
@@ -1726,34 +1802,60 @@ function AIFrontDesk() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
         <Card>
           <CardTitle>Recent call log</CardTitle>
-          {[
-            { dot: t.accentGreen, title: 'Robert Park · 3 min · Emergency', sub: 'AI triaged tooth pain. Booked 4pm emergency slot. Sent intake form via SMS.', pill: 'Booked', c: t.green, bg: t.greenL },
-            { dot: t.accentGreen, title: 'Unknown · 2 min · Hours inquiry', sub: 'Asked about office hours and parking. AI answered. Offered to book a cleaning.', pill: 'Resolved', c: t.brand, bg: t.brandL },
-            { dot: t.accentAmber, title: 'Maria Chen · 4 min · Insurance Q', sub: 'Asked about Delta Dental coverage. AI escalated to staff — required plan lookup.', pill: 'Escalated', c: t.amber, bg: t.amberL },
-            { dot: t.accentGreen, title: 'David Wong · 2 min · Reschedule', sub: 'Wanted to move Thursday appt. AI checked calendar, offered two alternatives. Done.', pill: 'Rescheduled', c: t.green, bg: t.greenL },
-          ].map((c, i) => (
-            <div key={i} className="px-row" style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '7px', border: `1px solid ${t.border2}` }}>
-              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: c.dot, marginTop: '5px', flexShrink: 0 }} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{c.title}</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{c.sub}</div></div>
-              <Pill label={c.pill} color={c.c} bg={c.bg} />
+          {CALL_LOG.map(c => (
+            <div key={c.id} className="px-row" onClick={() => setSelectedCall(c)} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '7px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: colorMap[c.color], marginTop: '5px', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{c.caller} · {c.duration} · {c.topic}</div>
+                <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{c.actions[0]}</div>
+              </div>
+              <Pill label={c.pill} color={colorMap[c.color]} bg={bgMap[c.color]} />
             </div>
           ))}
         </Card>
         <Card>
-          <CardTitle>AI voice settings</CardTitle>
-          {[['AI voice name', 'What callers hear when AI picks up', 'Alex'],
-            ['Auto-book appointments', 'AI can book without staff approval', 'On'],
-            ['Emergency escalation', 'Keywords that trigger urgent alert to staff', 'On'],
-            ['After-hours SMS fallback', 'Texts caller if they call when closed', 'On'],
-            ['Call recording', 'Stored 90 days · HIPAA compliant', 'On'],
-          ].map(([title, sub, val], i) => (
-            <RowItem key={i} style={{ justifyContent: 'space-between' }}>
-              <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{title}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
-              <span style={{ fontSize: i === 0 ? '13px' : '11px', color: i === 0 ? t.brand : t.green, fontWeight: '500', background: i === 0 ? 'transparent' : t.greenL, padding: i === 0 ? '0' : '3px 9px', borderRadius: '20px' }}>{val}</span>
+          <CardTitle>
+            AI voice settings
+            <Btn small primary onClick={saveSettings}>{saved ? <Check size={13} /> : null}{saved ? 'Saved' : 'Save'}</Btn>
+          </CardTitle>
+          <RowItem style={{ justifyContent: 'space-between' }}>
+            <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>AI voice name</div><div style={{ fontSize: '11.5px', color: t.muted }}>What callers hear when AI picks up</div></div>
+            <input value={voiceName} onChange={e => setVoiceName(e.target.value)} style={{ width: '90px', padding: '6px 9px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, textAlign: 'right' }} />
+          </RowItem>
+          {VOICE_SETTINGS_META.map(item => (
+            <RowItem key={item.key} style={{ justifyContent: 'space-between' }}>
+              <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{item.title}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{item.sub}</div></div>
+              <ToggleSwitch checked={settings[item.key]} onChange={() => toggleSetting(item.key)} />
             </RowItem>
           ))}
         </Card>
       </div>
+
+      {selectedCall && (
+        <SlidePanel title={selectedCall.caller} subtitle={`${selectedCall.topic} · ${selectedCall.time}`} onClose={() => setSelectedCall(null)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
+            <Pill label={selectedCall.pill} color={colorMap[selectedCall.color]} bg={bgMap[selectedCall.color]} />
+            <span style={{ fontSize: '12px', color: t.muted }}>{selectedCall.phone} · {selectedCall.duration}</span>
+          </div>
+
+          <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '8px' }}>AI actions taken</div>
+          <div style={{ marginBottom: '22px' }}>
+            {selectedCall.actions.map((a, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', color: t.ink2, marginBottom: '6px' }}>
+                <Check size={13} color={t.green} style={{ marginTop: '2px', flexShrink: 0 }} /> {a}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '10px' }}>Call transcript</div>
+          {selectedCall.transcript.map((line, i) => (
+            <div key={i} style={{ marginBottom: '10px', textAlign: line.speaker === 'AI' ? 'left' : 'right' }}>
+              <div style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, marginBottom: '3px' }}>{line.speaker === 'AI' ? `AI (${voiceName})` : selectedCall.caller}</div>
+              <div style={{ display: 'inline-block', maxWidth: '85%', padding: '9px 12px', borderRadius: '12px', fontSize: '12.5px', lineHeight: '1.5', background: line.speaker === 'AI' ? t.brandL : t.bgRow, color: t.ink2, textAlign: 'left' }}>{line.text}</div>
+            </div>
+          ))}
+        </SlidePanel>
+      )}
     </div>
   );
 }

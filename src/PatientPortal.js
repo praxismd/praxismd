@@ -7,6 +7,7 @@ import { light, withAlpha } from './theme';
 import {
   CalendarClock, MessageSquare, User, LogOut, Loader2, AlertTriangle,
   Stethoscope, Receipt, CreditCard, Download, Info, Home, Shield, FileText, CheckCircle2, PenLine,
+  Pill as PillIcon, Users, Plus, RotateCcw,
 } from 'lucide-react';
 
 const t = light;
@@ -65,12 +66,25 @@ const DOCUMENTS_SEED = [
   { id: 'doc4', name: 'Treatment plan consent — Crown #3', signed: false, date: null },
 ];
 
+const PRESCRIPTIONS_SEED = [
+  { id: 'rx1', name: 'Chlorhexidine Rinse 0.12%', dosage: 'Rinse 15mL twice daily', prescriber: 'Dr. Rivera', prescribedDate: 'Nov 2, 2023', refillsRemaining: 2, status: 'active' },
+  { id: 'rx2', name: 'Ibuprofen 600mg', dosage: '1 tablet every 6 hours as needed for pain', prescriber: 'Dr. Alvarez', prescribedDate: 'Jun 20, 2023', refillsRemaining: 1, status: 'active' },
+  { id: 'rx3', name: 'Amoxicillin 500mg', dosage: '1 capsule 3x daily for 7 days', prescriber: 'Dr. Rivera', prescribedDate: 'Mar 15, 2024', refillsRemaining: 0, status: 'expired' },
+];
+
+const FAMILY_SEED = [
+  { id: 'f1', name: 'Alex Thompson', relation: 'Spouse', dob: 'Apr 12, 1988', lastVisit: 'Feb 3, 2026' },
+  { id: 'f2', name: 'Maya Thompson', relation: 'Child', dob: 'Sep 30, 2015', lastVisit: 'Jan 20, 2026' },
+];
+
 const TABS = [
   { key: 'overview', label: 'Overview', Icon: Home },
   { key: 'chart', label: 'My Chart', Icon: Stethoscope },
+  { key: 'prescriptions', label: 'Prescriptions', Icon: PillIcon },
   { key: 'insurance', label: 'Insurance', Icon: Shield },
   { key: 'documents', label: 'Documents', Icon: FileText },
   { key: 'billing', label: 'Billing', Icon: CreditCard },
+  { key: 'family', label: 'Family', Icon: Users },
   { key: 'messages', label: 'Messages', Icon: MessageSquare },
 ];
 
@@ -506,6 +520,136 @@ function DocumentsTab({ setNotice }) {
   );
 }
 
+function PrescriptionsTab() {
+  const [prescriptions, setPrescriptions] = useState(PRESCRIPTIONS_SEED);
+  const [requested, setRequested] = useState({});
+
+  function requestRefill(id) {
+    setRequested(r => ({ ...r, [id]: true }));
+    setPrescriptions(ps => ps.map(p => p.id === id ? { ...p, refillsRemaining: Math.max(0, p.refillsRemaining - 1) } : p));
+  }
+
+  const active = prescriptions.filter(p => p.status === 'active');
+  const expired = prescriptions.filter(p => p.status === 'expired');
+
+  return (
+    <>
+      <div style={{ ...cardStyle, marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <PillIcon size={17} color={t.teal} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Active prescriptions</div>
+        </div>
+        <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '14px' }}>Request a refill and your practice will review it before it's sent to your pharmacy.</div>
+        {active.map(rx => (
+          <div key={rx.id} style={{ padding: '13px 14px', background: t.bgRow, borderRadius: '10px', marginBottom: '8px', border: `1px solid ${t.border2}` }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink2 }}>{rx.name}</div>
+                <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{rx.dosage}</div>
+                <div style={{ fontSize: '11px', color: t.muted, marginTop: '4px' }}>Prescribed by {rx.prescriber} · {rx.prescribedDate}</div>
+              </div>
+              {requested[rx.id] ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11.5px', color: t.teal, whiteSpace: 'nowrap', flexShrink: 0 }}><CheckCircle2 size={13} /> Requested</div>
+              ) : rx.refillsRemaining > 0 ? (
+                <PortalBtn onClick={() => requestRefill(rx.id)}><RotateCcw size={13} /> Request refill</PortalBtn>
+              ) : (
+                <div style={{ fontSize: '11.5px', color: t.muted, whiteSpace: 'nowrap', flexShrink: 0 }}>No refills left</div>
+              )}
+            </div>
+            <div style={{ fontSize: '11px', color: t.muted, marginTop: '8px' }}>{rx.refillsRemaining} refill{rx.refillsRemaining === 1 ? '' : 's'} remaining</div>
+          </div>
+        ))}
+        {active.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No active prescriptions on file.</div>}
+      </div>
+
+      {expired.length > 0 && (
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+            <FileText size={17} color={t.muted} />
+            <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Past prescriptions</div>
+          </div>
+          {expired.map(rx => (
+            <div key={rx.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${t.border2}` }}>
+              <div>
+                <div style={{ fontSize: '13px', color: t.ink2 }}>{rx.name}</div>
+                <div style={{ fontSize: '11px', color: t.muted, marginTop: '2px' }}>{rx.dosage}</div>
+              </div>
+              <div style={{ fontSize: '11.5px', color: t.muted }}>{rx.prescribedDate}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function FamilyTab({ setNotice }) {
+  const [family, setFamily] = useState(FAMILY_SEED);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name: '', relation: 'Child', dob: '' });
+
+  function addMember() {
+    if (!form.name.trim() || !form.dob.trim()) {
+      setNotice('Add a name and date of birth to continue.');
+      return;
+    }
+    setFamily(f => [...f, { id: `f-new-${Date.now()}`, name: form.name.trim(), relation: form.relation, dob: form.dob.trim(), lastVisit: null }]);
+    setForm({ name: '', relation: 'Child', dob: '' });
+    setShowForm(false);
+  }
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Users size={17} color={t.brand} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Family on this account</div>
+        </div>
+        <PortalBtn onClick={() => setShowForm(s => !s)}><Plus size={13} /> {showForm ? 'Cancel' : 'Add family member'}</PortalBtn>
+      </div>
+      <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '14px' }}>Manage appointments and records for dependents linked to your account.</div>
+
+      {showForm && (
+        <div className="px-expand" style={{ padding: '14px', background: t.bgRow, borderRadius: '10px', marginBottom: '14px', border: `1px solid ${t.border2}` }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Full name" style={inputStyle} />
+            <select value={form.relation} onChange={e => setForm(f => ({ ...f, relation: e.target.value }))} style={inputStyle}>
+              {['Spouse', 'Child', 'Parent', 'Other'].map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            <input value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} placeholder="Date of birth" style={inputStyle} />
+          </div>
+          <PortalBtn primary onClick={addMember}>Add to account</PortalBtn>
+        </div>
+      )}
+
+      {family.map(m => (
+        <div key={m.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: `1px solid ${t.border2}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: t.brandL, color: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', flexShrink: 0 }}>
+              {m.name.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</div>
+              <div style={{ fontSize: '11.5px', color: t.muted }}>{m.relation} · Born {m.dob}</div>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '11.5px', color: t.muted }}>{m.lastVisit ? `Last visit ${m.lastVisit}` : 'No visits yet'}</div>
+            <button
+              onClick={() => setNotice('Viewing a dependent\'s chart from your account is coming soon.')}
+              className="px-btn"
+              style={{ marginTop: '4px', padding: '4px 10px', borderRadius: '8px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.mid, fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
+            >View chart</button>
+          </div>
+        </div>
+      ))}
+      {family.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No family members added yet.</div>}
+    </div>
+  );
+}
+
 function formatMsgTime(ts) {
   if (!ts?.toDate) return 'Sending…';
   return ts.toDate().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -733,9 +877,11 @@ function PatientPortal() {
 
         {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} onOpenMessages={() => setTab('messages')} />}
         {tab === 'chart' && <ChartTab />}
+        {tab === 'prescriptions' && <PrescriptionsTab />}
         {tab === 'insurance' && <InsuranceTab setNotice={setNotice} />}
         {tab === 'documents' && <DocumentsTab setNotice={setNotice} />}
         {tab === 'billing' && <BillingTab setNotice={setNotice} />}
+        {tab === 'family' && <FamilyTab setNotice={setNotice} />}
         {tab === 'messages' && <MessagesTab profile={profile} />}
 
         {tab === 'overview' && (
