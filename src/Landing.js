@@ -7,6 +7,16 @@ import {
 
 const t = light;
 
+// Plain `href="#id"` anchors would normally let the browser scroll to the
+// element natively, but HashRouter reads everything after `#` as a route to
+// navigate to, so on this app it would try (and fail) to navigate instead of
+// scrolling. Scroll manually and skip the hash entirely.
+function scrollToId(id) {
+  return () => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  };
+}
+
 const PRICING = [
   {
     name: 'Starter', popular: false,
@@ -77,15 +87,15 @@ function NavBar() {
           <span style={{ fontSize: '18px', fontWeight: '700', color: t.ink }}>PraxisMD</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '28px', fontSize: '13.5px', fontWeight: '500', color: t.mid }}>
-          <a href="#features" style={{ color: 'inherit', textDecoration: 'none' }}>Features</a>
-          <a href="#pricing" style={{ color: 'inherit', textDecoration: 'none' }}>Pricing</a>
-          <a href="#compare" style={{ color: 'inherit', textDecoration: 'none' }}>Compare</a>
+          <button type="button" onClick={scrollToId('features')} style={{ color: 'inherit', background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', cursor: 'pointer', textDecoration: 'none' }}>Features</button>
+          <button type="button" onClick={scrollToId('pricing')} style={{ color: 'inherit', background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', cursor: 'pointer', textDecoration: 'none' }}>Pricing</button>
+          <button type="button" onClick={scrollToId('compare')} style={{ color: 'inherit', background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', cursor: 'pointer', textDecoration: 'none' }}>Compare</button>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <Link to="/login" style={{ color: t.mid, textDecoration: 'none', fontSize: '13.5px', fontWeight: '500', whiteSpace: 'nowrap' }}>Sign in</Link>
-          <a href="#demo" className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '10px', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+          <button type="button" onClick={scrollToId('demo')} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', fontFamily: 'inherit', textDecoration: 'none', whiteSpace: 'nowrap', cursor: 'pointer' }}>
             Book a Demo
-          </a>
+          </button>
         </div>
       </div>
     </div>
@@ -132,12 +142,12 @@ function Landing() {
           so your team spends less time chasing patients and paperwork, and more time in the chair.
         </p>
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <a href="#demo" className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', background: t.brand, color: 'white', fontSize: '15px', fontWeight: '600', textDecoration: 'none' }}>
+          <button type="button" onClick={scrollToId('demo')} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', border: 'none', background: t.brand, color: 'white', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit', textDecoration: 'none', cursor: 'pointer' }}>
             Book a Demo <ArrowRight size={16} />
-          </a>
-          <a href="#pricing" className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '15px', fontWeight: '600', textDecoration: 'none' }}>
+          </button>
+          <button type="button" onClick={scrollToId('pricing')} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '15px', fontWeight: '600', fontFamily: 'inherit', textDecoration: 'none', cursor: 'pointer' }}>
             See pricing
-          </a>
+          </button>
         </div>
         <div style={{ marginTop: '18px', fontSize: '12.5px', color: t.muted }}>No credit card required · Cancel anytime</div>
       </div>
