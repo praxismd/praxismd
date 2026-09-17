@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, Fragment } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -421,6 +421,7 @@ function App() {
   const [notifReadIds, setNotifReadIds] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [patientQuery, setPatientQuery] = useState('');
+  const [campaignSuggestion, setCampaignSuggestion] = useState(null);
   const [userRole, setUserRole] = useState('Owner');
   const [rolePermissions, setRolePermissions] = useState(DEFAULT_ROLE_PERMISSIONS);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -787,13 +788,13 @@ function App() {
         <div key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
           {gate('overview', <Overview setActiveTab={setActiveTab} userRole={userRole} />)}
           {gate('inbox', <Inbox contacts={contacts} userRole={userRole} />)}
-          {gate('campaigns', <Campaigns userRole={userRole} />)}
+          {gate('campaigns', <Campaigns userRole={userRole} suggestion={campaignSuggestion} onConsumeSuggestion={() => setCampaignSuggestion(null)} />)}
           {gate('recall', <Recall userRole={userRole} />)}
           {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />)}
           {gate('billing', <Billing userRole={userRole} />)}
           {gate('membershipplans', <MembershipPlans userRole={userRole} />)}
           {gate('payments', <Payments userRole={userRole} />)}
-          {gate('reports', <Reports userRole={userRole} />)}
+          {gate('reports', <Reports userRole={userRole} onSuggestCampaign={s => { setCampaignSuggestion(s); setActiveTab('campaigns'); }} />)}
           {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} brandColor={brandColor} onBrandColorChange={setBrandColor} />)}
           {gate('activitylog', <ActivityLog userRole={userRole} />)}
           {gate('aifrontdesk', <AIFrontDesk userRole={userRole} />)}
@@ -1621,7 +1622,7 @@ const CAMPAIGN_AUDIENCES = ['Inactive 3mo', 'Inactive 6mo', 'All patients', 'Cus
 const CAMPAIGN_TOUCHES = [3, 5, 7];
 const CAMPAIGN_CHANNELS = ['SMS', 'Email', 'Both'];
 
-function Campaigns() {
+function Campaigns({ suggestion, onConsumeSuggestion }) {
   const t = useTheme();
   const [campaigns, setCampaigns] = useState(CAMPAIGNS_DATA);
   const [selected, setSelected] = useState(null);
@@ -1629,6 +1630,14 @@ function Campaigns() {
   const [exported, setExported] = useState(false);
   const [form, setForm] = useState({ name: '', type: CAMPAIGN_TYPES[0], audience: CAMPAIGN_AUDIENCES[0], touches: CAMPAIGN_TOUCHES[1], channel: CAMPAIGN_CHANNELS[0], message: '' });
   const colorMap = { brand: t.brand, green: t.green, amber: t.amber, purple: t.purple, muted: t.muted };
+
+  useEffect(() => {
+    if (!suggestion) return;
+    setForm(f => ({ ...f, name: suggestion.name, message: suggestion.message }));
+    setShowForm(true);
+    onConsumeSuggestion && onConsumeSuggestion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestion]);
 
   function toggleStatus(name) {
     setCampaigns(cs => cs.map(c => c.name === name
@@ -3739,7 +3748,92 @@ const REPORTS_DATA = {
   },
 };
 
-function Reports() {
+// Rows = hourly slots (8am-8pm), columns = Mon-Sun. null = closed.
+const CHAIR_UTILIZATION_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const CHAIR_UTILIZATION_HOURS = ['8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', '7pm'];
+const CHAIR_UTILIZATION_GRID = [
+  [22, 45, 40, 38, 30, null, null],
+  [65, 78, 72, 68, 55, null, null],
+  [88, 92, 85, 90, 78, null, null],
+  [95, 88, 91, 87, 82, null, null],
+  [58, 62, 55, 60, 48, null, null],
+  [72, 80, 76, 74, 65, null, null],
+  [90, 94, 89, 92, 70, null, null],
+  [93, 96, 91, 95, 42, null, null],
+  [85, 82, 88, 80, null, null, null],
+  [50, 55, 48, 52, null, null, null],
+  [null, null, null, null, null, null, null],
+  [null, null, null, null, null, null, null],
+];
+
+function heatColor(rate, t) {
+  if (rate == null) return t.bgRow;
+  if (rate >= 80) return t.green;
+  if (rate >= 60) return withAlpha(t.accentGreen, .38);
+  if (rate >= 40) return t.amber;
+  if (rate >= 20) return withAlpha(t.accentRed, .3);
+  return t.red;
+}
+
+function ChairUtilization({ onUseInsight }) {
+  const t = useTheme();
+  let min = null, minHour = null, minDay = null;
+  CHAIR_UTILIZATION_GRID.forEach((row, hi) => {
+    row.forEach((rate, di) => {
+      if (rate != null && (min === null || rate < min)) { min = rate; minHour = CHAIR_UTILIZATION_HOURS[hi]; minDay = CHAIR_UTILIZATION_DAYS[di]; }
+    });
+  });
+
+  return (
+    <Card style={{ marginBottom: '16px' }}>
+      <CardTitle>Chair utilization</CardTitle>
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(${CHAIR_UTILIZATION_DAYS.length}, 1fr)`, gap: '4px', minWidth: '520px' }}>
+          <div />
+          {CHAIR_UTILIZATION_DAYS.map(d => (
+            <div key={d} style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textAlign: 'center', paddingBottom: '4px' }}>{d}</div>
+          ))}
+          {CHAIR_UTILIZATION_HOURS.map((hour, hi) => (
+            <Fragment key={hour}>
+              <div style={{ fontSize: '10.5px', color: t.muted, display: 'flex', alignItems: 'center' }}>{hour}</div>
+              {CHAIR_UTILIZATION_DAYS.map((day, di) => {
+                const rate = CHAIR_UTILIZATION_GRID[hi][di];
+                return (
+                  <div
+                    key={day}
+                    title={rate == null ? 'Closed' : `${day} ${hour}: ${rate}% booked`}
+                    style={{ height: '22px', borderRadius: '5px', background: heatColor(rate, t) }}
+                  />
+                );
+              })}
+            </Fragment>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', marginTop: '14px', fontSize: '11px', color: t.mid }}>
+        {[['80-100%', t.green], ['60-79%', withAlpha(t.accentGreen, .38)], ['40-59%', t.amber], ['20-39%', withAlpha(t.accentRed, .3)], ['0-19%', t.red]].map(([label, color], i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: color, display: 'inline-block' }} />
+            {label}
+          </div>
+        ))}
+      </div>
+      {min !== null && (
+        <div style={{ marginTop: '14px', padding: '10px 14px', background: t.brandL, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '12.5px', color: t.brand, display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <Sparkles size={13} /> Your emptiest slot is {minDay} {minHour} ({min}% booked) — consider targeting it with a campaign.
+          </div>
+          <Btn small primary onClick={() => onUseInsight({
+            name: `Fill the ${minDay} ${minHour} lull`,
+            message: `We noticed openings ${minDay} around ${minHour} — want to grab one? Reply YES and we'll get you booked.`,
+          })}>Use this insight</Btn>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function Reports({ onSuggestCampaign }) {
   const t = useTheme();
   const colorMap = { brand: t.brand, green: t.green, teal: t.teal, amber: t.amber, pink: t.pink, orange: t.orange, purple: t.purple };
   const accentMap = { brand: t.accentBlue, green: t.accentGreen, teal: t.accentTeal, amber: t.accentAmber, pink: t.accentPink, orange: t.accentOrange, purple: t.accentPurple };
@@ -3761,6 +3855,7 @@ function Reports() {
           <StatCard key={i} label={label} value={value} color={colorMap[color]} accent={accentMap[color]} sub={sub} />
         ))}
       </div>
+      <ChairUtilization onUseInsight={onSuggestCampaign} />
       <Card>
         <CardTitle>Monthly performance breakdown</CardTitle>
         {data.metrics.map(([label, val, color], i) => (
