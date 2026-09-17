@@ -14,7 +14,7 @@ import {
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
   Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
-  CalendarPlus,
+  CalendarPlus, BadgeCheck,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -318,7 +318,7 @@ function useGhlFetch(fetchFn) {
 const ROLES = ['Owner', 'Office Manager', 'Front Desk', 'Biller'];
 const EDITABLE_ROLES = ROLES.filter(r => r !== 'Owner');
 
-const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'treatmentplans', 'billing', 'payments', 'reports', 'activitylog', 'settings'];
+const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'treatmentplans', 'billing', 'membershipplans', 'payments', 'reports', 'activitylog', 'settings'];
 
 const TAB_LABELS = {
   overview: 'Overview', inbox: 'Inbox', campaigns: 'Campaigns', recall: 'Recall', calendar: 'Calendar',
@@ -326,7 +326,7 @@ const TAB_LABELS = {
   waitlist: 'Waitlist', patients: 'Patients', portal: 'Patient Portal', eligibility: 'Eligibility',
   reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents',
   treatmentplans: 'Treatment Plans',
-  billing: 'Billing', payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
+  billing: 'Billing', membershipplans: 'Membership Plans', payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
 };
 
 function buildPermissions(onTabs) {
@@ -366,7 +366,7 @@ function roleColor(role, t) {
 
 const MAIN_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist'];
 const PRACTICE_TABS = ['patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'treatmentplans'];
-const BILLINGSEC_TABS = ['billing', 'payments'];
+const BILLINGSEC_TABS = ['billing', 'membershipplans', 'payments'];
 const ANALYTICS_TABS = ['reports', 'settings', 'activitylog'];
 
 const STAFF_MEMBERS = [
@@ -652,6 +652,7 @@ function App() {
           {isTabVisible('treatmentplans', userRole, rolePermissions) && <NavItem label="Treatment Plans" Icon={ClipboardList} tab="treatmentplans" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {BILLINGSEC_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Billing" collapsed={!showFull} />}
           {isTabVisible('billing', userRole, rolePermissions) && <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />}
+          {isTabVisible('membershipplans', userRole, rolePermissions) && <NavItem label="Membership Plans" Icon={BadgeCheck} tab="membershipplans" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('payments', userRole, rolePermissions) && <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {ANALYTICS_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Analytics" collapsed={!showFull} />}
           {isTabVisible('reports', userRole, rolePermissions) && <NavItem label="Reports" Icon={TrendingUp} tab="reports" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
@@ -790,6 +791,7 @@ function App() {
           {gate('recall', <Recall userRole={userRole} />)}
           {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />)}
           {gate('billing', <Billing userRole={userRole} />)}
+          {gate('membershipplans', <MembershipPlans userRole={userRole} />)}
           {gate('payments', <Payments userRole={userRole} />)}
           {gate('reports', <Reports userRole={userRole} />)}
           {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} brandColor={brandColor} onBrandColorChange={setBrandColor} />)}
@@ -840,6 +842,7 @@ function getPageTitle(tab, ownerName) {
     documents: 'Documents',
     billing: 'Billing Automation',
     payments: 'Payments & Plans',
+    membershipplans: 'Membership Plans',
     reports: 'Reports',
     settings: 'Settings',
     activitylog: 'Activity Log',
@@ -3422,6 +3425,167 @@ function TreatmentPlans({ contacts }) {
           ))}
           <Btn small onClick={addProcedureRow} style={{ marginBottom: '18px' }}><Plus size={12} /> Add procedure</Btn>
           <Btn primary onClick={createPlan}>Create plan</Btn>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── MEMBERSHIP PLANS ──────────────────────────────────────
+const MEMBERSHIP_PLANS_SEED = [
+  { id: 'mp1', name: 'Basic', monthlyPrice: 29, annualPrice: 299, benefits: ['2 cleanings per year', '1 X-ray set per year', '10% off all other procedures'] },
+  { id: 'mp2', name: 'Premium', monthlyPrice: 49, annualPrice: 499, benefits: ['Everything in Basic', 'Free teeth whitening once a year', 'Priority scheduling'] },
+];
+
+const MEMBERSHIP_MEMBERS_SEED = [
+  { id: 'mm1', patientName: 'Maria Chen', planId: 'mp2', joinDate: 'Jan 15, 2026', nextBilling: 'Oct 15, 2026', status: 'Active' },
+  { id: 'mm2', patientName: 'David Wong', planId: 'mp1', joinDate: 'Mar 3, 2026', nextBilling: 'Oct 3, 2026', status: 'Active' },
+  { id: 'mm3', patientName: 'Sarah Martinez', planId: 'mp2', joinDate: 'May 20, 2026', nextBilling: 'Oct 20, 2026', status: 'Active' },
+  { id: 'mm4', patientName: 'James Lee', planId: 'mp1', joinDate: 'Jul 8, 2026', nextBilling: 'Sep 8, 2026', status: 'Failed' },
+  { id: 'mm5', patientName: 'Priya Patel', planId: 'mp1', joinDate: 'Aug 1, 2026', nextBilling: 'Oct 1, 2026', status: 'Active' },
+];
+
+function MembershipPlans() {
+  const t = useTheme();
+  const [plans, setPlans] = useState(MEMBERSHIP_PLANS_SEED);
+  const [members] = useState(MEMBERSHIP_MEMBERS_SEED);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: '', monthlyPrice: '', annualPrice: '', benefits: [''] });
+  const [linkNotice, setLinkNotice] = useState('');
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
+
+  const planById = Object.fromEntries(plans.map(p => [p.id, p]));
+  const activeMembers = members.filter(m => m.status === 'Active');
+  const mrr = activeMembers.reduce((sum, m) => sum + (planById[m.planId]?.monthlyPrice || 0), 0);
+
+  function planStats(plan) {
+    const planMembers = activeMembers.filter(m => m.planId === plan.id);
+    return { count: planMembers.length, revenue: planMembers.length * plan.monthlyPrice };
+  }
+
+  function updateBenefit(i, value) {
+    setCreateForm(f => ({ ...f, benefits: f.benefits.map((b, j) => j === i ? value : b) }));
+  }
+
+  function addBenefitRow() {
+    setCreateForm(f => ({ ...f, benefits: [...f.benefits, ''] }));
+  }
+
+  function createPlan() {
+    if (!createForm.name.trim() || !createForm.monthlyPrice) return;
+    setPlans(list => [...list, {
+      id: `mp-new-${Date.now()}`, name: createForm.name.trim(),
+      monthlyPrice: Number(createForm.monthlyPrice) || 0, annualPrice: Number(createForm.annualPrice) || 0,
+      benefits: createForm.benefits.filter(b => b.trim()),
+    }]);
+    setShowCreate(false);
+    setCreateForm({ name: '', monthlyPrice: '', annualPrice: '', benefits: [''] });
+  }
+
+  function generateLink() {
+    setLinkNotice('Stripe payment link generated: pay.stripe.com/praxismd-' + (createForm.name.trim().toLowerCase().replace(/\s+/g, '-') || 'plan') + ' (demo)');
+    setTimeout(() => setLinkNotice(''), 5000);
+  }
+
+  const monthlyNum = Number(createForm.monthlyPrice) || 0;
+  const annualNum = Number(createForm.annualPrice) || 0;
+  const annualSavings = monthlyNum > 0 && annualNum > 0 ? Math.max(0, monthlyNum * 12 - annualNum) : 0;
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+        <StatCard label="Total members" value={String(members.length)} color={t.brand} accent={t.accentBlue} sub={`${activeMembers.length} active`} />
+        <StatCard label="Monthly recurring revenue" value={`$${mrr.toLocaleString()}`} color={t.green} accent={t.accentGreen} sub="From active memberships" />
+        <StatCard label="Members added this month" value="3" color={t.purple} accent={t.accentPurple} sub="↑ growing steadily" />
+      </div>
+
+      <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        Plans
+        <Btn primary onClick={() => setShowCreate(true)}><Plus size={14} /> Create membership plan</Btn>
+      </div>
+
+      {linkNotice && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12.5px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, wordBreak: 'break-all' }}>{linkNotice}</div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+        {plans.map(plan => {
+          const stats = planStats(plan);
+          return (
+            <Card key={plan.id}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span style={{ fontSize: '16px', fontWeight: '700', color: t.ink }}>{plan.name}</span>
+                <Pill label={`${stats.count} members`} color={t.brand} bg={t.brandL} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '24px', fontWeight: '800', color: t.ink }}>${plan.monthlyPrice}</span>
+                <span style={{ fontSize: '12px', color: t.muted }}>/mo · ${plan.annualPrice}/yr</span>
+              </div>
+              <div style={{ fontSize: '12px', color: t.green, fontWeight: '600', marginBottom: '12px' }}>${stats.revenue.toLocaleString()}/mo revenue</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {plan.benefits.map((b, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', color: t.mid }}>
+                    <Check size={13} color={t.green} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span>{b}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card>
+        <CardTitle>Active members</CardTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', padding: '0 4px 8px', fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>
+          <div>Patient</div><div>Plan</div><div>Monthly</div><div>Join date</div><div>Next billing</div><div>Status</div>
+        </div>
+        {members.map(m => {
+          const plan = planById[m.planId];
+          return (
+            <div key={m.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', alignItems: 'center', padding: '10px 4px', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                <Ava initials={initialsOf(m.patientName)} bg={t.brandL} color={t.brand} />
+                <span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.patientName}</span>
+              </div>
+              <div style={{ fontSize: '12.5px', color: t.mid }}>{plan?.name}</div>
+              <div style={{ fontSize: '12.5px', color: t.ink2 }}>${plan?.monthlyPrice}</div>
+              <div style={{ fontSize: '12.5px', color: t.muted }}>{m.joinDate}</div>
+              <div style={{ fontSize: '12.5px', color: t.muted }}>{m.nextBilling}</div>
+              <Pill label={m.status} color={m.status === 'Active' ? t.green : t.red} bg={m.status === 'Active' ? t.greenL : t.redL} />
+            </div>
+          );
+        })}
+      </Card>
+
+      {showCreate && (
+        <Modal title="Create membership plan" onClose={() => setShowCreate(false)}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Plan name</label>
+            <input value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Family Plan" style={inputStyle} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '6px' }}>
+            <div>
+              <label style={labelStyle}>Monthly price</label>
+              <input value={createForm.monthlyPrice} onChange={e => setCreateForm(f => ({ ...f, monthlyPrice: e.target.value }))} type="number" placeholder="39" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Annual price</label>
+              <input value={createForm.annualPrice} onChange={e => setCreateForm(f => ({ ...f, annualPrice: e.target.value }))} type="number" placeholder="399" style={inputStyle} />
+            </div>
+          </div>
+          {annualSavings > 0 && <div style={{ fontSize: '11.5px', color: t.green, marginBottom: '12px' }}>Patients save ${annualSavings}/year paying annually.</div>}
+          <label style={labelStyle}>Benefits</label>
+          {createForm.benefits.map((b, i) => (
+            <input key={i} value={b} onChange={e => updateBenefit(i, e.target.value)} placeholder="e.g. 2 cleanings per year" style={{ ...inputStyle, marginBottom: '8px' }} />
+          ))}
+          <Btn small onClick={addBenefitRow} style={{ marginBottom: '14px' }}><Plus size={12} /> Add benefit</Btn>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn onClick={generateLink}><CreditCard size={13} /> Generate Stripe payment link</Btn>
+            <Btn primary onClick={createPlan}>Create plan</Btn>
+          </div>
         </Modal>
       )}
     </div>
