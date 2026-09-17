@@ -14,7 +14,7 @@ import {
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
   Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
-  CalendarPlus, BadgeCheck, Award, Flag,
+  CalendarPlus, BadgeCheck, Award, Flag, MessageCircle, Camera,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -1256,6 +1256,7 @@ function Inbox({ contacts }) {
     if (filter === 'SMS' && c.channel !== 'SMS') return false;
     if (filter === 'Email' && c.channel !== 'Email') return false;
     if (filter === 'Calls' && c.channel !== 'Calls') return false;
+    if (filter === 'WhatsApp' || filter === 'Instagram') return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       const last = c.messages[c.messages.length - 1];
@@ -1266,6 +1267,7 @@ function Inbox({ contacts }) {
 
   const selected = allConversations.find(c => c.id === selectedId) || null;
   const matchedContact = selected && selected.contactId ? contactList.find(c => c.id === selected.contactId) : null;
+  const unconnectedChannel = (filter === 'WhatsApp' || filter === 'Instagram') ? filter : null;
 
   function selectConversation(c) {
     setSelectedId(c.id);
@@ -1383,7 +1385,7 @@ function Inbox({ contacts }) {
               />
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {['All', 'Unread', 'SMS', 'Email', 'Calls'].map(label => (
+              {['All', 'Unread', 'SMS', 'Email', 'Calls', 'WhatsApp', 'Instagram'].map(label => (
                 <button
                   key={label}
                   type="button"
@@ -1401,10 +1403,20 @@ function Inbox({ contacts }) {
           )}
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            {filtered.length === 0 && (
-              <div style={{ padding: '32px 16px', textAlign: 'center', color: t.muted, fontSize: '12.5px' }}>No conversations match.</div>
-            )}
-            {filtered.map((c, i) => {
+            {unconnectedChannel ? (
+              <div style={{ padding: '32px 20px', textAlign: 'center', color: t.muted }}>
+                {unconnectedChannel === 'WhatsApp'
+                  ? <MessageCircle size={30} color={t.border} style={{ marginBottom: '8px' }} />
+                  : <Camera size={30} color={t.border} style={{ marginBottom: '8px' }} />}
+                <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink2, marginBottom: '4px' }}>{unconnectedChannel} isn't connected</div>
+                <div style={{ fontSize: '12px', lineHeight: '1.5' }}>Connect {unconnectedChannel === 'WhatsApp' ? 'WhatsApp Business' : 'Instagram'} in Settings → Integrations to see conversations here.</div>
+              </div>
+            ) : (
+              <>
+                {filtered.length === 0 && (
+                  <div style={{ padding: '32px 16px', textAlign: 'center', color: t.muted, fontSize: '12.5px' }}>No conversations match.</div>
+                )}
+                {filtered.map((c, i) => {
               const [color, bg] = avatarStyle(t, i);
               const last = c.messages[c.messages.length - 1];
               const isSelected = selectedId === c.id;
@@ -1430,7 +1442,9 @@ function Inbox({ contacts }) {
                   </div>
                 </div>
               );
-            })}
+                })}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1447,7 +1461,15 @@ function Inbox({ contacts }) {
               <div style={{ padding: '10px 18px', borderRadius: '10px', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600' }}>Drop to attach</div>
             </div>
           )}
-          {!selected ? (
+          {unconnectedChannel ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px', color: t.muted, padding: '20px', textAlign: 'center' }}>
+              {unconnectedChannel === 'WhatsApp' ? <MessageCircle size={40} color={t.border} /> : <Camera size={40} color={t.border} />}
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2, marginBottom: '4px' }}>{unconnectedChannel} isn't connected yet</div>
+                <div style={{ fontSize: '12.5px', maxWidth: '320px' }}>Head to Settings → Integrations to connect {unconnectedChannel === 'WhatsApp' ? 'WhatsApp Business' : 'Instagram'} and start receiving messages here.</div>
+              </div>
+            </div>
+          ) : !selected ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px', color: t.muted }}>
               <MessageSquare size={36} color={t.border} />
               <div style={{ fontSize: '13px' }}>Select a conversation to view</div>
@@ -3929,6 +3951,8 @@ const INTEGRATIONS = [
   { id: 'oa', name: 'Office Ally', sub: 'Clearinghouse · billing', connected: true },
   { id: 'stripe', name: 'Stripe', sub: 'Payment processing', connected: true, envVars: ['REACT_APP_STRIPE_PUBLISHABLE_KEY'] },
   { id: 'gb', name: 'Google Business', sub: 'Reviews and reputation', connected: false },
+  { id: 'whatsapp', name: 'WhatsApp Business', sub: 'Chat with patients over WhatsApp, right in your Inbox', connected: false },
+  { id: 'instagram', name: 'Instagram', sub: 'Reply to DMs and comments without leaving your Inbox', connected: false },
   { id: 'dentrix', name: 'Dentrix', sub: 'Practice management sync', connected: false },
   { id: 'eaglesoft', name: 'Eaglesoft', sub: 'Practice management sync', connected: false },
   { id: 'availity', name: 'Availity', sub: 'Eligibility verification', connected: false },
