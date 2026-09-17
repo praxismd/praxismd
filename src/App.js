@@ -3824,6 +3824,131 @@ const REPORTS_DATA = {
   },
 };
 
+const AD_PLATFORMS = ['Google Ads', 'Facebook Ads'];
+const AD_PERFORMANCE_DATA = {
+  'Google Ads': {
+    weeks: [
+      { label: 'Wk 1', spend: 410, revenue: 1620 },
+      { label: 'Wk 2', spend: 455, revenue: 1980 },
+      { label: 'Wk 3', spend: 480, revenue: 1740 },
+      { label: 'Wk 4', spend: 495, revenue: 2260 },
+      { label: 'Wk 5', spend: 520, revenue: 2510 },
+      { label: 'Wk 6', spend: 505, revenue: 2830 },
+    ],
+    leads: 68,
+    confirmedPatients: 22,
+    insight: 'Cost-per-patient dropped to $134 this month, your best return yet on Google Ads — consider shifting more budget here.',
+  },
+  'Facebook Ads': {
+    weeks: [
+      { label: 'Wk 1', spend: 280, revenue: 780 },
+      { label: 'Wk 2', spend: 310, revenue: 840 },
+      { label: 'Wk 3', spend: 340, revenue: 690 },
+      { label: 'Wk 4', spend: 360, revenue: 910 },
+      { label: 'Wk 5', spend: 355, revenue: 1020 },
+      { label: 'Wk 6', spend: 375, revenue: 960 },
+    ],
+    leads: 41,
+    confirmedPatients: 9,
+    insight: "Facebook Ads' cost-per-patient is running well above Google — try narrowing the audience to your top ZIP codes.",
+  },
+};
+
+function AdSpendChart({ weeks }) {
+  const t = useTheme();
+  const maxVal = Math.max(...weeks.flatMap(w => [w.spend, w.revenue]), 1);
+  const chartH = 120;
+  const barW = 20;
+  const gapInGroup = 5;
+  const groupW = barW * 2 + gapInGroup + 24;
+  const width = weeks.length * groupW;
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <svg width={width} height={chartH + 30} viewBox={`0 0 ${width} ${chartH + 30}`} style={{ display: 'block', minWidth: `${width}px` }}>
+        <line x1="0" y1={chartH} x2={width} y2={chartH} stroke={t.border} strokeWidth="1" />
+        {weeks.map((w, i) => {
+          const x = i * groupW + 12;
+          const spendH = (w.spend / maxVal) * chartH;
+          const revH = (w.revenue / maxVal) * chartH;
+          return (
+            <g key={i}>
+              <rect x={x} y={chartH - spendH} width={barW} height={spendH} rx="3" fill={t.brand} />
+              <rect x={x + barW + gapInGroup} y={chartH - revH} width={barW} height={revH} rx="3" fill={t.green} />
+              <text x={x + barW + gapInGroup / 2} y={chartH + 16} textAnchor="middle" fontSize="10" fill={t.muted}>{w.label}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function AdPerformance() {
+  const t = useTheme();
+  const [platform, setPlatform] = useState(AD_PLATFORMS[0]);
+  const [comingSoon, setComingSoon] = useState(null);
+  const data = AD_PERFORMANCE_DATA[platform];
+  const totalSpend = data.weeks.reduce((s, w) => s + w.spend, 0);
+  const totalRevenue = data.weeks.reduce((s, w) => s + w.revenue, 0);
+  const costPerPatient = Math.round(totalSpend / data.confirmedPatients);
+  const netROI = Math.round(((totalRevenue - totalSpend) / totalSpend) * 100);
+
+  const stats = [
+    ['Ad spend', `$${totalSpend.toLocaleString()}`, t.red, t.accentRed],
+    ['Leads generated', data.leads, t.brand, t.accentBlue],
+    ['Confirmed patients', data.confirmedPatients, t.teal, t.accentTeal],
+    ['Cost per patient', `$${costPerPatient}`, t.amber, t.accentAmber],
+    ['Revenue attributed', `$${totalRevenue.toLocaleString()}`, t.green, t.accentGreen],
+    ['Net ROI', `${netROI >= 0 ? '+' : ''}${netROI}%`, netROI >= 0 ? t.green : t.red, netROI >= 0 ? t.accentGreen : t.accentRed],
+  ];
+
+  return (
+    <Card style={{ marginBottom: '16px' }}>
+      <CardTitle>
+        Ad performance
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {AD_PLATFORMS.map(p => (
+            <span
+              key={p}
+              onClick={() => setPlatform(p)}
+              style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: platform === p ? 'none' : `1px solid ${t.border}`, background: platform === p ? t.brand : 'transparent', color: platform === p ? 'white' : t.mid }}
+            >{p}</span>
+          ))}
+        </div>
+      </CardTitle>
+      <div style={{ padding: '9px 12px', background: t.tealL, borderRadius: '10px', fontSize: '11.5px', color: t.teal, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+        <Sparkles size={12} /> Demo campaign data shown — connect {platform} for real numbers.
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '18px' }}>
+        {stats.map(([label, value, color, accent], i) => (
+          <StatCard key={i} label={label} value={value} color={color} accent={accent} />
+        ))}
+      </div>
+      <div style={{ fontSize: '12px', fontWeight: '600', color: t.ink2, marginBottom: '10px' }}>Weekly spend vs. revenue</div>
+      <AdSpendChart weeks={data.weeks} />
+      <div style={{ display: 'flex', gap: '16px', marginTop: '10px', fontSize: '11px', color: t.mid }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '10px', height: '10px', borderRadius: '3px', background: t.brand, display: 'inline-block' }} /> Spend</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '10px', height: '10px', borderRadius: '3px', background: t.green, display: 'inline-block' }} /> Revenue</div>
+      </div>
+      <div style={{ marginTop: '16px', padding: '10px 14px', background: t.brandL, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ fontSize: '12.5px', color: t.brand, display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <Sparkles size={13} /> {data.insight}
+        </div>
+        <Btn small onClick={() => setComingSoon(platform)}>Connect {platform}</Btn>
+      </div>
+      {comingSoon && (
+        <Modal title={`Connect ${comingSoon}`} onClose={() => setComingSoon(null)}>
+          <div style={{ fontSize: '13px', color: t.mid, lineHeight: '1.6' }}>
+            Direct {comingSoon} integration is coming soon. Once connected, this dashboard will pull live spend, leads, and attributed revenue automatically — no more manual exports.
+          </div>
+          <Btn primary style={{ marginTop: '16px' }} onClick={() => setComingSoon(null)}>Got it</Btn>
+        </Modal>
+      )}
+    </Card>
+  );
+}
+
 // Rows = hourly slots (8am-8pm), columns = Mon-Sun. null = closed.
 const CHAIR_UTILIZATION_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const CHAIR_UTILIZATION_HOURS = ['8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', '7pm'];
@@ -3919,6 +4044,7 @@ function Reports({ onSuggestCampaign }) {
 
   return (
     <div>
+      <AdPerformance />
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         {REPORTS_PERIODS.map((label, i) => (
           <span key={i} onClick={() => setPeriod(label)} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: period === label ? 'none' : `1px solid ${t.border}`, background: period === label ? t.brand : t.bgCard, color: period === label ? 'white' : t.mid }}>{label}</span>
