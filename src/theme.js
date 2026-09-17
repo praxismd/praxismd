@@ -35,6 +35,18 @@ export const light = {
   accentTeal: '#06B6D4',
   accentPink: '#EC4899',
   accentOrange: '#F97316',
+  glassBg: 'rgba(255, 255, 255, 0.7)',
+  glassBorder: 'rgba(255, 255, 255, 0.8)',
+  glassShadow: '0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03)',
+  sidebarGlassBg: 'rgba(248, 249, 250, 0.85)',
+  sidebarGlassBorder: 'rgba(0,0,0,0.06)',
+  topbarGlassBg: 'rgba(255, 255, 255, 0.8)',
+  topbarGlassBorder: 'rgba(0,0,0,0.06)',
+  pageGradient: 'linear-gradient(135deg, #F0F2F5 0%, #E8ECF0 100%)',
+  rowBorder: 'rgba(0,0,0,0.06)',
+  rowHover: 'rgba(0,0,0,0.025)',
+  navHover: 'rgba(0,0,0,0.04)',
+  secondaryBorder: 'rgba(0,0,0,0.12)',
 };
 
 export const dark = {
@@ -74,6 +86,18 @@ export const dark = {
   accentTeal: '#22D3EE',
   accentPink: '#EC4899',
   accentOrange: '#F97316',
+  glassBg: 'rgba(28, 29, 35, 0.75)',
+  glassBorder: 'rgba(255,255,255,0.06)',
+  glassShadow: '0 1px 3px rgba(0,0,0,0.2)',
+  sidebarGlassBg: 'rgba(18, 19, 24, 0.9)',
+  sidebarGlassBorder: 'rgba(255,255,255,0.05)',
+  topbarGlassBg: 'rgba(18, 19, 24, 0.85)',
+  topbarGlassBorder: 'rgba(255,255,255,0.05)',
+  pageGradient: 'linear-gradient(135deg, #0F1117 0%, #131720 100%)',
+  rowBorder: 'rgba(255,255,255,0.04)',
+  rowHover: 'rgba(255,255,255,0.04)',
+  navHover: 'rgba(255,255,255,0.04)',
+  secondaryBorder: 'rgba(255,255,255,0.14)',
 };
 
 export function withAlpha(hex, alpha) {

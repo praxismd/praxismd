@@ -237,7 +237,7 @@ function GlobalSearchModal({ open, onClose, contacts, query, setQuery, setActive
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,15,20,.5)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh' }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '560px', maxWidth: '92vw', maxHeight: '66vh', background: t.bgCard, borderRadius: '16px', boxShadow: '0 24px 60px rgba(0,0,0,.35)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div onClick={e => e.stopPropagation()} className="px-glass" style={{ width: '560px', maxWidth: '92vw', maxHeight: '66vh', borderRadius: '8px', boxShadow: '0 24px 60px rgba(0,0,0,.35)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '15px 16px', borderBottom: `1px solid ${t.border2}`, flexShrink: 0 }}>
           <Search size={16} color={t.muted} />
           <input
@@ -657,25 +657,40 @@ function App() {
     <PrivacyContext.Provider value={privacyMode}>
     <ThemeContext.Provider value={t}>
     <style>{`
-      @keyframes pxFadeSlide { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-      .px-page-transition { animation: pxFadeSlide .32s ease; }
+      @keyframes pxFadeSlide { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+      .px-page-transition { animation: pxFadeSlide .15s ease; will-change: opacity, transform; }
       .px-navitem { transition: background .12s ease, border-color .12s ease, color .12s ease; }
-      .px-navitem:hover { background: ${t.bgHover}; }
+      .px-navitem:hover { background: ${t.navHover}; }
       .px-row { transition: background .12s ease; }
-      .px-row:hover { background: ${t.bgHover}; }
-      .px-card { transition: transform .15s ease, box-shadow .15s ease; }
-      .px-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,${mode === 'dark' ? '0.4' : '0.09'}); }
+      .px-row:hover { background: ${t.rowHover}; }
+      .px-card { transition: border-color .15s ease; }
+      .px-glass {
+        background: ${t.glassBg};
+        -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
+        border: 1px solid ${t.glassBorder};
+        box-shadow: ${t.glassShadow};
+      }
+      .px-sidebar-glass { background: ${t.sidebarGlassBg}; }
+      .px-topbar-glass { background: ${t.topbarGlassBg}; }
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .px-glass { background: ${t.bgCard}; }
+        .px-sidebar-glass { background: ${t.bgSidebar}; }
+        .px-topbar-glass { background: ${t.bgSidebar}; }
+      }
+      .px-btn-ghost:hover { text-decoration: underline; }
       button { transition: transform .08s ease; }
       button:active { transform: scale(0.96); }
       .px-tooltip-wrap { position: relative; }
       .px-tooltip-bubble {
         position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
         margin-left: 12px; background: ${t.ink}; color: ${t.bgCard}; font-size: 11px;
-        font-weight: 500; padding: 6px 10px; border-radius: 6px; white-space: nowrap;
+        font-weight: 500; padding: 6px 10px; border-radius: 5px; white-space: nowrap;
         opacity: 0; pointer-events: none; transition: opacity .12s ease; z-index: 200;
       }
       .px-tooltip-wrap:hover .px-tooltip-bubble { opacity: 1; }
       input:focus, select:focus { outline: 2px solid ${withAlpha(t.teal, .35)}; }
+      body { line-height: 1.6; }
       @keyframes pxSpin { to { transform: rotate(360deg); } }
       .px-spin { animation: pxSpin .7s linear infinite; }
       @keyframes pxSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
@@ -698,8 +713,11 @@ function App() {
       <div
         onMouseEnter={() => { if (!isMobileView && !suppressHoverRef.current) setSidebarHover(true); }}
         onMouseLeave={() => setSidebarHover(false)}
+        className="px-sidebar-glass"
         style={{
-          width: isMobileView ? '240px' : (showFull ? '240px' : '72px'), background: t.bgSidebar, borderRight: `1px solid ${t.border}`,
+          width: isMobileView ? '240px' : (showFull ? '240px' : '72px'),
+          backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+          borderRight: `1px solid ${t.sidebarGlassBorder}`,
           display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh', overflow: 'hidden',
           zIndex: isMobileView ? 100 : (collapsed && sidebarHover ? 60 : 40),
           boxShadow: isMobileView ? (mobileDrawerOpen ? '4px 0 24px rgba(0,0,0,.25)' : 'none') : (collapsed && sidebarHover ? '4px 0 24px rgba(0,0,0,.18)' : 'none'),
@@ -757,7 +775,7 @@ function App() {
 
         <div style={{ padding: showFull ? '12px 16px' : '12px 0', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: showFull ? 'space-between' : 'center', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-            <div style={{ width: '34px', height: '34px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>{initialsOf(ownerDisplayName)}</div>
+            <div style={{ width: '34px', height: '34px', borderRadius: '5px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>{initialsOf(ownerDisplayName)}</div>
             {showFull && (
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{ownerDisplayName}</div>
@@ -774,7 +792,7 @@ function App() {
       </div>
 
       {/* MAIN */}
-      <div style={{ marginLeft: isMobileView ? 0 : (collapsed ? '72px' : '240px'), flex: 1, display: 'flex', flexDirection: 'column', background: t.bgPage, minHeight: '100vh', transition: 'margin-left .18s ease' }}>
+      <div style={{ marginLeft: isMobileView ? 0 : (collapsed ? '72px' : '240px'), flex: 1, display: 'flex', flexDirection: 'column', background: t.pageGradient, minHeight: '100vh', transition: 'margin-left .18s ease' }}>
 
         {!appBannerDismissed && isMobileView && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: t.brand, color: 'white' }}>
@@ -792,13 +810,13 @@ function App() {
         )}
 
         {/* TOPBAR */}
-        <div style={{ height: '64px', background: t.bgSidebar, borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: '24px', padding: '0 26px', position: 'sticky', top: 0, zIndex: 50 }}>
+        <div className="px-topbar-glass" style={{ height: '64px', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: `1px solid ${t.topbarGlassBorder}`, display: 'flex', alignItems: 'center', gap: '24px', padding: '0 26px', position: 'sticky', top: 0, zIndex: 50 }}>
           {isMobileView && (
             <button
               type="button"
               onClick={() => setMobileDrawerOpen(true)}
               aria-label="Open menu"
-              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid, flexShrink: 0 }}
+              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid, flexShrink: 0 }}
             >
               <Menu size={17} />
             </button>
@@ -812,7 +830,7 @@ function App() {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '260px', padding: '8px 10px 8px 12px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '260px', padding: '8px 10px 8px 12px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', fontFamily: 'inherit' }}
             >
               <Search size={15} color={t.muted} style={{ flexShrink: 0 }} />
               <span style={{ flex: 1, textAlign: 'left', fontSize: '13px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Search patients, campaigns...</span>
@@ -825,7 +843,7 @@ function App() {
               onClick={() => setPrivacyMode(p => !p)}
               aria-label="Toggle privacy mode"
               title={privacyMode ? 'Privacy mode on — click to show patient info' : 'Blur patient names, emails, and phone numbers'}
-              style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 13px', borderRadius: '10px', border: `1px solid ${privacyMode ? t.red : t.border}`, background: privacyMode ? t.redL : t.bgCard, cursor: 'pointer', color: privacyMode ? t.red : t.mid, fontSize: '12.5px', fontWeight: '500', fontFamily: 'inherit' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 13px', borderRadius: '5px', border: `1px solid ${privacyMode ? t.red : t.border}`, background: privacyMode ? t.redL : t.bgCard, cursor: 'pointer', color: privacyMode ? t.red : t.mid, fontSize: '12.5px', fontWeight: '500', fontFamily: 'inherit' }}
             >
               <EyeOff size={15} /> {privacyMode && 'Privacy on'}
             </button>
@@ -833,13 +851,13 @@ function App() {
               onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle dark mode"
               title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid }}
+              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid }}
             >
               {mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
 
             <div ref={notifRef} style={{ position: 'relative' }}>
-              <button onClick={() => setNotifOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 15px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '13px', cursor: 'pointer', color: t.mid, position: 'relative' }}>
+              <button onClick={() => setNotifOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 15px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '13px', cursor: 'pointer', color: t.mid, position: 'relative' }}>
                 <Bell size={15} />
                 Notifications
                 {unreadNotifCount > 0 && (
@@ -871,19 +889,19 @@ function App() {
               )}
             </div>
 
-            <button onClick={() => setActiveTab('campaigns')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+            <button onClick={() => setActiveTab('campaigns')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', borderRadius: '5px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
               <Plus size={14} /> New campaign
             </button>
 
             <div ref={userMenuRef} style={{ position: 'relative' }}>
               <button
                 onClick={() => { setUserMenuOpen(o => !o); setSwitchOpen(false); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px 5px 5px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px 5px 5px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer' }}
               >
                 <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>{initialsOf(currentUser.name)}</div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, lineHeight: 1.25 }}>{currentUser.name}</div>
-                  <span style={{ fontSize: '9.5px', fontWeight: '600', padding: '1px 7px', borderRadius: '20px', display: 'inline-block', marginTop: '2px', background: roleColor(currentUser.role, t).bg, color: roleColor(currentUser.role, t).color }}>{currentUser.role}</span>
+                  <span style={{ fontSize: '9.5px', fontWeight: '600', padding: '1px 7px', borderRadius: '3px', display: 'inline-block', marginTop: '2px', background: roleColor(currentUser.role, t).bg, color: roleColor(currentUser.role, t).color }}>{currentUser.role}</span>
                 </div>
                 <ChevronDown size={14} color={t.muted} />
               </button>
@@ -996,7 +1014,7 @@ function getPageTitle(tab, ownerName) {
 function NavSection({ label, collapsed }) {
   const t = useTheme();
   if (collapsed) return <div style={{ height: '1px', background: t.border2, margin: '10px 10px' }} />;
-  return <div style={{ fontSize: '10px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '1px', padding: '14px 10px 6px' }}>{label}</div>;
+  return <div style={{ fontSize: '10px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '0.1em', padding: '14px 10px 6px' }}>{label}</div>;
 }
 
 function NavItem({ label, Icon, tab, active, onClick, badge, badgeColor, collapsed }) {
@@ -1010,62 +1028,78 @@ function NavItem({ label, Icon, tab, active, onClick, badge, badgeColor, collaps
         display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '10px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         padding: collapsed ? '10px 0' : '8px 11px',
-        borderRadius: '10px', marginBottom: '1px',
-        borderLeft: `3px solid ${isActive ? t.teal : 'transparent'}`,
-        color: isActive ? t.teal : t.mid,
+        borderRadius: '4px', marginBottom: '1px',
+        borderLeft: `2px solid ${isActive ? t.brand : 'transparent'}`,
+        background: 'transparent',
+        color: isActive ? t.brand : t.muted,
         cursor: 'pointer', fontSize: '13px', fontWeight: isActive ? '600' : '400',
       }}
     >
       <Icon size={16} style={{ flexShrink: 0 }} />
       {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
-      {!collapsed && badge && <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '20px', background: badgeColor + '22', color: badgeColor }}>{badge}</span>}
+      {!collapsed && badge && <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '3px', background: badgeColor + '22', color: badgeColor }}>{badge}</span>}
       {collapsed && <span className="px-tooltip-bubble">{label}{badge ? ` · ${badge}` : ''}</span>}
     </div>
   );
 }
 
-function StatCard({ label, value, color, accent, sub, icon: ValueIcon }) {
+function StatCard({ label, value, color, accent, sub, icon: ValueIcon, decorIcon: DecorIcon }) {
   const t = useTheme();
   const display = useCountUp(value);
   return (
-    <div className="px-card" style={{ background: t.bgCard, borderRadius: '14px', padding: '16px 18px', border: `1px solid ${t.border}`, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: `linear-gradient(90deg, ${accent}, ${color})` }} />
-      <div style={{ fontSize: '11px', color: t.muted, fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px' }}>{label}</div>
-      <div style={{ fontSize: '26px', fontWeight: '700', color, letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+    <div className="px-card px-glass" style={{ borderRadius: '6px', padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
+      {DecorIcon && <DecorIcon size={20} color={accent || color} style={{ position: 'absolute', top: '12px', right: '12px', opacity: 0.15 }} />}
+      <div style={{ fontSize: '10px', color: t.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>{label}</div>
+      <div style={{ fontSize: '28px', fontWeight: '700', color, letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
         {display}{ValueIcon && <ValueIcon size={18} color={color} fill={color} />}
       </div>
-      <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '7px' }}>{sub}</div>
+      <div style={{ fontSize: '11px', color: t.muted, marginTop: '6px', lineHeight: 1.6 }}>{sub}</div>
     </div>
   );
 }
 
 function Card({ children, style, onClick, className }) {
-  const t = useTheme();
-  return <div className={className ? `px-card ${className}` : 'px-card'} onClick={onClick} style={{ background: t.bgCard, borderRadius: '14px', padding: '18px 20px', border: `1px solid ${t.border}`, ...style }}>{children}</div>;
+  return <div className={className ? `px-card px-glass ${className}` : 'px-card px-glass'} onClick={onClick} style={{ borderRadius: '6px', padding: '16px', ...style }}>{children}</div>;
 }
 
 function CardTitle({ children }) {
   const t = useTheme();
-  return <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink2, marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>{children}</div>;
+  return <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink2, marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>{children}</div>;
 }
 
 function Pill({ label, color, bg }) {
-  return <span style={{ fontSize: '11px', fontWeight: '600', padding: '3px 9px', borderRadius: '20px', background: bg, color, whiteSpace: 'nowrap' }}>{label}</span>;
+  return <span style={{ fontSize: '11px', fontWeight: '600', padding: '3px 9px', borderRadius: '3px', background: bg, color, whiteSpace: 'nowrap' }}>{label}</span>;
 }
 
 function RowItem({ children, style, onClick }) {
   const t = useTheme();
-  return <div className="px-row" onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 13px', borderRadius: '10px', background: t.bgRow, marginBottom: '7px', borderWidth: '1px', borderStyle: 'solid', borderColor: t.border2, ...style }}>{children}</div>;
+  return <div className="px-row" onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderRadius: 0, background: 'transparent', borderBottom: `1px solid ${t.rowBorder}`, ...style }}>{children}</div>;
 }
 
 function Ava({ initials, bg, color }) {
-  return <div style={{ width: '34px', height: '34px', minWidth: '34px', borderRadius: '10px', background: bg, color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600' }}>{initials}</div>;
+  return <div style={{ width: '34px', height: '34px', minWidth: '34px', borderRadius: '6px', background: bg, color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600' }}>{initials}</div>;
 }
 
-function Btn({ children, onClick, primary, small, style, disabled }) {
+function Btn({ children, onClick, primary, small, ghost, danger, style, disabled }) {
   const t = useTheme();
+  let variant;
+  if (ghost) variant = { border: 'none', background: 'transparent', color: t.brand, padding: 0 };
+  else if (danger) variant = { border: `1px solid ${t.red}`, background: 'transparent', color: t.red };
+  else if (primary) variant = { border: 'none', background: t.brand, color: 'white' };
+  else variant = { border: `1px solid ${t.secondaryBorder}`, background: 'transparent', color: t.mid };
   return (
-    <button onClick={onClick} disabled={disabled} style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: small ? '5px 11px' : '8px 14px', borderRadius: '10px', borderWidth: '1px', borderStyle: 'solid', borderColor: primary ? 'transparent' : t.border, background: primary ? t.brand : t.bgCard, color: primary ? 'white' : t.mid, fontSize: small ? '12px' : '13px', fontWeight: '500', cursor: disabled ? 'default' : 'pointer', opacity: disabled ? .65 : 1, ...style }}>{children}</button>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={ghost ? 'px-btn-ghost' : undefined}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: '6px',
+        padding: ghost ? 0 : (small ? '5px 10px' : '7px 14px'),
+        borderRadius: '5px', fontSize: small ? '12px' : '13px', fontWeight: '500',
+        cursor: disabled ? 'default' : 'pointer', opacity: disabled ? .65 : 1,
+        ...variant, ...style,
+      }}
+    >{children}</button>
   );
 }
 
@@ -1110,17 +1144,17 @@ function SlidePanel({ title, subtitle, onClose, children }) {
   return (
     <>
       <div onClick={onClose} className="px-panel-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 200 }} />
-      <div className="px-panel" style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: '420px', maxWidth: '92vw', background: t.bgCard, borderLeft: `1px solid ${t.border}`, boxShadow: '-8px 0 30px rgba(0,0,0,.18)', zIndex: 201, overflowY: 'auto' }}>
-        <div style={{ padding: '18px 20px', borderBottom: `1px solid ${t.border2}`, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'sticky', top: 0, background: t.bgCard }}>
+      <div className="px-panel px-glass" style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: '420px', maxWidth: '92vw', borderLeft: `1px solid ${t.glassBorder}`, boxShadow: '-8px 0 30px rgba(0,0,0,.18)', zIndex: 201, overflowY: 'auto' }}>
+        <div className="px-glass" style={{ padding: '16px 20px', borderBottom: `1px solid ${t.rowBorder}`, borderLeft: 'none', borderRight: 'none', borderTop: 'none', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'sticky', top: 0 }}>
           <div>
             <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
             {subtitle && <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px', flexShrink: 0 }}>
+          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '5px', flexShrink: 0 }}>
             <X size={16} />
           </button>
         </div>
-        <div style={{ padding: '20px' }}>{children}</div>
+        <div style={{ padding: '16px 20px' }}>{children}</div>
       </div>
     </>
   );
@@ -1155,14 +1189,14 @@ function Modal({ title, onClose, children }) {
   return (
     <>
       <div onClick={onClose} className="px-panel-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 300 }} />
-      <div className="px-expand" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '420px', maxWidth: '92vw', maxHeight: '86vh', overflowY: 'auto', background: t.bgCard, borderRadius: '16px', border: `1px solid ${t.border}`, boxShadow: '0 20px 60px rgba(0,0,0,.25)', zIndex: 301 }}>
-        <div style={{ padding: '18px 20px', borderBottom: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: t.bgCard }}>
+      <div className="px-expand px-glass" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '420px', maxWidth: '92vw', maxHeight: '86vh', overflowY: 'auto', borderRadius: '8px', border: `1px solid ${t.glassBorder}`, boxShadow: '0 20px 60px rgba(0,0,0,.25)', zIndex: 301 }}>
+        <div className="px-glass" style={{ padding: '16px 20px', borderBottom: `1px solid ${t.rowBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0 }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
-          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '5px' }}>
             <X size={16} />
           </button>
         </div>
-        <div style={{ padding: '20px' }}>{children}</div>
+        <div style={{ padding: '16px 20px' }}>{children}</div>
       </div>
     </>
   );
@@ -1182,18 +1216,17 @@ function AccessRestricted({ tab }) {
 }
 
 // ─── OVERVIEW ──────────────────────────────────────────────
-function BigStatCard({ label, value, color, accent, sub, icon: ValueIcon }) {
+function BigStatCard({ label, value, color, accent, sub, icon: ValueIcon, decorIcon: DecorIcon }) {
   const t = useTheme();
   const display = useCountUp(value);
   return (
-    <div className="px-card" style={{ background: t.bgCard, borderRadius: '16px', padding: '24px', border: `1px solid ${t.border}`, position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: 0, right: 0, width: '150px', height: '150px', background: `radial-gradient(circle at top right, ${withAlpha(accent, .14)}, transparent 70%)`, pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: `linear-gradient(90deg, ${accent}, ${color})` }} />
-      <div style={{ fontSize: '11.5px', color: t.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '12px', position: 'relative' }}>{label}</div>
-      <div style={{ fontSize: '32px', fontWeight: '700', color, letterSpacing: '-0.8px', display: 'flex', alignItems: 'center', gap: '9px', position: 'relative' }}>
+    <div className="px-card px-glass" style={{ borderRadius: '6px', padding: '16px', position: 'relative', overflow: 'hidden' }}>
+      {DecorIcon && <DecorIcon size={20} color={accent || color} style={{ position: 'absolute', top: '14px', right: '14px', opacity: 0.15 }} />}
+      <div style={{ fontSize: '10px', color: t.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px' }}>{label}</div>
+      <div style={{ fontSize: '30px', fontWeight: '700', color, letterSpacing: '-0.8px', display: 'flex', alignItems: 'center', gap: '9px' }}>
         {display}{ValueIcon && <ValueIcon size={22} color={color} fill={color} />}
       </div>
-      <div style={{ fontSize: '12.5px', color: t.muted, marginTop: '10px', position: 'relative' }}>{sub}</div>
+      <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '9px', lineHeight: 1.6 }}>{sub}</div>
     </div>
   );
 }
@@ -1231,21 +1264,21 @@ function Overview({ setActiveTab }) {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '16px', marginBottom: '18px' }}>
-        <BigStatCard label="Revenue recovered" value="$8,400" color={t.green} accent={t.accentGreen} sub="↑ 14 patients reactivated" />
-        <BigStatCard label="Appointments today" value="4" color={t.brand} accent={t.accentBlue} sub="1 needs confirmation" />
-        <BigStatCard label="Open messages" value="4" color={t.red} accent={t.accentRed} sub="Needs reply today" />
-        <BigStatCard label="Unread alerts" value="3" color={t.amber} accent={t.accentAmber} sub="Across billing & recall" />
+        <BigStatCard label="Revenue recovered" value="$8,400" color={t.green} accent={t.accentGreen} sub="↑ 14 patients reactivated" decorIcon={TrendingUp} />
+        <BigStatCard label="Appointments today" value="4" color={t.brand} accent={t.accentBlue} sub="1 needs confirmation" decorIcon={CalendarIcon} />
+        <BigStatCard label="Open messages" value="4" color={t.red} accent={t.accentRed} sub="Needs reply today" decorIcon={InboxIcon} />
+        <BigStatCard label="Unread alerts" value="3" color={t.amber} accent={t.accentAmber} sub="Across billing & recall" decorIcon={Bell} />
       </div>
 
-      <div style={{ background: `linear-gradient(120deg, ${withAlpha(t.brand, .1)}, ${withAlpha(t.teal, .06)})`, border: `1px solid ${t.border}`, borderRadius: '14px', padding: '18px 20px', marginBottom: '18px' }}>
-        <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><Sparkles size={13} color={t.teal} /> Today at a glance</div>
+      <div className="px-glass" style={{ background: `linear-gradient(120deg, ${withAlpha(t.brand, .08)}, ${withAlpha(t.teal, .05)}), ${t.glassBg}`, borderRadius: '6px', padding: '16px', marginBottom: '16px' }}>
+        <div style={{ fontSize: '10px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><Sparkles size={13} color={t.teal} /> Today at a glance</div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {GLANCE_CHIPS.map((chip, i) => (
             <button
               key={i}
               onClick={() => setActiveTab(chip.tab)}
               className="px-btn"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '9px 15px', borderRadius: '20px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '9px 15px', borderRadius: '3px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
             >
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: colorMap[chip.color], flexShrink: 0 }} />
               {chip.text}
@@ -1254,11 +1287,11 @@ function Overview({ setActiveTab }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.1fr 0.9fr', gap: '14px', marginBottom: '18px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1.1fr 0.9fr', gap: '12px', marginBottom: '18px', alignItems: 'start' }}>
         <Card>
           <CardTitle>Today's schedule</CardTitle>
           {TODAY_SCHEDULE.map((a, i) => (
-            <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: t.bgRow }}>
+            <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0 10px 10px', borderBottom: `1px solid ${t.rowBorder}`, borderLeft: `2px solid ${colorMap[a.color]}` }}>
               <div style={{ fontSize: '11.5px', color: t.muted, width: '58px', flexShrink: 0, fontWeight: '500' }}>{a.time}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{a.name}</PII></div>
@@ -1272,7 +1305,7 @@ function Overview({ setActiveTab }) {
         <Card>
           <CardTitle>Priority inbox</CardTitle>
           {OVERVIEW_MESSAGES.map((m, i) => (
-            <div key={i} className="px-row" style={{ display: 'flex', gap: '10px', padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: t.brandL, border: `1px solid ${withAlpha(t.accentBlue, .15)}` }}>
+            <div key={i} className="px-row" style={{ display: 'flex', gap: '10px', padding: '10px 0 10px 10px', borderBottom: `1px solid ${t.rowBorder}`, borderLeft: `2px solid ${t.brand}` }}>
               <Ava initials={initialsOf(m.name)} bg={t.brand} color="white" />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{m.name}</PII></span><span style={{ fontSize: '11px', color: t.muted, flexShrink: 0 }}>{m.time}</span></div>
@@ -1288,10 +1321,10 @@ function Overview({ setActiveTab }) {
             <button
               key={i}
               onClick={() => setActiveTab(qa.tab)}
-              className="px-btn px-card"
-              style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 18px', borderRadius: '14px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+              className="px-btn px-card px-glass"
+              style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 16px', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
             >
-              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: withAlpha(colorMap[qa.color], .12), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '6px', background: withAlpha(colorMap[qa.color], .12), display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <qa.Icon size={17} color={colorMap[qa.color]} />
               </div>
               <span style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2 }}>{qa.label}</span>
@@ -1300,7 +1333,7 @@ function Overview({ setActiveTab }) {
         </div>
       </div>
 
-      <div style={{ padding: '12px 16px', background: t.greenL, borderRadius: '12px', fontSize: '12.5px', color: t.green, fontWeight: '500', border: `1px solid ${withAlpha(t.accentGreen, .15)}`, display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div style={{ padding: '12px 16px', background: t.greenL, borderRadius: '6px', fontSize: '12.5px', color: t.green, fontWeight: '500', border: `1px solid ${withAlpha(t.accentGreen, .15)}`, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <Zap size={14} /> AI handled 47 interactions today · saved 4.2 hours
       </div>
     </div>
@@ -1513,16 +1546,16 @@ function Inbox({ contacts }) {
   const displayMessages = selected ? [...selected.messages, ...(attachmentOverlay[selected.id] || [])] : [];
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 108px)', minHeight: '520px', background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '16px', overflow: 'hidden' }}>
+    <div className="px-glass" style={{ display: 'flex', height: 'calc(100vh - 108px)', minHeight: '520px', borderRadius: '6px', overflow: 'hidden' }}>
       {showList && (
-        <div style={{ width: isMobileView ? '100%' : '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: isMobileView ? 'none' : `1px solid ${t.border}` }}>
+        <div style={{ width: isMobileView ? '100%' : '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: isMobileView ? 'none' : `1px solid ${t.rowBorder}` }}>
           <div style={{ padding: '14px', borderBottom: `1px solid ${t.border2}` }}>
             <div style={{ position: 'relative', marginBottom: '10px' }}>
               <Search size={14} color={t.muted} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search conversations…"
-                style={{ width: '100%', padding: '9px 12px 9px 32px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '9px 12px 9px 32px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
               />
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -1531,7 +1564,7 @@ function Inbox({ contacts }) {
                   key={label}
                   type="button"
                   onClick={() => setFilter(label)}
-                  style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: filter === label ? 'none' : `1px solid ${t.border}`, background: filter === label ? t.brand : 'transparent', color: filter === label ? 'white' : t.mid, fontFamily: 'inherit' }}
+                  style={{ padding: '5px 12px', borderRadius: '3px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: filter === label ? 'none' : `1px solid ${t.border}`, background: filter === label ? t.brand : 'transparent', color: filter === label ? 'white' : t.mid, fontFamily: 'inherit' }}
                 >{label}</button>
               ))}
             </div>
@@ -1566,7 +1599,7 @@ function Inbox({ contacts }) {
                   key={c.id}
                   onClick={() => selectConversation(c)}
                   className="px-row"
-                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', cursor: 'pointer', borderBottom: `1px solid ${t.border2}`, background: isSelected ? t.bgRow : 'transparent' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', cursor: 'pointer', borderBottom: `1px solid ${t.rowBorder}`, background: isSelected ? t.rowHover : 'transparent' }}
                 >
                   <Ava initials={initialsOf(c.name)} bg={bg} color={color} />
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -1599,7 +1632,7 @@ function Inbox({ contacts }) {
         >
           {isDragOver && (
             <div style={{ position: 'absolute', inset: 0, background: withAlpha(t.brand, .06), zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-              <div style={{ padding: '10px 18px', borderRadius: '10px', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600' }}>Drop to attach</div>
+              <div style={{ padding: '10px 18px', borderRadius: '5px', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600' }}>Drop to attach</div>
             </div>
           )}
           {unconnectedChannel ? (
@@ -1664,10 +1697,10 @@ function Inbox({ contacts }) {
               </div>
 
               {sendError && (
-                <div style={{ margin: '0 18px', background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '9px 12px', fontSize: '12px' }}>{sendError}</div>
+                <div style={{ margin: '0 18px', background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '5px', padding: '9px 12px', fontSize: '12px' }}>{sendError}</div>
               )}
               {attachError && (
-                <div style={{ margin: '10px 18px 0', background: t.redL, color: t.red, borderRadius: '10px', padding: '8px 12px', fontSize: '11.5px' }}>{attachError}</div>
+                <div style={{ margin: '10px 18px 0', background: t.redL, color: t.red, borderRadius: '5px', padding: '8px 12px', fontSize: '11.5px' }}>{attachError}</div>
               )}
 
               <div style={{ padding: '14px 18px', borderTop: `1px solid ${t.border2}` }}>
@@ -1675,7 +1708,7 @@ function Inbox({ contacts }) {
                 <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => { handleFilePicked(e.target.files?.[0], 'image'); e.target.value = ''; }} />
 
                 {pendingAttachment && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '9px', padding: '7px 10px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgRow, maxWidth: '320px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '9px', padding: '7px 10px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgRow, maxWidth: '320px' }}>
                     {pendingAttachment.kind === 'image' ? (
                       <img src={pendingAttachment.dataUrl} alt="" style={{ width: '30px', height: '30px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }} />
                     ) : (
@@ -1697,7 +1730,7 @@ function Inbox({ contacts }) {
                   <button
                     type="button"
                     onClick={() => setDraft(suggestion)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '9px', padding: '6px 12px', borderRadius: '20px', border: `1px solid ${withAlpha(t.brand, .25)}`, background: t.brandL, color: t.brand, fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit', maxWidth: '100%' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '9px', padding: '6px 12px', borderRadius: '3px', border: `1px solid ${withAlpha(t.brand, .25)}`, background: t.brandL, color: t.brand, fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit', maxWidth: '100%' }}
                   >
                     <Bot size={12} style={{ flexShrink: 0 }} />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>AI: {suggestion}</span>
@@ -1717,7 +1750,7 @@ function Inbox({ contacts }) {
                     value={draft} onChange={e => setDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
                     placeholder="Type a reply…"
-                    style={{ flex: 1, padding: '10px 13px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, minWidth: 0 }}
+                    style={{ flex: 1, padding: '10px 13px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, minWidth: 0 }}
                   />
                   <Btn small primary onClick={handleSend} disabled={sending || (!draft.trim() && !pendingAttachment)}>
                     {sending ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} Send
@@ -1731,8 +1764,8 @@ function Inbox({ contacts }) {
 
       {lightboxSrc && (
         <div onClick={() => setLightboxSrc(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', cursor: 'zoom-out' }}>
-          <img src={lightboxSrc} alt="" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '10px', boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} />
-          <button type="button" onClick={() => setLightboxSrc(null)} style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,.15)', borderRadius: '10px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <img src={lightboxSrc} alt="" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '5px', boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} />
+          <button type="button" onClick={() => setLightboxSrc(null)} style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,.15)', borderRadius: '5px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <X size={18} color="white" />
           </button>
         </div>
@@ -1817,7 +1850,7 @@ function Campaigns() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="Patients in sequences" value="231" color={t.brand} accent={t.accentBlue} sub="" />
         <StatCard label="Replies this month" value="47" color={t.amber} accent={t.accentAmber} sub="↑ 20% from last month" />
         <StatCard label="Booked from campaigns" value="14" color={t.green} accent={t.accentGreen} sub="$8,400 revenue recovered" />
@@ -1832,37 +1865,37 @@ function Campaigns() {
           <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>New campaign</div>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Campaign name</label>
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Spring cleaning push" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Spring cleaning push" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
             <div>
               <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_TYPES.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Audience</label>
-              <select value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <select value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_AUDIENCES.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Touches</label>
-              <select value={form.touches} onChange={e => setForm(f => ({ ...f, touches: Number(e.target.value) }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <select value={form.touches} onChange={e => setForm(f => ({ ...f, touches: Number(e.target.value) }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_TOUCHES.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Channel</label>
-              <select value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <select value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_CHANNELS.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
           </div>
           <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>First message ({form.message.length}/160)</label>
-            <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value.slice(0, 160) }))} rows={3} placeholder="Hi {'{'}first_name{'}'}, ..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box' }} />
+            <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value.slice(0, 160) }))} rows={3} placeholder="Hi {'{'}first_name{'}'}, ..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Btn primary onClick={createCampaign}>Create campaign</Btn>
@@ -1885,7 +1918,7 @@ function Campaigns() {
           {c.stats.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c.stats.length},1fr)`, gap: '10px', marginBottom: c.prog ? '10px' : '0' }}>
               {c.stats.map(([label, val], j) => (
-                <div key={j} className="px-row" style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '10px', border: `1px solid ${t.border2}` }}>
+                <div key={j} className="px-row" style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '5px', border: `1px solid ${t.border2}` }}>
                   <div style={{ fontSize: '11px', color: t.muted }}>{label}</div>
                   <div style={{ fontSize: '16px', fontWeight: '600', color: colorMap[c.statColors[j]] }}>{val}</div>
                 </div>
@@ -1893,7 +1926,7 @@ function Campaigns() {
             </div>
           )}
           {c.prog && <div><div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden', marginTop: '8px' }}><div style={{ height: '100%', borderRadius: '3px', background: t.accentGreen, width: `${c.prog}%` }} /></div><div style={{ fontSize: '11px', color: t.muted, marginTop: '5px' }}>Touch 3 of 7 · {c.prog}% through sequence</div></div>}
-          {c.pill === 'Queued' && <div style={{ padding: '10px 12px', background: t.amberL, borderRadius: '10px', fontSize: '12px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, marginTop: '8px', display: 'flex', alignItems: 'center', gap: '7px' }}><Clock size={13} /> Scheduled in 7 days · 89 patients receive first touch September 20</div>}
+          {c.pill === 'Queued' && <div style={{ padding: '10px 12px', background: t.amberL, borderRadius: '5px', fontSize: '12px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, marginTop: '8px', display: 'flex', alignItems: 'center', gap: '7px' }}><Clock size={13} /> Scheduled in 7 days · 89 patients receive first touch September 20</div>}
         </Card>
       ))}
 
@@ -1902,7 +1935,7 @@ function Campaigns() {
           {selected.stats.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(selected.stats.length, 3)},1fr)`, gap: '8px', marginBottom: '20px' }}>
               {selected.stats.map(([label, val], j) => (
-                <div key={j} style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '10px', border: `1px solid ${t.border2}` }}>
+                <div key={j} style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '5px', border: `1px solid ${t.border2}` }}>
                   <div style={{ fontSize: '10px', color: t.muted }}>{label}</div>
                   <div style={{ fontSize: '15px', fontWeight: '600', color: colorMap[selected.statColors[j]] }}>{val}</div>
                 </div>
@@ -1982,7 +2015,7 @@ function PatientRequests() {
         <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No requests yet — they'll appear here as soon as a patient asks for one from their portal.</div>
       )}
       {pending.map(r => (
-        <RowItem key={r.id} style={{ background: t.brandL, borderColor: withAlpha(t.brand, .2) }}>
+        <RowItem key={r.id} style={{ borderLeft: `2px solid ${t.brand}`, paddingLeft: '10px' }}>
           <Ava initials={initialsOf(r.patientName || 'Patient')} bg={t.brandL} color={t.brand} />
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{r.patientName}</PII></div>
@@ -2021,13 +2054,13 @@ function Recall() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="Recall due this month" value="89" color={t.teal} accent={t.accentTeal} sub="Overdue for 6-month cleaning" />
         <StatCard label="Recalled this month" value="34" color={t.green} accent={t.accentGreen} sub="↑ 38% conversion rate" />
         <StatCard label="Recall revenue" value="$6,120" color={t.brand} accent={t.accentBlue} sub="From recalled patients" />
       </div>
       <PatientRequests />
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <Card>
           <CardTitle>Recall sequence — auto-touch</CardTitle>
           {[['3 months post-visit', 'Friendly reminder email — "Time for your checkup"', 'Active'],
@@ -2035,7 +2068,7 @@ function Recall() {
             ['6 months post-visit', 'SMS + email — "Book your cleaning today"', 'Active'],
             ['7 months — overdue', 'Urgent SMS — "Don\'t forget your dental health"', 'Overdue'],
           ].map(([title, sub, status], i) => (
-            <RowItem key={i} style={status === 'Overdue' ? { background: t.redL, borderColor: withAlpha(t.accentRed, .15) } : { background: t.greenL, borderColor: withAlpha(t.accentGreen, .15) }}>
+            <RowItem key={i} style={{ borderLeft: `2px solid ${status === 'Overdue' ? t.red : t.green}`, paddingLeft: '10px' }}>
               <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{title}</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{sub}</div></div>
               <Pill label={status} color={status === 'Overdue' ? t.red : t.green} bg={status === 'Overdue' ? t.redL : t.greenL} />
             </RowItem>
@@ -2044,7 +2077,7 @@ function Recall() {
         <Card>
           <CardTitle>Overdue patients — action needed</CardTitle>
           {OVERDUE_PATIENTS.map(p => (
-            <RowItem key={p.id} style={{ background: bgMap[p.bg], borderColor: withAlpha(t.accentRed, .15) }}>
+            <RowItem key={p.id} style={{ borderLeft: `2px solid ${t.red}`, paddingLeft: '10px' }}>
               <Ava initials={p.ini} bg={bgMap[p.bg]} color={colorMap[p.c]} />
               <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{p.name}</PII></div><div style={{ fontSize: '11.5px', color: t.muted }}>{p.sub}</div></div>
               {sent[p.id] ? <Pill label="Sent" color={t.green} bg={t.greenL} /> : <Btn small onClick={() => setSent(s => ({ ...s, [p.id]: true }))}>Send recall</Btn>}
@@ -2144,10 +2177,10 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
-        <StatCard label="Average patient LTV" value={`$${avgLtv.toLocaleString()}`} color={t.brand} accent={t.accentBlue} sub="Across all patients" />
-        <StatCard label="Highest value patient" value={highestLtv ? `$${highestLtv.ltv.toLocaleString()}` : '—'} color={t.green} accent={t.accentGreen} sub={highestLtv ? <PII>{highestLtv.name}</PII> : ''} />
-        <StatCard label="Total practice patient value" value={`$${totalLtv.toLocaleString()}`} color={t.purple} accent={t.accentPurple} sub={`${list.length} patients`} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
+        <StatCard label="Average patient LTV" value={`$${avgLtv.toLocaleString()}`} color={t.brand} accent={t.accentBlue} sub="Across all patients" decorIcon={Users} />
+        <StatCard label="Highest value patient" value={highestLtv ? `$${highestLtv.ltv.toLocaleString()}` : '—'} color={t.green} accent={t.accentGreen} sub={highestLtv ? <PII>{highestLtv.name}</PII> : ''} decorIcon={Award} />
+        <StatCard label="Total practice patient value" value={`$${totalLtv.toLocaleString()}`} color={t.purple} accent={t.accentPurple} sub={`${list.length} patients`} decorIcon={CreditCard} />
       </div>
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
         <div style={{ position: 'relative', flex: 1 }}>
@@ -2156,7 +2189,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
             placeholder="Search patients by name, email, or phone..."
             value={query}
             onChange={e => onQueryChange(e.target.value)}
-            style={{ width: '100%', padding: '9px 14px 9px 36px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '9px 14px 9px 36px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
           />
         </div>
         <Btn primary onClick={handleAddClick}><Plus size={14} /> Add patient</Btn>
@@ -2164,16 +2197,16 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
       </div>
 
       {notice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{notice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{notice}</div>
       )}
 
       {showAddForm && (
         <Card className="px-expand" style={{ marginBottom: '14px' }}>
           <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>Add a patient</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full name" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
-            <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
-            <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Phone" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full name" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Phone" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Btn primary onClick={submitNewPatient}>Add patient</Btn>
@@ -2189,7 +2222,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
       ) : (
         <>
           {!isGhlConfigured && (
-            <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}>
               <Sparkles size={13} /> Showing demo data — connect GoHighLevel to load your real patients.
             </div>
           )}
@@ -2208,7 +2241,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
                     <th
                       key={i}
                       onClick={h.key ? () => toggleSort(h.key) : undefined}
-                      style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '500', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '.5px', borderBottom: `1px solid ${t.border}`, cursor: h.key ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}
+                      style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '600', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${t.rowBorder}`, cursor: h.key ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}
                     >
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         {h.label}
@@ -2220,7 +2253,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
               </thead>
               <tbody>
                 {sorted.map((p, i) => (
-                  <tr key={p.id || i} onClick={() => setSelected(p)} className="px-row" style={{ borderBottom: `1px solid ${t.border2}`, cursor: 'pointer' }}>
+                  <tr key={p.id || i} onClick={() => setSelected(p)} className="px-row" style={{ borderBottom: `1px solid ${t.rowBorder}`, cursor: 'pointer' }}>
                     <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}><PII>{p.name}</PII></div><div style={{ fontSize: '11px', color: t.muted }}><PII>{p.email}</PII></div></td>
                     <td style={{ padding: '11px 13px', color: t.mid }}><PII>{p.phone}</PII></td>
                     <td style={{ padding: '11px 13px' }}>{p.tag ? <Pill label={p.tag} color={t.brand} bg={t.brandL} /> : <span style={{ color: t.muted }}>—</span>}</td>
@@ -2246,7 +2279,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
       {selected && (
         <SlidePanel title={selected.name} subtitle={selected.tag || 'Patient'} onClose={() => setSelected(null)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
-            <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: t.brandL, color: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', fontWeight: '700' }}>{initialsOf(selected.name)}</div>
+            <div style={{ width: '52px', height: '52px', borderRadius: '8px', background: t.brandL, color: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', fontWeight: '700' }}>{initialsOf(selected.name)}</div>
             <div>
               <div style={{ fontSize: '16px', fontWeight: '700', color: t.ink }}><PII>{selected.name}</PII></div>
               {selected.tag && <div style={{ marginTop: '4px' }}><Pill label={selected.tag} color={t.brand} bg={t.brandL} /></div>}
@@ -2257,7 +2290,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
           <DetailRow label="Patient since" value={selected.dateAdded} />
           <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>APPOINTMENT HISTORY</div>
-            <div style={{ padding: '16px', background: t.bgRow, borderRadius: '10px', fontSize: '12.5px', color: t.muted, textAlign: 'center' }}>
+            <div style={{ padding: '16px', background: t.bgRow, borderRadius: '5px', fontSize: '12.5px', color: t.muted, textAlign: 'center' }}>
               Connect the calendar sync to see this patient's visit history here.
             </div>
           </div>
@@ -2290,10 +2323,10 @@ function Billing() {
 
   return (
     <div>
-      <div style={{ padding: '11px 15px', background: t.purpleL, borderRadius: '10px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${withAlpha(t.purple, .15)}` }}>
+      <div style={{ padding: '11px 15px', background: t.purpleL, borderRadius: '5px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${withAlpha(t.purple, .15)}` }}>
         <Zap size={14} color={t.purple} /><span style={{ fontSize: '13px', color: t.purple, fontWeight: '500' }}>Pro — Billing automation active · Connected to Office Ally clearinghouse</span>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '13px', marginBottom: '18px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '18px' }}>
         <StatCard label="Claims submitted" value="48" color={t.brand} accent={t.accentBlue} sub="This month" />
         <StatCard label="Claims paid" value="39" color={t.green} accent={t.accentGreen} sub="$28,400 collected" />
         <StatCard label="Pending" value="7" color={t.amber} accent={t.accentAmber} sub="$4,200 in queue" />
@@ -2302,7 +2335,7 @@ function Billing() {
       <Card>
         <CardTitle>Recent claims</CardTitle>
         {claims.map(c => (
-          <div key={c.id} className="px-row" style={{ padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: bgMap[c.bg], border: `1px solid ${colorMap[c.color]}22`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div key={c.id} className="px-row" style={{ padding: '10px 0 10px 10px', borderBottom: `1px solid ${t.rowBorder}`, borderLeft: `2px solid ${colorMap[c.color]}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{c.name}</PII></div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{c.code}</div></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '14px', fontWeight: '600', color: colorMap[c.color] }}>{c.amount}</span>
@@ -2341,12 +2374,12 @@ function Payments() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="Collected this month" value="$12,840" color={t.green} accent={t.accentGreen} sub="↑ 18% from last month" />
         <StatCard label="Active payment plans" value="8" color={t.brand} accent={t.accentBlue} sub="$4,200 total outstanding" />
         <StatCard label="Co-pays collected online" value="$3,240" color={t.amber} accent={t.accentAmber} sub="Before patients arrived" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <Card>
           <CardTitle>Active payment plans</CardTitle>
           {[
@@ -2354,7 +2387,7 @@ function Payments() {
             ['PG', t.purpleL, t.purple, 'Patricia Green · Implant $3,200', '$200/mo · 14 payments remaining', 'On track', t.green, t.greenL],
             ['MB', t.redL, t.red, 'Mike Brown · Veneers $2,400', 'Payment failed Sep 10 — card declined', 'Failed', t.red, t.redL],
           ].map(([ini, bg, c, name, sub, status, sc, sbg], i) => (
-            <RowItem key={i} style={status === 'Failed' ? { background: t.redL, borderColor: withAlpha(t.accentRed, .15) } : {}}>
+            <RowItem key={i} style={status === 'Failed' ? { borderLeft: `2px solid ${t.red}`, paddingLeft: '10px' } : {}}>
               <Ava initials={ini} bg={bg} color={c} />
               <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{name}</PII></div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
               {status === 'Failed' ? <Btn small style={{ color: sc, borderColor: sc }}>Retry</Btn> : <Pill label={status} color={sc} bg={sbg} />}
@@ -2365,15 +2398,15 @@ function Payments() {
           <CardTitle>Send payment request</CardTitle>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Patient name</label>
-            <input value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="Search patient..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="Search patient..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Amount</label>
-            <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="$0.00" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="$0.00" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
-            <select value={reqType} onChange={e => setReqType(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+            <select value={reqType} onChange={e => setReqType(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
               <option>Co-pay collection</option><option>Balance due</option><option>Deposit for procedure</option><option>Payment plan setup</option>
             </select>
           </div>
@@ -2381,16 +2414,16 @@ function Payments() {
             {sending ? <Loader2 size={14} className="px-spin" /> : <Send size={14} />} Send payment link via SMS
           </Btn>
           {!isStripeConfigured && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.amberL, borderRadius: '10px', fontSize: '11.5px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.amberL, borderRadius: '5px', fontSize: '11.5px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
               <AlertTriangle size={13} style={{ marginTop: '1px', flexShrink: 0 }} />
               <span>Stripe isn't connected yet. Add <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_STRIPE_PUBLISHABLE_KEY</code> to your <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>.env.local</code> — this is a bare-bones scaffold for now.</span>
             </div>
           )}
           {error && isStripeConfigured && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.redL, borderRadius: '10px', fontSize: '11.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{error}</div>
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.redL, borderRadius: '5px', fontSize: '11.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{error}</div>
           )}
           {sent && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '10px', fontSize: '11.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>Payment link sent.</div>
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '5px', fontSize: '11.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>Payment link sent.</div>
           )}
         </Card>
       </div>
@@ -2479,17 +2512,17 @@ function AIFrontDesk() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="Calls answered today" value="47" color={t.green} accent={t.accentGreen} sub="0 missed · 100% rate" />
         <StatCard label="Appts booked by AI" value="6" color={t.brand} accent={t.accentBlue} sub="No human involvement" />
         <StatCard label="Escalated to staff" value="2" color={t.amber} accent={t.accentAmber} sub="Complex cases only" />
         <StatCard label="Hours saved today" value="4.2h" color={t.purple} accent={t.accentPurple} sub="Front desk time reclaimed" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <Card>
           <CardTitle>Recent call log</CardTitle>
           {CALL_LOG.map(c => (
-            <div key={c.id} className="px-row" onClick={() => setSelectedCall(c)} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '7px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}>
+            <div key={c.id} className="px-row" onClick={() => setSelectedCall(c)} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '5px', marginBottom: '7px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: colorMap[c.color], marginTop: '5px', flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{c.caller}</PII> · {c.duration} · {c.topic}</div>
@@ -2649,7 +2682,7 @@ function ReputationCenter() {
         <CardTitle>Review request automation</CardTitle>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
           {REVIEW_AUTOMATION_SEED.map(r => (
-            <div key={r.platform} style={{ padding: '12px', background: t.bgRow, borderRadius: '10px' }}>
+            <div key={r.platform} style={{ padding: '12px', background: t.bgRow, borderRadius: '5px' }}>
               <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, marginBottom: '6px' }}>{r.platform}</div>
               <div style={{ fontSize: '11.5px', color: t.mid }}>{r.sent} sent this month</div>
               <div style={{ fontSize: '11.5px', color: t.green, fontWeight: '600' }}>{Math.round((r.converted / r.sent) * 100)}% conversion</div>
@@ -2667,7 +2700,7 @@ function ReputationCenter() {
         </div>
         {filtered.length === 0 && <div style={{ fontSize: '13px', color: t.muted, textAlign: 'center', padding: '20px 0' }}>No reviews match these filters.</div>}
         {filtered.map(r => (
-          <div key={r.id} className="px-row" style={{ padding: '14px', borderRadius: '10px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.rating < 4 ? t.accentRed : t.accentAmber}` }}>
+          <div key={r.id} className="px-row" style={{ padding: '14px', borderRadius: '5px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.rating < 4 ? t.accentRed : t.accentAmber}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
               <StarRating rating={r.rating} />
               <Pill label={r.platform} color={t.brand} bg={t.brandL} />
@@ -2693,7 +2726,7 @@ function ReputationCenter() {
                     <textarea
                       value={drafts[r.id] || ''} onChange={e => setDrafts(d => ({ ...d, [r.id]: e.target.value }))}
                       placeholder="Write a reply…" rows={3}
-                      style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '8px' }}
+                      style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '8px' }}
                     />
                     <Btn small primary onClick={() => send(r)}><Send size={12} /> Send reply</Btn>
                   </div>
@@ -2763,18 +2796,18 @@ function Surveys() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="NPS score" value="72" color={t.pink} accent={t.accentPink} sub="↑ 4 pts from last month" />
         <StatCard label="Promoters (9-10)" value="68%" color={t.green} accent={t.accentGreen} sub="Would recommend us" />
         <StatCard label="Detractors (0-6)" value="12%" color={t.red} accent={t.accentRed} sub="Needs follow-up" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <Card>
           <CardTitle>Recent responses</CardTitle>
           {SURVEY_RESPONSES.map((s, i) => (
             <RowItem
               key={i} onClick={() => openSurvey(s)}
-              style={{ cursor: 'pointer', ...(s.status === 'Detractor' ? { background: t.redL, borderColor: withAlpha(t.accentRed, .15) } : {}) }}
+              style={{ cursor: 'pointer', ...(s.status === 'Detractor' ? { borderLeft: `2px solid ${t.red}`, paddingLeft: '10px' } : {}) }}
             >
               <Ava initials={s.ini} bg={bgMap[s.bg]} color={colorMap[s.c]} />
               <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{s.name}</PII> · Score: {s.score}</div><div style={{ fontSize: '11.5px', color: t.muted }}>"{s.quote}"</div></div>
@@ -2804,7 +2837,7 @@ function Surveys() {
           <div style={{ marginTop: '20px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>REPLY TO PATIENT</div>
             {sentReply ? (
-              <div style={{ padding: '12px 14px', background: t.greenL, color: t.green, borderRadius: '10px', fontSize: '12.5px' }}>Reply sent.</div>
+              <div style={{ padding: '12px 14px', background: t.greenL, color: t.green, borderRadius: '5px', fontSize: '12.5px' }}>Reply sent.</div>
             ) : (
               <>
                 {selected.status === 'Detractor' && (
@@ -2814,7 +2847,7 @@ function Surveys() {
                 )}
                 <textarea
                   value={reply} onChange={e => setReply(e.target.value)} placeholder="Write a reply…" rows={4}
-                  style={{ width: '100%', padding: '10px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '10px' }}
+                  style={{ width: '100%', padding: '10px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '10px' }}
                 />
                 <Btn primary style={{ width: '100%', justifyContent: 'center' }} onClick={() => reply.trim() && setSentReply(true)}>
                   <Send size={13} /> Send reply
@@ -2868,7 +2901,7 @@ function Eligibility() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="Verified today" value="4" color={t.green} accent={t.accentGreen} sub="Auto-checked before appt" />
         <StatCard label="Issues found" value="3" color={t.amber} accent={t.accentAmber} sub="Requires action before visit" />
         <StatCard label="Denials prevented" value="$2,840" color={t.brand} accent={t.accentBlue} sub="This month in saved claims" />
@@ -2878,7 +2911,7 @@ function Eligibility() {
         {ELIGIBILITY_DATA.map((e, i) => (
           <div
             key={i} onClick={() => setSelected(e)} className="px-row"
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 13px', background: bgMap[e.rowBg], borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0 10px 10px', borderBottom: `1px solid ${t.rowBorder}`, borderLeft: `2px solid ${colorMap[e.sc]}`, cursor: 'pointer' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
               <Ava initials={e.ini} bg={bgMap[e.bg]} color={colorMap[e.c]} />
@@ -2920,23 +2953,44 @@ function Eligibility() {
 }
 
 // ─── PORTAL ────────────────────────────────────────────────
+const PORTAL_AVAILABLE_FORMS = [
+  { name: 'New patient health history', Icon: FileText },
+  { name: 'HIPAA consent form', Icon: FileText },
+  { name: 'Treatment plan consent', Icon: FileText },
+  { name: 'Insurance update form', Icon: FileText },
+  { name: 'Financial responsibility agreement', Icon: FileText },
+];
+
 function Portal() {
   const t = useTheme();
+  const formsCompletedThisWeek = 12;
+  const formsThisWeekTotal = 15;
+  const weekPct = Math.round((formsCompletedThisWeek / formsThisWeekTotal) * 100);
+
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
-        <StatCard label="Forms pending" value="7" color={t.purple} accent={t.accentPurple} sub="Awaiting patient completion" />
-        <StatCard label="Completed this week" value="18" color={t.green} accent={t.accentGreen} sub="↑ 94% completion rate" />
-        <StatCard label="Docs e-signed" value="31" color={t.brand} accent={t.accentBlue} sub="No paper needed" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
+        <StatCard label="Forms pending" value="7" color={t.purple} accent={t.accentPurple} sub="Awaiting patient completion" decorIcon={ClipboardList} />
+        <StatCard label="Completed this week" value="18" color={t.green} accent={t.accentGreen} sub="↑ 94% completion rate" decorIcon={Check} />
+        <StatCard label="Docs e-signed" value="31" color={t.brand} accent={t.accentBlue} sub="No paper needed" decorIcon={FileText} />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <Card>
           <CardTitle>Pending intake forms</CardTitle>
+          <div style={{ marginBottom: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: t.muted, marginBottom: '5px' }}>
+              <span>Completed this week</span><span>{formsCompletedThisWeek} of {formsThisWeekTotal}</span>
+            </div>
+            <div style={{ height: '3px', borderRadius: '2px', background: t.rowBorder, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${weekPct}%`, background: t.brand }} />
+            </div>
+          </div>
           {[['RP', t.redL, t.red, 'Robert Park', 'Emergency intake — due before 4pm today', true],
             ['JL', t.amberL, t.amber, 'James Lee', 'Crown consent form — sent Sep 10', false],
             ['MC', t.brandL, t.brand, 'Maria Chen', 'New patient health history — sent Sep 12', false],
           ].map(([ini, bg, c, name, sub, urgent], i) => (
-            <RowItem key={i} style={urgent ? { background: t.redL, borderColor: withAlpha(t.accentRed, .15) } : {}}>
+            <RowItem key={i}>
+              {urgent && <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: t.red, flexShrink: 0 }} />}
               <Ava initials={ini} bg={bg} color={c} />
               <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{name}</PII></div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
               <Btn small primary={urgent}>Remind</Btn>
@@ -2945,12 +2999,15 @@ function Portal() {
         </Card>
         <Card>
           <CardTitle>Available forms</CardTitle>
-          {['New patient health history', 'HIPAA consent form', 'Treatment plan consent', 'Insurance update form', 'Financial responsibility agreement'].map((form, i) => (
-            <RowItem key={i} style={{ justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '13px', color: t.ink2 }}>{form}</span>
-              <Btn small>Send</Btn>
-            </RowItem>
-          ))}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }}>
+            {PORTAL_AVAILABLE_FORMS.map((form, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 6px' }}>
+                <form.Icon size={16} color={t.muted} style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2, flex: 1, minWidth: 0 }}>{form.name}</span>
+                <Btn ghost small>Send →</Btn>
+              </div>
+            ))}
+          </div>
         </Card>
       </div>
     </div>
@@ -2986,7 +3043,7 @@ function Documents({ contacts }) {
   const [shareNotice, setShareNotice] = useState('');
   const contactList = contacts || [];
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   const filtered = documents
@@ -3028,7 +3085,7 @@ function Documents({ contacts }) {
           {[['received', 'Received'], ['sent', 'Sent']].map(([key, label]) => (
             <button
               key={key} type="button" onClick={() => setTab(key)}
-              style={{ padding: '8px 18px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: tab === key ? 'none' : `1px solid ${t.border}`, background: tab === key ? t.brand : t.bgCard, color: tab === key ? 'white' : t.mid, fontFamily: 'inherit' }}
+              style={{ padding: '8px 18px', borderRadius: '5px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: tab === key ? 'none' : `1px solid ${t.border}`, background: tab === key ? t.brand : t.bgCard, color: tab === key ? 'white' : t.mid, fontFamily: 'inherit' }}
             >{label}</button>
           ))}
         </div>
@@ -3044,20 +3101,20 @@ function Documents({ contacts }) {
         {DOCUMENT_CATEGORIES.map(cat => (
           <button
             key={cat} type="button" onClick={() => setCategory(cat)}
-            style={{ padding: '6px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: category === cat ? 'none' : `1px solid ${t.border}`, background: category === cat ? t.brand : t.bgCard, color: category === cat ? 'white' : t.mid, fontFamily: 'inherit' }}
+            style={{ padding: '6px 13px', borderRadius: '3px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: category === cat ? 'none' : `1px solid ${t.border}`, background: category === cat ? t.brand : t.bgCard, color: category === cat ? 'white' : t.mid, fontFamily: 'inherit' }}
           >{cat}</button>
         ))}
       </div>
 
       {shareNotice && (
-        <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{shareNotice}</div>
+        <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{shareNotice}</div>
       )}
 
       <Card>
         {filtered.length === 0 && <div style={{ fontSize: '13px', color: t.muted, textAlign: 'center', padding: '28px 0' }}>No documents match these filters.</div>}
         {filtered.map(doc => (
           <RowItem key={doc.id}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '5px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <FileText size={17} color={t.brand} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -3145,12 +3202,12 @@ function Waitlist() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="On waitlist" value={String(list.length)} color={t.teal} accent={t.accentTeal} sub="Waiting for open slots" />
         <StatCard label="Slots filled this week" value="5" color={t.green} accent={t.accentGreen} sub="Auto-filled · no manual work" />
         <StatCard label="Avg fill time" value="8 min" color={t.brand} accent={t.accentBlue} sub="From cancellation to fill" />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'start' }}>
         <Card>
           <CardTitle>Current waitlist</CardTitle>
           {list.map((p, i) => {
@@ -3195,7 +3252,7 @@ function Waitlist() {
               </div>
             );
           })}
-          <div style={{ marginTop: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> When a slot opens PraxisMD auto-texts the next patient. First to reply gets the spot.</div>
+          <div style={{ marginTop: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> When a slot opens PraxisMD auto-texts the next patient. First to reply gets the spot.</div>
         </Card>
         <Card>
           <CardTitle>Recent auto-fills</CardTitle>
@@ -3282,7 +3339,7 @@ function Calendar() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '14px', alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '12px', alignItems: 'start' }}>
       <Card>
         <CardTitle>{monthLabel} <div style={{ display: 'flex', gap: '8px' }}><Btn small onClick={() => setMonthOffset(o => o - 1)}><ChevronLeft size={14} /> Prev</Btn><Btn small onClick={() => setMonthOffset(o => o + 1)}>Next <ChevronRight size={14} /></Btn></div></CardTitle>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px', marginBottom: '6px' }}>
@@ -3301,7 +3358,7 @@ function Calendar() {
                 onClick={() => { setSelectedKey(dayKey); setShowAddForm(false); }}
                 className="px-btn"
                 style={{
-                  borderRadius: '10px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', minHeight: '54px',
+                  borderRadius: '5px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', minHeight: '54px',
                   border: `${isSelected ? '2px' : '1px'} solid ${isToday ? t.brand : isSelected ? t.teal : has ? withAlpha(t.accentBlue, .2) : t.border2}`,
                   background: isToday ? t.brand : has ? t.brandL : t.bgRow, transition: 'all .12s',
                 }}
@@ -3312,7 +3369,7 @@ function Calendar() {
             );
           })}
         </div>
-        <div style={{ display: 'flex', gap: '14px', marginTop: '14px', paddingTop: '12px', borderTop: `1px solid ${t.border2}` }}>
+        <div style={{ display: 'flex', gap: '12px', marginTop: '14px', paddingTop: '12px', borderTop: `1px solid ${t.border2}` }}>
           {[[t.brand, 'Today'], [t.brandL, 'Has appointments'], [t.bgRow, 'Available']].map(([bg, label], i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: t.muted }}>
               <div style={{ width: '10px', height: '10px', borderRadius: '3px', background: bg, border: `1px solid ${t.border}` }} />{label}
@@ -3344,7 +3401,7 @@ function Calendar() {
         })}
 
         {showAddForm ? (
-          <div style={{ background: t.bgRow, border: `1px solid ${t.border2}`, borderRadius: '10px', padding: '12px', marginTop: '8px' }}>
+          <div style={{ background: t.bgRow, border: `1px solid ${t.border2}`, borderRadius: '5px', padding: '12px', marginTop: '8px' }}>
             <input value={newPatient} onChange={e => setNewPatient(e.target.value)} placeholder="Patient name" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, marginBottom: '8px', boxSizing: 'border-box' }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
               <select value={newTime} onChange={e => setNewTime(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
@@ -3416,7 +3473,7 @@ function AppointmentRequests() {
   const [suggestTime, setSuggestTime] = useState('');
   const [notice, setNotice] = useState('');
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   const confirmedCount = requests.filter(r => r.status === 'confirmed').length;
@@ -3460,14 +3517,14 @@ function AppointmentRequests() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="Total requests this week" value={String(requests.length)} color={t.brand} accent={t.accentBlue} sub="Across all channels" />
         <StatCard label="Average response time" value="38 min" color={t.teal} accent={t.accentTeal} sub="From request to reply" />
         <StatCard label="Confirmation rate" value={`${confirmationRate}%`} color={t.green} accent={t.accentGreen} sub="Of resolved requests" />
       </div>
 
       {notice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '10px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{notice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '5px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{notice}</div>
       )}
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
@@ -3478,7 +3535,7 @@ function AppointmentRequests() {
 
       {filtered.map(r => (
         <Card key={r.id} className="px-card" style={{ marginBottom: '12px', borderColor: r.emergency ? withAlpha(t.accentRed, .3) : undefined }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '13px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
             <Ava initials={initialsOf(r.patientName)} bg={r.emergency ? t.redL : t.brandL} color={r.emergency ? t.red : t.brand} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
@@ -3602,7 +3659,7 @@ function TreatmentPlans({ contacts }) {
   const [sentNotice, setSentNotice] = useState('');
   const contactList = contacts || [];
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   const enriched = plans.map(p => {
@@ -3651,14 +3708,14 @@ function TreatmentPlans({ contacts }) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="Treatment acceptance rate" value={`${acceptanceRate}%`} color={acceptanceRate >= 70 ? t.green : t.amber} accent={acceptanceRate >= 70 ? t.accentGreen : t.accentAmber} sub={`Industry average: 70%`} />
         <StatCard label="Active plan value" value={`$${enriched.filter(p => p.isActive).reduce((s, p) => s + p.totalValue, 0).toLocaleString()}`} color={t.brand} accent={t.accentBlue} sub="Across in-progress plans" />
         <StatCard label="Plans this month" value={String(plans.length)} color={t.purple} accent={t.accentPurple} sub="Created across all patients" />
       </div>
 
       {sentNotice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '10px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sentNotice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '5px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sentNotice}</div>
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
@@ -3666,7 +3723,7 @@ function TreatmentPlans({ contacts }) {
           {[['active', 'Active Plans'], ['history', 'History']].map(([key, label]) => (
             <button
               key={key} type="button" onClick={() => setView(key)}
-              style={{ padding: '8px 18px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: view === key ? 'none' : `1px solid ${t.border}`, background: view === key ? t.brand : t.bgCard, color: view === key ? 'white' : t.mid, fontFamily: 'inherit' }}
+              style={{ padding: '8px 18px', borderRadius: '5px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: view === key ? 'none' : `1px solid ${t.border}`, background: view === key ? t.brand : t.bgCard, color: view === key ? 'white' : t.mid, fontFamily: 'inherit' }}
             >{label}</button>
           ))}
         </div>
@@ -3680,7 +3737,7 @@ function TreatmentPlans({ contacts }) {
         const total = p.procedures.length;
         return (
           <Card key={p.id} className="px-card" style={{ marginBottom: '12px' }}>
-            <div onClick={() => setExpandedId(isExpanded ? null : p.id)} style={{ display: 'flex', alignItems: 'center', gap: '13px', cursor: 'pointer' }}>
+            <div onClick={() => setExpandedId(isExpanded ? null : p.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
               <Ava initials={initialsOf(p.patientName)} bg={t.brandL} color={t.brand} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
@@ -3766,7 +3823,7 @@ function MembershipPlans() {
   const [createForm, setCreateForm] = useState({ name: '', monthlyPrice: '', annualPrice: '', benefits: [''] });
   const [linkNotice, setLinkNotice] = useState('');
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   const planById = Object.fromEntries(plans.map(p => [p.id, p]));
@@ -3808,7 +3865,7 @@ function MembershipPlans() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="Total members" value={String(members.length)} color={t.brand} accent={t.accentBlue} sub={`${activeMembers.length} active`} />
         <StatCard label="Monthly recurring revenue" value={`$${mrr.toLocaleString()}`} color={t.green} accent={t.accentGreen} sub="From active memberships" />
         <StatCard label="Members added this month" value="3" color={t.purple} accent={t.accentPurple} sub="↑ growing steadily" />
@@ -3820,10 +3877,10 @@ function MembershipPlans() {
       </div>
 
       {linkNotice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12.5px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, wordBreak: 'break-all' }}>{linkNotice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '5px', fontSize: '12.5px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, wordBreak: 'break-all' }}>{linkNotice}</div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginBottom: '18px' }}>
         {plans.map(plan => {
           const stats = planStats(plan);
           return (
@@ -3858,7 +3915,7 @@ function MembershipPlans() {
         {members.map(m => {
           const plan = planById[m.planId];
           return (
-            <div key={m.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', alignItems: 'center', padding: '10px 4px', borderRadius: '10px' }}>
+            <div key={m.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', alignItems: 'center', padding: '10px 4px', borderRadius: '5px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
                 <Ava initials={initialsOf(m.patientName)} bg={t.brandL} color={t.brand} />
                 <span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{m.patientName}</PII></span>
@@ -4051,12 +4108,12 @@ function AdPerformance() {
             <span
               key={p}
               onClick={() => setPlatform(p)}
-              style={{ padding: '5px 12px', borderRadius: '20px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: platform === p ? 'none' : `1px solid ${t.border}`, background: platform === p ? t.brand : 'transparent', color: platform === p ? 'white' : t.mid }}
+              style={{ padding: '5px 12px', borderRadius: '3px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: platform === p ? 'none' : `1px solid ${t.border}`, background: platform === p ? t.brand : 'transparent', color: platform === p ? 'white' : t.mid }}
             >{p}</span>
           ))}
         </div>
       </CardTitle>
-      <div style={{ padding: '9px 12px', background: t.tealL, borderRadius: '10px', fontSize: '11.5px', color: t.teal, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+      <div style={{ padding: '9px 12px', background: t.tealL, borderRadius: '5px', fontSize: '11.5px', color: t.teal, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
         <Sparkles size={12} /> Demo campaign data shown — connect {platform} for real numbers.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '18px' }}>
@@ -4070,7 +4127,7 @@ function AdPerformance() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '10px', height: '10px', borderRadius: '3px', background: t.brand, display: 'inline-block' }} /> Spend</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '10px', height: '10px', borderRadius: '3px', background: t.green, display: 'inline-block' }} /> Revenue</div>
       </div>
-      <div style={{ marginTop: '16px', padding: '10px 14px', background: t.brandL, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+      <div style={{ marginTop: '16px', padding: '10px 14px', background: t.brandL, borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ fontSize: '12.5px', color: t.brand, display: 'flex', alignItems: 'center', gap: '7px' }}>
           <Sparkles size={13} /> {data.insight}
         </div>
@@ -4101,12 +4158,12 @@ function Reports() {
       <AdPerformance />
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         {REPORTS_PERIODS.map((label, i) => (
-          <span key={i} onClick={() => setPeriod(label)} style={{ padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: period === label ? 'none' : `1px solid ${t.border}`, background: period === label ? t.brand : t.bgCard, color: period === label ? 'white' : t.mid }}>{label}</span>
+          <span key={i} onClick={() => setPeriod(label)} style={{ padding: '6px 14px', borderRadius: '3px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: period === label ? 'none' : `1px solid ${t.border}`, background: period === label ? t.brand : t.bgCard, color: period === label ? 'white' : t.mid }}>{label}</span>
         ))}
         <Btn small onClick={() => setNotice(`Exported ${period} report as PDF.`)}><Download size={13} /> Export PDF</Btn>
         {notice && <span style={{ fontSize: '12px', color: t.green, marginLeft: '4px' }}>{notice}</span>}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         {data.stats.map(([label, value, color, sub], i) => (
           <StatCard key={i} label={label} value={value} color={colorMap[color]} accent={accentMap[color]} sub={sub} />
         ))}
@@ -4114,7 +4171,7 @@ function Reports() {
       <Card>
         <CardTitle>Monthly performance breakdown</CardTitle>
         {data.metrics.map(([label, val, color], i) => (
-          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', background: t.bgRow, borderRadius: '10px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
+          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', background: t.bgRow, borderRadius: '5px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
             <span style={{ fontSize: '12.5px', color: t.mid }}>{label}</span>
             <span style={{ fontSize: '14px', fontWeight: '600', color: colorMap[color] }}>{val}</span>
           </div>
@@ -4248,7 +4305,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
     setTimeout(() => setSessionNotice(''), 3000);
   }
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   function saveChanges() {
@@ -4300,7 +4357,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
         <Card>
           <CardTitle>Practice details</CardTitle>
           {[['Practice name', 'Bright Smiles Dental'], ['Phone number', '(813) 555-0142'], ['Email', 'hello@brightsmiles.com'], ['Address', '4210 W Bay Ave, Tampa FL 33616'], ['NPI number', '1234567890']].map(([label, val], i) => (
@@ -4314,13 +4371,13 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
         <Card>
           <CardTitle>Integrations</CardTitle>
           {INTEGRATIONS.map(item => (
-            <div key={item.id} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', borderWidth: '1px', borderStyle: 'solid', background: item.connected ? t.greenL : t.bgRow, borderColor: item.connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
+            <div key={item.id} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '5px', marginBottom: '8px', borderWidth: '1px', borderStyle: 'solid', background: item.connected ? t.greenL : t.bgRow, borderColor: item.connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
               <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{item.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{item.sub}</div></div>
               {item.connected ? <Pill label="Connected" color={t.green} bg={t.greenL} /> : <Btn small onClick={() => connect(item)}>Connect</Btn>}
             </div>
           ))}
           {connectNotice && (
-            <div style={{ marginTop: '8px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{connectNotice}</div>
+            <div style={{ marginTop: '8px', padding: '10px 12px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{connectNotice}</div>
           )}
         </Card>
       </div>
@@ -4337,7 +4394,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                 type="button"
                 onClick={() => onBrandColorChange && onBrandColorChange(preset.hex)}
                 className="px-row"
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 13px', borderRadius: '10px', border: active ? `2px solid ${preset.hex}` : `1px solid ${t.border}`, background: t.bgRow, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 13px', borderRadius: '5px', border: active ? `2px solid ${preset.hex}` : `1px solid ${t.border}`, background: t.bgRow, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
               >
                 <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: preset.hex, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {active && <Check size={13} color="white" />}
@@ -4374,7 +4431,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           <Btn small primary onClick={() => setShowInviteModal(true)}><UserPlus size={13} /> Invite staff member</Btn>
         </CardTitle>
         {inviteNotice && (
-          <div style={{ marginBottom: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '10px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{inviteNotice}</div>
+          <div style={{ marginBottom: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{inviteNotice}</div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.9fr 1.1fr 0.9fr 0.9fr 1.4fr', gap: '8px', padding: '0 13px 8px', fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>
           <div>Name</div><div>Email</div><div>Role</div><div>Last login</div><div>Status</div><div>Actions</div>
@@ -4383,7 +4440,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           const rc = roleColor(s.role, t);
           const isOwner = s.role === 'Owner';
           return (
-            <div key={s.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.9fr 1.1fr 0.9fr 0.9fr 1.4fr', gap: '8px', alignItems: 'center', padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: t.bgRow }}>
+            <div key={s.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.9fr 1.1fr 0.9fr 0.9fr 1.4fr', gap: '8px', alignItems: 'center', padding: '10px 13px', borderRadius: '5px', marginBottom: '6px', background: t.bgRow }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                 <Ava initials={initialsOf(s.name)} bg={t.brandL} color={t.brand} />
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
@@ -4413,7 +4470,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           const onCount = ALL_TABS.filter(tab => perms[tab]).length;
           const rc = roleColor(role, t);
           return (
-            <div key={role} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '10px', marginBottom: '8px', background: t.bgRow }}>
+            <div key={role} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '5px', marginBottom: '8px', background: t.bgRow }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Pill label={role} color={rc.color} bg={rc.bg} />
                 <span style={{ fontSize: '12px', color: t.muted }}>{onCount} of {ALL_TABS.length} tabs visible</span>
@@ -4431,7 +4488,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
 
       <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, margin: '18px 0 10px' }}>Appointment Request Settings</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
         <Card>
           <CardTitle>Doctors available for requests</CardTitle>
           {requestDoctors.map(d => (
@@ -4468,7 +4525,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
       <Card style={{ marginBottom: '14px' }}>
         <CardTitle>Business hours for requests</CardTitle>
         {Object.entries(businessHours).map(([day, hrs]) => (
-          <div key={day} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '9px 2px', borderBottom: `1px solid ${t.border2}` }}>
+          <div key={day} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '9px 2px', borderBottom: `1px solid ${t.border2}` }}>
             <div style={{ width: '42px', fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{day}</div>
             <ToggleSwitch checked={hrs.open} onChange={() => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], open: !bh[day].open } }))} />
             {hrs.open ? (
@@ -4508,7 +4565,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
 
         {briefingEnabled && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
               <div>
                 <label style={labelStyle}>Send time</label>
                 <input type="time" value={briefingTime} onChange={e => setBriefingTime(e.target.value)} style={inputStyle} />
@@ -4519,7 +4576,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                   {['SMS', 'Email', 'Both'].map(method => (
                     <button
                       key={method} type="button" onClick={() => setBriefingDelivery(method)}
-                      style={{ flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', border: briefingDelivery === method ? 'none' : `1px solid ${t.border}`, background: briefingDelivery === method ? t.brand : t.bgCard, color: briefingDelivery === method ? 'white' : t.mid, fontFamily: 'inherit' }}
+                      style={{ flex: 1, padding: '8px', borderRadius: '5px', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', border: briefingDelivery === method ? 'none' : `1px solid ${t.border}`, background: briefingDelivery === method ? t.brand : t.bgCard, color: briefingDelivery === method ? 'white' : t.mid, fontFamily: 'inherit' }}
                     >{method}</button>
                   ))}
                 </div>
@@ -4578,14 +4635,14 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
       <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, margin: '18px 0 10px' }}>Security</div>
 
       {twoFANotice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '10px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{twoFANotice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '5px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{twoFANotice}</div>
       )}
 
       <Card style={{ marginBottom: '18px' }}>
         <CardTitle>Two-factor authentication</CardTitle>
-        <RowItem style={{ justifyContent: 'space-between', background: twoFAEnabled ? t.greenL : t.bgRow, borderColor: twoFAEnabled ? withAlpha(t.accentGreen, .15) : t.border2 }}>
+        <RowItem style={{ justifyContent: 'space-between', borderLeft: twoFAEnabled ? `2px solid ${t.green}` : 'none', paddingLeft: twoFAEnabled ? '10px' : 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: twoFAEnabled ? t.greenL : t.bgCard, border: twoFAEnabled ? 'none' : `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '5px', background: twoFAEnabled ? t.greenL : t.bgCard, border: twoFAEnabled ? 'none' : `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {twoFAEnabled ? <ShieldCheck size={17} color={t.green} /> : <Shield size={17} color={t.muted} />}
             </div>
             <div>
@@ -4604,12 +4661,12 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
       <Card style={{ marginBottom: '18px' }}>
         <CardTitle>Active sessions</CardTitle>
         {sessionNotice && (
-          <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '10px', fontSize: '12px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sessionNotice}</div>
+          <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '5px', fontSize: '12px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sessionNotice}</div>
         )}
         {sessions.map(s => (
           <RowItem key={s.id} style={{ justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '5px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {s.device === 'mobile' ? <Smartphone size={16} color={t.brand} /> : <Monitor size={16} color={t.brand} />}
               </div>
               <div>
@@ -4707,9 +4764,9 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                   key={key}
                   onClick={() => setWizardMethod(key)}
                   className="px-row"
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: `2px solid ${wizardMethod === key ? t.brand : t.border2}`, background: wizardMethod === key ? t.brandL : t.bgRow }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px', borderRadius: '5px', marginBottom: '10px', cursor: 'pointer', border: `2px solid ${wizardMethod === key ? t.brand : t.border2}`, background: wizardMethod === key ? t.brandL : t.bgRow }}
                 >
-                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: t.bgCard, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '5px', background: t.bgCard, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon size={18} color={wizardMethod === key ? t.brand : t.muted} />
                   </div>
                   <div>
@@ -4732,7 +4789,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                   ))}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '5px', marginBottom: '18px' }}>
                 <span style={{ fontSize: '12.5px', color: t.ink2, fontFamily: 'monospace', letterSpacing: '.5px' }}>JBSW Y3DP EHPK 3PXP</span>
                 <KeyRound size={14} color={t.muted} />
               </div>
@@ -4805,7 +4862,7 @@ function FilterPillGroup({ options, value, onChange }) {
           <button
             key={key}
             onClick={() => onChange(key)}
-            style={{ padding: '6px 13px', borderRadius: '20px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', borderWidth: '1px', borderStyle: 'solid', borderColor: active ? 'transparent' : t.border, background: active ? t.brand : t.bgCard, color: active ? 'white' : t.mid }}
+            style={{ padding: '6px 13px', borderRadius: '3px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', borderWidth: '1px', borderStyle: 'solid', borderColor: active ? 'transparent' : t.border, background: active ? t.brand : t.bgCard, color: active ? 'white' : t.mid }}
           >
             {label}
           </button>
@@ -4876,13 +4933,13 @@ function ActivityLog() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search by user or action…"
-                style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12.5px', color: t.ink2, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12.5px', color: t.ink2, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '7px 9px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '7px 9px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
               <span style={{ fontSize: '12px', color: t.muted }}>to</span>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '7px 9px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '7px 9px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
             </div>
             <Btn small onClick={exportCsv}><Download size={13} /> Export CSV</Btn>
           </div>
@@ -4905,7 +4962,7 @@ function ActivityLog() {
         {filtered.map(a => {
           const rc = roleColor(a.role, t);
           return (
-            <RowItem key={a.id} style={a.suspicious ? { background: t.redL, borderColor: withAlpha(t.red, .2) } : undefined}>
+            <RowItem key={a.id} style={a.suspicious ? { borderLeft: `2px solid ${t.red}`, paddingLeft: '10px' } : undefined}>
               <div style={{ width: '128px', flexShrink: 0, fontSize: '12px', color: t.muted }}>{formatTs(a.ts)}</div>
               <Ava initials={initialsOf(a.user)} bg={a.suspicious ? t.redL : t.brandL} color={a.suspicious ? t.red : t.brand} />
               <div style={{ flex: 1, minWidth: 0 }}>
