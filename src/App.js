@@ -318,14 +318,15 @@ function useGhlFetch(fetchFn) {
 const ROLES = ['Owner', 'Office Manager', 'Front Desk', 'Biller'];
 const EDITABLE_ROLES = ROLES.filter(r => r !== 'Owner');
 
-const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'billing', 'payments', 'reports', 'activitylog', 'settings'];
+const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'treatmentplans', 'billing', 'payments', 'reports', 'activitylog', 'settings'];
 
 const TAB_LABELS = {
   overview: 'Overview', inbox: 'Inbox', campaigns: 'Campaigns', recall: 'Recall', calendar: 'Calendar',
   appointmentrequests: 'Appointment Requests',
   waitlist: 'Waitlist', patients: 'Patients', portal: 'Patient Portal', eligibility: 'Eligibility',
-  reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents', billing: 'Billing',
-  payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
+  reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents',
+  treatmentplans: 'Treatment Plans',
+  billing: 'Billing', payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
 };
 
 function buildPermissions(onTabs) {
@@ -364,7 +365,7 @@ function roleColor(role, t) {
 }
 
 const MAIN_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist'];
-const PRACTICE_TABS = ['patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents'];
+const PRACTICE_TABS = ['patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'treatmentplans'];
 const BILLINGSEC_TABS = ['billing', 'payments'];
 const ANALYTICS_TABS = ['reports', 'settings', 'activitylog'];
 
@@ -648,6 +649,7 @@ function App() {
           {isTabVisible('surveys', userRole, rolePermissions) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('aifrontdesk', userRole, rolePermissions) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
           {isTabVisible('documents', userRole, rolePermissions) && <NavItem label="Documents" Icon={FileArchive} tab="documents" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('treatmentplans', userRole, rolePermissions) && <NavItem label="Treatment Plans" Icon={ClipboardList} tab="treatmentplans" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {BILLINGSEC_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Billing" collapsed={!showFull} />}
           {isTabVisible('billing', userRole, rolePermissions) && <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />}
           {isTabVisible('payments', userRole, rolePermissions) && <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
@@ -798,6 +800,7 @@ function App() {
           {gate('eligibility', <Eligibility userRole={userRole} />)}
           {gate('portal', <Portal userRole={userRole} />)}
           {gate('documents', <Documents contacts={contacts} userRole={userRole} />)}
+          {gate('treatmentplans', <TreatmentPlans contacts={contacts} userRole={userRole} />)}
           {gate('waitlist', <Waitlist userRole={userRole} />)}
           {gate('calendar', <Calendar userRole={userRole} />)}
           {gate('appointmentrequests', <AppointmentRequests userRole={userRole} />)}
@@ -826,6 +829,7 @@ function getPageTitle(tab, ownerName) {
     recall: 'Recall & Scheduling',
     calendar: 'Calendar',
     appointmentrequests: 'Appointment Requests',
+    treatmentplans: 'Treatment Plans',
     waitlist: 'Smart Waitlist',
     patients: 'Patients',
     portal: 'Patient Portal',
@@ -3231,6 +3235,193 @@ function AppointmentRequests() {
             <input value={suggestTime} onChange={e => setSuggestTime(e.target.value)} placeholder="e.g. Sep 23, 2:00pm" style={inputStyle} />
           </div>
           <Btn primary onClick={submitSuggestion} disabled={!suggestTime.trim()}><Send size={13} /> Send suggestion</Btn>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── TREATMENT PLANS ───────────────────────────────────────
+const TREATMENT_PLANS_SEED = [
+  {
+    id: 'tp1', patientName: 'James Lee', planName: 'Full Mouth Restoration', createdDate: 'Aug 20, 2026',
+    procedures: [
+      { code: 'D2740', name: 'Crown', cost: 1200, status: 'Accepted' },
+      { code: 'D2740', name: 'Crown', cost: 1200, status: 'Accepted' },
+      { code: 'D4341', name: 'Periodontal Scaling', cost: 280, status: 'Pending' },
+    ],
+  },
+  {
+    id: 'tp2', patientName: 'Robert Park', planName: 'Implant Replacement', createdDate: 'Sep 5, 2026',
+    procedures: [
+      { code: 'D6010', name: 'Implant Placement', cost: 3200, status: 'Pending' },
+      { code: 'D1110', name: 'Cleaning', cost: 150, status: 'Accepted' },
+    ],
+  },
+  {
+    id: 'tp3', patientName: 'Sarah Martinez', planName: 'Preventive Care Plan', createdDate: 'Jul 12, 2026',
+    procedures: [
+      { code: 'D1110', name: 'Cleaning', cost: 150, status: 'Accepted' },
+      { code: 'D1110', name: 'Cleaning', cost: 150, status: 'Accepted' },
+    ],
+  },
+  {
+    id: 'tp4', patientName: 'David Wong', planName: 'Crown & Scaling', createdDate: 'Sep 1, 2026',
+    procedures: [
+      { code: 'D2740', name: 'Crown', cost: 1200, status: 'Declined' },
+      { code: 'D4341', name: 'Scaling', cost: 280, status: 'Accepted' },
+    ],
+  },
+];
+
+const PROC_STATUS_COLOR = { Accepted: 'green', Pending: 'amber', Declined: 'red' };
+
+function TreatmentPlans({ contacts }) {
+  const t = useTheme();
+  const [plans, setPlans] = useState(TREATMENT_PLANS_SEED);
+  const [view, setView] = useState('active');
+  const [expandedId, setExpandedId] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ patient: '', planName: '', procedures: [{ code: '', cost: '' }] });
+  const [sentNotice, setSentNotice] = useState('');
+  const contactList = contacts || [];
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
+
+  const enriched = plans.map(p => {
+    const totalValue = p.procedures.reduce((sum, pr) => sum + pr.cost, 0);
+    const accepted = p.procedures.filter(pr => pr.status === 'Accepted').length;
+    const pending = p.procedures.filter(pr => pr.status === 'Pending').length;
+    const declined = p.procedures.filter(pr => pr.status === 'Declined').length;
+    const isActive = pending > 0;
+    const statusLabel = isActive ? 'In progress' : (declined > 0 && accepted === 0 ? 'Declined' : 'Completed');
+    return { ...p, totalValue, accepted, pending, declined, isActive, statusLabel };
+  });
+
+  const visible = enriched.filter(p => view === 'active' ? p.isActive : !p.isActive);
+
+  const allProcedures = enriched.flatMap(p => p.procedures);
+  const resolvedProcedures = allProcedures.filter(pr => pr.status === 'Accepted' || pr.status === 'Declined');
+  const acceptanceRate = resolvedProcedures.length > 0
+    ? Math.round((resolvedProcedures.filter(pr => pr.status === 'Accepted').length / resolvedProcedures.length) * 100)
+    : 0;
+
+  function addProcedureRow() {
+    setCreateForm(f => ({ ...f, procedures: [...f.procedures, { code: '', cost: '' }] }));
+  }
+
+  function updateProcedureRow(i, field, value) {
+    setCreateForm(f => ({ ...f, procedures: f.procedures.map((p, j) => j === i ? { ...p, [field]: value } : p) }));
+  }
+
+  function createPlan() {
+    if (!createForm.patient.trim() || !createForm.planName.trim()) return;
+    const procedures = createForm.procedures
+      .filter(p => p.code.trim() && p.cost)
+      .map(p => ({ code: p.code.trim(), name: p.code.trim(), cost: Number(p.cost) || 0, status: 'Pending' }));
+    setPlans(list => [{
+      id: `tp-new-${Date.now()}`, patientName: createForm.patient.trim(), planName: createForm.planName.trim(),
+      createdDate: 'Just now', procedures: procedures.length ? procedures : [{ code: '—', name: '—', cost: 0, status: 'Pending' }],
+    }, ...list]);
+    setShowCreate(false);
+    setCreateForm({ patient: '', planName: '', procedures: [{ code: '', cost: '' }] });
+  }
+
+  function sendToPatient(plan) {
+    setSentNotice(`Payment and approval link sent to ${plan.patientName} via SMS.`);
+    setTimeout(() => setSentNotice(''), 4000);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+        <StatCard label="Treatment acceptance rate" value={`${acceptanceRate}%`} color={acceptanceRate >= 70 ? t.green : t.amber} accent={acceptanceRate >= 70 ? t.accentGreen : t.accentAmber} sub={`Industry average: 70%`} />
+        <StatCard label="Active plan value" value={`$${enriched.filter(p => p.isActive).reduce((s, p) => s + p.totalValue, 0).toLocaleString()}`} color={t.brand} accent={t.accentBlue} sub="Across in-progress plans" />
+        <StatCard label="Plans this month" value={String(plans.length)} color={t.purple} accent={t.accentPurple} sub="Created across all patients" />
+      </div>
+
+      {sentNotice && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '10px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sentNotice}</div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {[['active', 'Active Plans'], ['history', 'History']].map(([key, label]) => (
+            <button
+              key={key} type="button" onClick={() => setView(key)}
+              style={{ padding: '8px 18px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: view === key ? 'none' : `1px solid ${t.border}`, background: view === key ? t.brand : t.bgCard, color: view === key ? 'white' : t.mid, fontFamily: 'inherit' }}
+            >{label}</button>
+          ))}
+        </div>
+        <Btn primary onClick={() => setShowCreate(true)}><Plus size={14} /> Create treatment plan</Btn>
+      </div>
+
+      {visible.length === 0 && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No {view === 'active' ? 'active' : 'completed'} plans.</Card>}
+
+      {visible.map(p => {
+        const isExpanded = expandedId === p.id;
+        const total = p.procedures.length;
+        return (
+          <Card key={p.id} className="px-card" style={{ marginBottom: '12px' }}>
+            <div onClick={() => setExpandedId(isExpanded ? null : p.id)} style={{ display: 'flex', alignItems: 'center', gap: '13px', cursor: 'pointer' }}>
+              <Ava initials={initialsOf(p.patientName)} bg={t.brandL} color={t.brand} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{p.patientName}</span>
+                  <span style={{ fontSize: '12.5px', color: t.muted }}>· {p.planName}</span>
+                </div>
+                <div style={{ fontSize: '11.5px', color: t.muted }}>${p.totalValue.toLocaleString()} · {total} procedure{total === 1 ? '' : 's'} · Created {p.createdDate}</div>
+                <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden', marginTop: '8px', background: t.bgRow }}>
+                  {p.accepted > 0 && <div style={{ width: `${(p.accepted / total) * 100}%`, background: t.green }} />}
+                  {p.pending > 0 && <div style={{ width: `${(p.pending / total) * 100}%`, background: t.amber }} />}
+                  {p.declined > 0 && <div style={{ width: `${(p.declined / total) * 100}%`, background: t.red }} />}
+                </div>
+              </div>
+              <Pill label={p.statusLabel} color={p.isActive ? t.amber : (p.statusLabel === 'Declined' ? t.red : t.green)} bg={p.isActive ? t.amberL : (p.statusLabel === 'Declined' ? t.redL : t.greenL)} />
+              <ChevronDown size={16} color={t.muted} style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease', flexShrink: 0 }} />
+            </div>
+            {isExpanded && (
+              <div className="px-expand" style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${t.border2}` }}>
+                {p.procedures.map((pr, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0', borderBottom: i < p.procedures.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: '600', color: t.muted, width: '54px', flexShrink: 0 }}>{pr.code}</span>
+                    <span style={{ flex: 1, fontSize: '13px', color: t.ink2 }}>{pr.name}</span>
+                    <span style={{ fontSize: '13px', color: t.mid, width: '70px', textAlign: 'right' }}>${pr.cost.toLocaleString()}</span>
+                    <Pill label={pr.status} color={t[PROC_STATUS_COLOR[pr.status]]} bg={t[`${PROC_STATUS_COLOR[pr.status]}L`]} />
+                  </div>
+                ))}
+                {p.isActive && (
+                  <Btn small primary style={{ marginTop: '10px' }} onClick={() => sendToPatient(p)}><Send size={12} /> Send to patient</Btn>
+                )}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+
+      {showCreate && (
+        <Modal title="Create treatment plan" onClose={() => setShowCreate(false)}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Patient</label>
+            <input value={createForm.patient} onChange={e => setCreateForm(f => ({ ...f, patient: e.target.value }))} placeholder="Search patients…" list="tp-patient-list" style={inputStyle} />
+            <datalist id="tp-patient-list">
+              {contactList.map(c => <option key={c.id} value={c.name} />)}
+            </datalist>
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Plan name</label>
+            <input value={createForm.planName} onChange={e => setCreateForm(f => ({ ...f, planName: e.target.value }))} placeholder="e.g. Crown & Root Canal" style={inputStyle} />
+          </div>
+          <label style={labelStyle}>Procedures</label>
+          {createForm.procedures.map((pr, i) => (
+            <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <input value={pr.code} onChange={e => updateProcedureRow(i, 'code', e.target.value)} placeholder="Code / name (e.g. D2740 Crown)" style={{ ...inputStyle, flex: 2 }} />
+              <input value={pr.cost} onChange={e => updateProcedureRow(i, 'cost', e.target.value)} placeholder="Cost" type="number" style={{ ...inputStyle, flex: 1 }} />
+            </div>
+          ))}
+          <Btn small onClick={addProcedureRow} style={{ marginBottom: '18px' }}><Plus size={12} /> Add procedure</Btn>
+          <Btn primary onClick={createPlan}>Create plan</Btn>
         </Modal>
       )}
     </div>
