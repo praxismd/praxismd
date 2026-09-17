@@ -14,7 +14,7 @@ import {
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
   Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
-  CalendarPlus, BadgeCheck,
+  CalendarPlus, BadgeCheck, Award, Flag,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -324,7 +324,7 @@ const TAB_LABELS = {
   overview: 'Overview', inbox: 'Inbox', campaigns: 'Campaigns', recall: 'Recall', calendar: 'Calendar',
   appointmentrequests: 'Appointment Requests',
   waitlist: 'Waitlist', patients: 'Patients', portal: 'Patient Portal', eligibility: 'Eligibility',
-  reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents',
+  reviews: 'Reputation Center', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents',
   treatmentplans: 'Treatment Plans',
   billing: 'Billing', membershipplans: 'Membership Plans', payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
 };
@@ -645,7 +645,7 @@ function App() {
           {isTabVisible('patients', userRole, rolePermissions) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('portal', userRole, rolePermissions) && <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('eligibility', userRole, rolePermissions) && <NavItem label="Eligibility" Icon={Shield} tab="eligibility" active={activeTab} onClick={setActiveTab} badge="3" badgeColor={t.amber} collapsed={!showFull} />}
-          {isTabVisible('reviews', userRole, rolePermissions) && <NavItem label="Reviews" Icon={Star} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('reviews', userRole, rolePermissions) && <NavItem label="Reputation Center" Icon={Award} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('surveys', userRole, rolePermissions) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('aifrontdesk', userRole, rolePermissions) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
           {isTabVisible('documents', userRole, rolePermissions) && <NavItem label="Documents" Icon={FileArchive} tab="documents" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
@@ -797,7 +797,7 @@ function App() {
           {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} brandColor={brandColor} onBrandColorChange={setBrandColor} />)}
           {gate('activitylog', <ActivityLog userRole={userRole} />)}
           {gate('aifrontdesk', <AIFrontDesk userRole={userRole} />)}
-          {gate('reviews', <Reviews userRole={userRole} />)}
+          {gate('reviews', <ReputationCenter userRole={userRole} />)}
           {gate('surveys', <Surveys userRole={userRole} />)}
           {gate('eligibility', <Eligibility userRole={userRole} />)}
           {gate('portal', <Portal userRole={userRole} />)}
@@ -836,7 +836,7 @@ function getPageTitle(tab, ownerName) {
     patients: 'Patients',
     portal: 'Patient Portal',
     eligibility: 'Insurance Eligibility',
-    reviews: 'Reviews',
+    reviews: 'Reputation Center',
     surveys: 'Patient Satisfaction',
     aifrontdesk: 'AI Front Desk',
     documents: 'Documents',
@@ -2344,23 +2344,60 @@ function AIFrontDesk() {
   );
 }
 
-// ─── REVIEWS ───────────────────────────────────────────────
-const REVIEWS_DATA = [
-  { id: 'rv1', rating: 5, text: '"Dr. Rivera and the team are absolutely wonderful. The automated reminder texts are so convenient!"', author: '— Sarah M. · 2 days ago · Google', negative: false },
-  { id: 'rv2', rating: 3, text: '"Good dentist but the wait time was a bit long. Would appreciate better scheduling."', author: '— Anonymous · 1 week ago · Google', negative: true },
+// ─── REPUTATION CENTER ─────────────────────────────────────
+const REPUTATION_PLATFORMS_SEED = [
+  { id: 'Google', rating: 4.8, count: 142, lastReview: '2 days ago' },
+  { id: 'Yelp', rating: 4.2, count: 38, lastReview: '5 days ago' },
+  { id: 'Healthgrades', rating: 3.6, count: 21, lastReview: '1 week ago' },
+  { id: 'Facebook', rating: 4.9, count: 64, lastReview: '3 days ago' },
+  { id: 'Zocdoc', rating: 4.5, count: 29, lastReview: '4 days ago' },
 ];
 
-function Reviews() {
+const REVIEW_AUTOMATION_SEED = [
+  { platform: 'Google', sent: 64, converted: 22 },
+  { platform: 'Yelp', sent: 38, converted: 9 },
+  { platform: 'Healthgrades', sent: 21, converted: 4 },
+];
+
+const REVIEWS_DATA = [
+  { id: 'rv1', platform: 'Google', rating: 5, text: '"Dr. Rivera and the team are absolutely wonderful. The automated reminder texts are so convenient!"', author: 'Sarah M.', date: '2 days ago' },
+  { id: 'rv2', platform: 'Google', rating: 3, text: '"Good dentist but the wait time was a bit long. Would appreciate better scheduling."', author: 'Anonymous', date: '1 week ago' },
+  { id: 'rv3', platform: 'Yelp', rating: 5, text: '"Best cleaning I’ve ever had. Staff is so friendly!"', author: 'Tom R.', date: '4 days ago' },
+  { id: 'rv4', platform: 'Yelp', rating: 2, text: '"Billing was confusing and I was charged more than quoted."', author: 'Jamie K.', date: '5 days ago' },
+  { id: 'rv5', platform: 'Healthgrades', rating: 4, text: '"Professional office, good with kids."', author: 'Alicia P.', date: '6 days ago' },
+  { id: 'rv6', platform: 'Healthgrades', rating: 3, text: '"Appointment got moved twice without much notice."', author: 'Marcus D.', date: '1 week ago' },
+  { id: 'rv7', platform: 'Google', rating: 5, text: '"Painless root canal, highly recommend Dr. Alvarez."', author: 'Dana W.', date: '3 days ago' },
+  { id: 'rv8', platform: 'Yelp', rating: 4, text: '"Clean office, easy to book online."', author: 'Chris B.', date: '1 week ago' },
+];
+
+function ReputationCenter() {
   const t = useTheme();
+  const [reviews] = useState(REVIEWS_DATA);
+  const [platformFilter, setPlatformFilter] = useState('All');
+  const [starFilter, setStarFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [openId, setOpenId] = useState(null);
   const [drafts, setDrafts] = useState({});
   const [replied, setReplied] = useState({});
+  const [flagged, setFlagged] = useState({});
   const [aiDrafting, setAiDrafting] = useState(null);
+
+  const overallScore = Math.round((REPUTATION_PLATFORMS_SEED.reduce((s, p) => s + p.rating, 0) / REPUTATION_PLATFORMS_SEED.length) * 2 * 10) / 10;
+  const scoreColor = overallScore >= 8 ? t.green : overallScore >= 6 ? t.amber : t.red;
+  const lowPlatforms = REPUTATION_PLATFORMS_SEED.filter(p => p.rating < 4.0);
+
+  const filtered = reviews.filter(r => {
+    if (platformFilter !== 'All' && r.platform !== platformFilter) return false;
+    if (starFilter !== 'All' && r.rating !== Number(starFilter)) return false;
+    if (statusFilter === 'Replied' && !replied[r.id]) return false;
+    if (statusFilter === 'Needs reply' && replied[r.id]) return false;
+    return true;
+  });
 
   function draftWithAi(r) {
     setAiDrafting(r.id);
     setTimeout(() => {
-      setDrafts(d => ({ ...d, [r.id]: "Thank you for the feedback — we're sorry your wait ran long and are working on tightening up scheduling. We'd love the chance to give you a smoother visit next time." }));
+      setDrafts(d => ({ ...d, [r.id]: "Thank you for sharing this — we're sorry the experience fell short and we're already working on it. We'd love the chance to make it right on your next visit." }));
       setAiDrafting(null);
     }, 600);
   }
@@ -2373,29 +2410,81 @@ function Reviews() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
-        <StatCard label="Google rating" value="4.8" icon={Star} color={t.amber} accent={t.accentAmber} sub="From 142 total reviews" />
-        <StatCard label="New this month" value="6" color={t.green} accent={t.accentGreen} sub="↑ 3 from last month" />
-        <StatCard label="Response rate" value="92%" color={t.brand} accent={t.accentBlue} sub="Industry avg is 54%" />
+      <Card style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: `6px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span style={{ fontSize: '26px', fontWeight: '800', color: scoreColor }}>{overallScore}</span>
+        </div>
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '4px' }}>Overall reputation score</div>
+          <div style={{ fontSize: '13px', color: t.mid }}>Weighted across Google, Yelp, Healthgrades, Facebook, and Zocdoc.</div>
+        </div>
+      </Card>
+
+      {lowPlatforms.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: t.redL, border: `1px solid ${withAlpha(t.red, .25)}`, borderRadius: '12px', marginBottom: '16px' }}>
+          <AlertTriangle size={18} color={t.red} style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: '13px', color: t.red, fontWeight: '500' }}>
+            {lowPlatforms.map(p => p.id).join(', ')} {lowPlatforms.length === 1 ? 'has' : 'have'} dropped below 4.0 stars — review recent feedback below.
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginBottom: '16px' }}>
+        {REPUTATION_PLATFORMS_SEED.map(p => (
+          <Card key={p.id} style={{ padding: '16px' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, marginBottom: '8px' }}>{p.id}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '20px', fontWeight: '800', color: p.rating < 4 ? t.red : t.ink }}>{p.rating}</span>
+              <Star size={13} color={t.amber} fill={t.amber} />
+            </div>
+            <div style={{ fontSize: '11px', color: t.muted }}>{p.count} reviews</div>
+            <div style={{ fontSize: '10.5px', color: t.muted, marginTop: '2px' }}>Last: {p.lastReview}</div>
+          </Card>
+        ))}
       </div>
+
+      <Card style={{ marginBottom: '16px' }}>
+        <CardTitle>Review request automation</CardTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+          {REVIEW_AUTOMATION_SEED.map(r => (
+            <div key={r.platform} style={{ padding: '12px', background: t.bgRow, borderRadius: '10px' }}>
+              <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, marginBottom: '6px' }}>{r.platform}</div>
+              <div style={{ fontSize: '11.5px', color: t.mid }}>{r.sent} sent this month</div>
+              <div style={{ fontSize: '11.5px', color: t.green, fontWeight: '600' }}>{Math.round((r.converted / r.sent) * 100)}% conversion</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       <Card>
-        <CardTitle>Recent reviews</CardTitle>
-        {REVIEWS_DATA.map(r => (
-          <div key={r.id} className="px-row" style={{ padding: '14px', borderRadius: '10px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.negative ? t.accentRed : t.accentAmber}` }}>
-            <div style={{ marginBottom: '5px' }}><StarRating rating={r.rating} /></div>
+        <CardTitle>All reviews</CardTitle>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+          <FilterPillGroup options={['All', ...REPUTATION_PLATFORMS_SEED.map(p => p.id)]} value={platformFilter} onChange={setPlatformFilter} />
+          <FilterPillGroup options={['All', '5', '4', '3', '2', '1']} value={starFilter} onChange={setStarFilter} />
+          <FilterPillGroup options={['All', 'Replied', 'Needs reply']} value={statusFilter} onChange={setStatusFilter} />
+        </div>
+        {filtered.length === 0 && <div style={{ fontSize: '13px', color: t.muted, textAlign: 'center', padding: '20px 0' }}>No reviews match these filters.</div>}
+        {filtered.map(r => (
+          <div key={r.id} className="px-row" style={{ padding: '14px', borderRadius: '10px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.rating < 4 ? t.accentRed : t.accentAmber}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+              <StarRating rating={r.rating} />
+              <Pill label={r.platform} color={t.brand} bg={t.brandL} />
+              {flagged[r.id] && <Pill label="Flagged" color={t.red} bg={t.redL} />}
+            </div>
             <div style={{ fontSize: '12.5px', color: t.mid, lineHeight: '1.6' }}>{r.text}</div>
-            <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '7px' }}>{r.author}</div>
+            <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '7px' }}>— {r.author} · {r.date}</div>
             {replied[r.id] ? (
               <div style={{ marginTop: '8px' }}><Pill label="Replied" color={t.green} bg={t.greenL} /></div>
             ) : (
               <>
                 <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                  {r.negative && (
+                  {r.rating < 4 && (
                     <Btn small primary onClick={() => { setOpenId(r.id); draftWithAi(r); }} disabled={aiDrafting === r.id}>
                       {aiDrafting === r.id ? <Loader2 size={13} className="px-spin" /> : <Bot size={13} />} AI draft response
                     </Btn>
                   )}
                   <Btn small onClick={() => setOpenId(id => (id === r.id ? null : r.id))}>Reply</Btn>
+                  <Btn small onClick={() => setFlagged(f => ({ ...f, [r.id]: !f[r.id] }))}><Flag size={12} /> {flagged[r.id] ? 'Unflag' : 'Flag'}</Btn>
                 </div>
                 {openId === r.id && (
                   <div className="px-expand" style={{ marginTop: '10px' }}>
