@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext, Fragment } from 'react';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -204,11 +204,11 @@ const NOTIF_TYPE_META = {
   security: { color: 'purple' },
 };
 const NOTIF_SEED = [
-  { id: 'n1', type: 'message', Icon: MessageSquare, text: 'New message from Maria Chen', time: '18m ago', tab: 'inbox' },
-  { id: 'n2', type: 'recall', Icon: RotateCcw, text: '3 patients are overdue for recall', time: '32m ago', tab: 'recall' },
-  { id: 'n3', type: 'claim', Icon: AlertTriangle, text: 'Denied claim needs attention — Robert Park', time: '1h ago', tab: 'billing' },
-  { id: 'n4', type: 'review', Icon: Star, text: 'New 5-star review from Sarah M.', time: '2h ago', tab: 'reviews' },
-  { id: 'n5', type: 'security', Icon: Lock, text: 'Suspicious login attempt flagged on an unknown device', time: '3h ago', tab: 'activitylog' },
+  { id: 'n1', type: 'message', Icon: MessageSquare, textBefore: 'New message from ', patient: 'Maria Chen', time: '18m ago', tab: 'inbox' },
+  { id: 'n2', type: 'recall', Icon: RotateCcw, textBefore: '3 patients are overdue for recall', time: '32m ago', tab: 'recall' },
+  { id: 'n3', type: 'claim', Icon: AlertTriangle, textBefore: 'Denied claim needs attention — ', patient: 'Robert Park', time: '1h ago', tab: 'billing' },
+  { id: 'n4', type: 'review', Icon: Star, textBefore: 'New 5-star review from Sarah M.', time: '2h ago', tab: 'reviews' },
+  { id: 'n5', type: 'security', Icon: Lock, textBefore: 'Suspicious login attempt flagged on an unknown device', time: '3h ago', tab: 'activitylog' },
 ];
 
 // ─── GLOBAL SEARCH MODAL ───────────────────────────────────
@@ -260,8 +260,8 @@ function GlobalSearchModal({ open, onClose, contacts, query, setQuery, setActive
                 <div key={p.id} className="px-row" onClick={() => go('patients')} style={rowStyle}>
                   <Ava initials={initialsOf(p.name)} bg={t.brandL} color={t.brand} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div>
-                    <div style={{ fontSize: '11px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.email}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{p.name}</PII></div>
+                    <div style={{ fontSize: '11px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><PII>{p.email}</PII></div>
                   </div>
                   <Pill label={p.tag || 'Active'} color={t.brand} bg={t.brandL} />
                 </div>
@@ -406,21 +406,21 @@ const ACTION_TYPES = [
 ];
 
 const ACTIVITY_LOG = [
-  { id: 1, ts: '2026-09-15T09:14:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'message', action: 'Sent message to Maria Chen', patient: 'Maria Chen', suspicious: false },
-  { id: 2, ts: '2026-09-15T09:30:00', user: 'Dr. Rivera', role: 'Owner', type: 'claim', action: 'Submitted claim D2740 for James Lee', patient: 'James Lee', suspicious: false },
-  { id: 3, ts: '2026-09-15T10:02:00', user: 'James Coleman', role: 'Biller', type: 'claim', action: 'Resubmitted denied claim for Robert Park', patient: 'Robert Park', suspicious: false },
-  { id: 4, ts: '2026-09-15T10:05:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'appointment', action: 'Booked appointment for Sarah Malone', patient: 'Sarah Malone', suspicious: false },
+  { id: 1, ts: '2026-09-15T09:14:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'message', action: 'Sent message to patient', patient: 'Maria Chen', suspicious: false },
+  { id: 2, ts: '2026-09-15T09:30:00', user: 'Dr. Rivera', role: 'Owner', type: 'claim', action: 'Submitted claim D2740', patient: 'James Lee', suspicious: false },
+  { id: 3, ts: '2026-09-15T10:02:00', user: 'James Coleman', role: 'Biller', type: 'claim', action: 'Resubmitted denied claim', patient: 'Robert Park', suspicious: false },
+  { id: 4, ts: '2026-09-15T10:05:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'appointment', action: 'Booked appointment', patient: 'Sarah Malone', suspicious: false },
   { id: 5, ts: '2026-09-15T10:41:00', user: 'Nina Torres', role: 'Office Manager', type: 'record', action: 'Viewed patient record', patient: 'Tom Alvarez', suspicious: false },
   { id: 6, ts: '2026-09-15T11:45:00', user: 'Unknown device', role: 'Unknown', type: 'login', action: 'Login attempt flagged', patient: null, suspicious: true },
   { id: 7, ts: '2026-09-15T12:10:00', user: 'Nina Torres', role: 'Office Manager', type: 'campaign', action: 'Launched "6-month reactivation" campaign', patient: null, suspicious: false },
   { id: 8, ts: '2026-09-15T13:20:00', user: 'James Coleman', role: 'Biller', type: 'payment', action: 'Collected payment of $340', patient: 'Mike Brown', suspicious: false },
   { id: 9, ts: '2026-09-15T14:05:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'recall', action: 'Sent recall reminder', patient: 'Priya Patel', suspicious: false },
-  { id: 10, ts: '2026-09-15T14:48:00', user: 'Nina Torres', role: 'Office Manager', type: 'appointment', action: 'Rescheduled appointment for David Wong', patient: 'David Wong', suspicious: false },
+  { id: 10, ts: '2026-09-15T14:48:00', user: 'Nina Torres', role: 'Office Manager', type: 'appointment', action: 'Rescheduled appointment', patient: 'David Wong', suspicious: false },
   { id: 11, ts: '2026-09-14T16:12:00', user: 'Dr. Rivera', role: 'Owner', type: 'login', action: 'Logged in', patient: null, suspicious: false },
-  { id: 12, ts: '2026-09-14T15:03:00', user: 'James Coleman', role: 'Biller', type: 'claim', action: 'Submitted claim for Angela Ruiz', patient: 'Angela Ruiz', suspicious: false },
+  { id: 12, ts: '2026-09-14T15:03:00', user: 'James Coleman', role: 'Biller', type: 'claim', action: 'Submitted claim', patient: 'Angela Ruiz', suspicious: false },
   { id: 13, ts: '2026-09-14T11:30:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'record', action: 'Viewed patient record', patient: 'Jordan Ellis', suspicious: false },
   { id: 14, ts: '2026-09-14T09:55:00', user: 'Nina Torres', role: 'Office Manager', type: 'payment', action: 'Collected payment of $1,200', patient: 'James Lee', suspicious: false },
-  { id: 15, ts: '2026-09-13T14:22:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'message', action: 'Sent message to Maria Chen', patient: 'Maria Chen', suspicious: false },
+  { id: 15, ts: '2026-09-13T14:22:00', user: 'Sarah Byrd', role: 'Front Desk', type: 'message', action: 'Sent message to patient', patient: 'Maria Chen', suspicious: false },
   { id: 16, ts: '2026-09-13T10:15:00', user: 'Dr. Rivera', role: 'Owner', type: 'campaign', action: 'Launched "Post-visit review request" campaign', patient: null, suspicious: false },
   { id: 17, ts: '2026-09-13T08:00:00', user: 'Dr. Rivera', role: 'Owner', type: 'login', action: 'Logged in', patient: null, suspicious: false },
 ];
@@ -438,7 +438,6 @@ function App() {
   const [notifReadIds, setNotifReadIds] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [patientQuery, setPatientQuery] = useState('');
-  const [campaignSuggestion, setCampaignSuggestion] = useState(null);
   const [userRole, setUserRole] = useState('Owner');
   const [rolePermissions, setRolePermissions] = useState(DEFAULT_ROLE_PERMISSIONS);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -861,7 +860,7 @@ function App() {
                         <n.Icon size={14} color={n.color} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '12.5px', color: t.ink2, fontWeight: n.read ? '400' : '600' }}>{n.text}</div>
+                        <div style={{ fontSize: '12.5px', color: t.ink2, fontWeight: n.read ? '400' : '600' }}>{n.textBefore}{n.patient && <PII>{n.patient}</PII>}</div>
                         <div style={{ fontSize: '11px', color: t.muted, marginTop: '2px' }}>{n.time}</div>
                       </div>
                       {!n.read && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: t.brand, flexShrink: 0, marginTop: '4px' }} />}
@@ -918,13 +917,13 @@ function App() {
         <div key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
           {gate('overview', <Overview setActiveTab={setActiveTab} userRole={userRole} />)}
           {gate('inbox', <Inbox contacts={contacts} userRole={userRole} />)}
-          {gate('campaigns', <Campaigns userRole={userRole} suggestion={campaignSuggestion} onConsumeSuggestion={() => setCampaignSuggestion(null)} />)}
+          {gate('campaigns', <Campaigns userRole={userRole} />)}
           {gate('recall', <Recall userRole={userRole} />)}
           {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />)}
           {gate('billing', <Billing userRole={userRole} />)}
           {gate('membershipplans', <MembershipPlans userRole={userRole} />)}
           {gate('payments', <Payments userRole={userRole} />)}
-          {gate('reports', <Reports userRole={userRole} onSuggestCampaign={s => { setCampaignSuggestion(s); setActiveTab('campaigns'); }} />)}
+          {gate('reports', <Reports userRole={userRole} />)}
           {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} brandColor={brandColor} onBrandColorChange={setBrandColor} />)}
           {gate('activitylog', <ActivityLog userRole={userRole} />)}
           {gate('aifrontdesk', <AIFrontDesk userRole={userRole} />)}
@@ -1262,7 +1261,7 @@ function Overview({ setActiveTab }) {
             <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: t.bgRow }}>
               <div style={{ fontSize: '11.5px', color: t.muted, width: '58px', flexShrink: 0, fontWeight: '500' }}>{a.time}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{a.name}</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{a.name}</PII></div>
                 <div style={{ fontSize: '11.5px', color: t.muted }}>{a.procedure}</div>
               </div>
               <Pill label={a.status} color={colorMap[a.color]} bg={withAlpha(colorMap[a.color], .12)} />
@@ -1276,7 +1275,7 @@ function Overview({ setActiveTab }) {
             <div key={i} className="px-row" style={{ display: 'flex', gap: '10px', padding: '10px 12px', borderRadius: '10px', marginBottom: '6px', background: t.brandL, border: `1px solid ${withAlpha(t.accentBlue, .15)}` }}>
               <Ava initials={initialsOf(m.name)} bg={t.brand} color="white" />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.name}</span><span style={{ fontSize: '11px', color: t.muted, flexShrink: 0 }}>{m.time}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}><span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{m.name}</PII></span><span style={{ fontSize: '11px', color: t.muted, flexShrink: 0 }}>{m.time}</span></div>
                 <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.msg}</div>
               </div>
             </div>
@@ -1786,7 +1785,7 @@ const CAMPAIGN_AUDIENCES = ['Inactive 3mo', 'Inactive 6mo', 'All patients', 'Cus
 const CAMPAIGN_TOUCHES = [3, 5, 7];
 const CAMPAIGN_CHANNELS = ['SMS', 'Email', 'Both'];
 
-function Campaigns({ suggestion, onConsumeSuggestion }) {
+function Campaigns() {
   const t = useTheme();
   const [campaigns, setCampaigns] = useState(CAMPAIGNS_DATA);
   const [selected, setSelected] = useState(null);
@@ -1794,14 +1793,6 @@ function Campaigns({ suggestion, onConsumeSuggestion }) {
   const [exported, setExported] = useState(false);
   const [form, setForm] = useState({ name: '', type: CAMPAIGN_TYPES[0], audience: CAMPAIGN_AUDIENCES[0], touches: CAMPAIGN_TOUCHES[1], channel: CAMPAIGN_CHANNELS[0], message: '' });
   const colorMap = { brand: t.brand, green: t.green, amber: t.amber, purple: t.purple, muted: t.muted };
-
-  useEffect(() => {
-    if (!suggestion) return;
-    setForm(f => ({ ...f, name: suggestion.name, message: suggestion.message }));
-    setShowForm(true);
-    onConsumeSuggestion && onConsumeSuggestion();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suggestion]);
 
   function toggleStatus(name) {
     setCampaigns(cs => cs.map(c => c.name === name
@@ -1994,7 +1985,7 @@ function PatientRequests() {
         <RowItem key={r.id} style={{ background: t.brandL, borderColor: withAlpha(t.brand, .2) }}>
           <Ava initials={initialsOf(r.patientName || 'Patient')} bg={t.brandL} color={t.brand} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{r.patientName}</div>
+            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{r.patientName}</PII></div>
             <div style={{ fontSize: '11.5px', color: t.muted }}>Wants: {r.preferredWhen}{r.reason ? ` · ${r.reason}` : ''}</div>
           </div>
           <Btn small onClick={() => respond(r.id, 'confirmed')}><Check size={12} /> Confirm</Btn>
@@ -2005,7 +1996,7 @@ function PatientRequests() {
         <RowItem key={r.id}>
           <Ava initials={initialsOf(r.patientName || 'Patient')} bg={t.bgRow} color={t.muted} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{r.patientName}</div>
+            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{r.patientName}</PII></div>
             <div style={{ fontSize: '11.5px', color: t.muted }}>Wanted: {r.preferredWhen}</div>
           </div>
           <Pill label={r.status === 'confirmed' ? 'Confirmed' : 'Declined'} color={r.status === 'confirmed' ? t.green : t.muted} bg={r.status === 'confirmed' ? t.greenL : t.bgRow} />
@@ -2312,7 +2303,7 @@ function Billing() {
         <CardTitle>Recent claims</CardTitle>
         {claims.map(c => (
           <div key={c.id} className="px-row" style={{ padding: '10px 13px', borderRadius: '10px', marginBottom: '6px', background: bgMap[c.bg], border: `1px solid ${colorMap[c.color]}22`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{c.name}</div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{c.code}</div></div>
+            <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{c.name}</PII></div><div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{c.code}</div></div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '14px', fontWeight: '600', color: colorMap[c.color] }}>{c.amount}</span>
               {c.status === 'Denied' ? <Btn small style={{ color: colorMap[c.color], borderColor: colorMap[c.color] }} onClick={() => resubmit(c.id)}><RotateCw size={12} /> Resubmit</Btn> : <Pill label={c.status} color={colorMap[c.color]} bg={bgMap[c.bg]} />}
@@ -2365,7 +2356,7 @@ function Payments() {
           ].map(([ini, bg, c, name, sub, status, sc, sbg], i) => (
             <RowItem key={i} style={status === 'Failed' ? { background: t.redL, borderColor: withAlpha(t.accentRed, .15) } : {}}>
               <Ava initials={ini} bg={bg} color={c} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{name}</PII></div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
               {status === 'Failed' ? <Btn small style={{ color: sc, borderColor: sc }}>Retry</Btn> : <Pill label={status} color={sc} bg={sbg} />}
             </RowItem>
           ))}
@@ -2501,7 +2492,7 @@ function AIFrontDesk() {
             <div key={c.id} className="px-row" onClick={() => setSelectedCall(c)} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '7px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: colorMap[c.color], marginTop: '5px', flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{c.caller} · {c.duration} · {c.topic}</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{c.caller}</PII> · {c.duration} · {c.topic}</div>
                 <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{c.actions[0]}</div>
               </div>
               <Pill label={c.pill} color={colorMap[c.color]} bg={bgMap[c.color]} />
@@ -2527,10 +2518,10 @@ function AIFrontDesk() {
       </div>
 
       {selectedCall && (
-        <SlidePanel title={selectedCall.caller} subtitle={`${selectedCall.topic} · ${selectedCall.time}`} onClose={() => setSelectedCall(null)}>
+        <SlidePanel title={<PII>{selectedCall.caller}</PII>} subtitle={`${selectedCall.topic} · ${selectedCall.time}`} onClose={() => setSelectedCall(null)}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px' }}>
             <Pill label={selectedCall.pill} color={colorMap[selectedCall.color]} bg={bgMap[selectedCall.color]} />
-            <span style={{ fontSize: '12px', color: t.muted }}>{selectedCall.phone} · {selectedCall.duration}</span>
+            <span style={{ fontSize: '12px', color: t.muted }}><PII>{selectedCall.phone}</PII> · {selectedCall.duration}</span>
           </div>
 
           <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '8px' }}>AI actions taken</div>
@@ -2545,7 +2536,7 @@ function AIFrontDesk() {
           <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '10px' }}>Call transcript</div>
           {selectedCall.transcript.map((line, i) => (
             <div key={i} style={{ marginBottom: '10px', textAlign: line.speaker === 'AI' ? 'left' : 'right' }}>
-              <div style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, marginBottom: '3px' }}>{line.speaker === 'AI' ? `AI (${voiceName})` : selectedCall.caller}</div>
+              <div style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, marginBottom: '3px' }}>{line.speaker === 'AI' ? `AI (${voiceName})` : <PII>{selectedCall.caller}</PII>}</div>
               <div style={{ display: 'inline-block', maxWidth: '85%', padding: '9px 12px', borderRadius: '12px', fontSize: '12.5px', lineHeight: '1.5', background: line.speaker === 'AI' ? t.brandL : t.bgRow, color: t.ink2, textAlign: 'left' }}>{line.text}</div>
             </div>
           ))}
@@ -2786,7 +2777,7 @@ function Surveys() {
               style={{ cursor: 'pointer', ...(s.status === 'Detractor' ? { background: t.redL, borderColor: withAlpha(t.accentRed, .15) } : {}) }}
             >
               <Ava initials={s.ini} bg={bgMap[s.bg]} color={colorMap[s.c]} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{s.name} · Score: {s.score}</div><div style={{ fontSize: '11.5px', color: t.muted }}>"{s.quote}"</div></div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{s.name}</PII> · Score: {s.score}</div><div style={{ fontSize: '11.5px', color: t.muted }}>"{s.quote}"</div></div>
               <Pill label={s.status} color={colorMap[s.sc]} bg={bgMap[s.sbg]} />
             </RowItem>
           ))}
@@ -2803,7 +2794,7 @@ function Surveys() {
       </div>
 
       {selected && (
-        <SlidePanel title={selected.name} subtitle={`${selected.date} · Score ${selected.score}/10`} onClose={() => setSelected(null)}>
+        <SlidePanel title={<PII>{selected.name}</PII>} subtitle={`${selected.date} · Score ${selected.score}/10`} onClose={() => setSelected(null)}>
           {selected.answers.map(([q, a], i) => (
             <div key={i} style={{ marginBottom: '16px' }}>
               <div style={{ fontSize: '11.5px', fontWeight: '600', color: t.muted, marginBottom: '4px' }}>{q}</div>
@@ -2892,7 +2883,7 @@ function Eligibility() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
               <Ava initials={e.ini} bg={bgMap[e.bg]} color={colorMap[e.c]} />
               <div>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{e.name} · {e.payer}</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{e.name}</PII> · {e.payer}</div>
                 <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   {e.warn && <AlertTriangle size={12} color={t.amber} />}{e.sub}
                 </div>
@@ -2904,7 +2895,7 @@ function Eligibility() {
       </Card>
 
       {selected && (
-        <SlidePanel title={selected.name} subtitle={`${selected.payer} · Member ID ${selected.memberId}`} onClose={() => setSelected(null)}>
+        <SlidePanel title={<PII>{selected.name}</PII>} subtitle={<>{selected.payer} · Member ID <PII>{selected.memberId}</PII></>} onClose={() => setSelected(null)}>
           <DetailRow label="Group number" value={selected.group} />
           <DetailRow label="Deductible" value={selected.deductible} />
           <DetailRow label="Next appointment" value={selected.nextAppt} />
@@ -2947,7 +2938,7 @@ function Portal() {
           ].map(([ini, bg, c, name, sub, urgent], i) => (
             <RowItem key={i} style={urgent ? { background: t.redL, borderColor: withAlpha(t.accentRed, .15) } : {}}>
               <Ava initials={ini} bg={bg} color={c} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{name}</PII></div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
               <Btn small primary={urgent}>Remind</Btn>
             </RowItem>
           ))}
@@ -3213,7 +3204,7 @@ function Waitlist() {
             ['Sep 11 4pm — filled in 6 min', 'Priya Patel accepted the slot'],
           ].map(([title, sub], i) => (
             <RowItem key={i} style={{ justifyContent: 'space-between' }}>
-              <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{title}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div></div>
+              <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{title}</div><div style={{ fontSize: '11.5px', color: t.muted }}><PII>{sub}</PII></div></div>
               <Pill label="Filled" color={t.green} bg={t.greenL} />
             </RowItem>
           ))}
@@ -4097,92 +4088,7 @@ function AdPerformance() {
   );
 }
 
-// Rows = hourly slots (8am-8pm), columns = Mon-Sun. null = closed.
-const CHAIR_UTILIZATION_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const CHAIR_UTILIZATION_HOURS = ['8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', '7pm'];
-const CHAIR_UTILIZATION_GRID = [
-  [22, 45, 40, 38, 30, null, null],
-  [65, 78, 72, 68, 55, null, null],
-  [88, 92, 85, 90, 78, null, null],
-  [95, 88, 91, 87, 82, null, null],
-  [58, 62, 55, 60, 48, null, null],
-  [72, 80, 76, 74, 65, null, null],
-  [90, 94, 89, 92, 70, null, null],
-  [93, 96, 91, 95, 42, null, null],
-  [85, 82, 88, 80, null, null, null],
-  [50, 55, 48, 52, null, null, null],
-  [null, null, null, null, null, null, null],
-  [null, null, null, null, null, null, null],
-];
-
-function heatColor(rate, t) {
-  if (rate == null) return t.bgRow;
-  if (rate >= 80) return t.green;
-  if (rate >= 60) return withAlpha(t.accentGreen, .38);
-  if (rate >= 40) return t.amber;
-  if (rate >= 20) return withAlpha(t.accentRed, .3);
-  return t.red;
-}
-
-function ChairUtilization({ onUseInsight }) {
-  const t = useTheme();
-  let min = null, minHour = null, minDay = null;
-  CHAIR_UTILIZATION_GRID.forEach((row, hi) => {
-    row.forEach((rate, di) => {
-      if (rate != null && (min === null || rate < min)) { min = rate; minHour = CHAIR_UTILIZATION_HOURS[hi]; minDay = CHAIR_UTILIZATION_DAYS[di]; }
-    });
-  });
-
-  return (
-    <Card style={{ marginBottom: '16px' }}>
-      <CardTitle>Chair utilization</CardTitle>
-      <div style={{ overflowX: 'auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(${CHAIR_UTILIZATION_DAYS.length}, 1fr)`, gap: '4px', minWidth: '520px' }}>
-          <div />
-          {CHAIR_UTILIZATION_DAYS.map(d => (
-            <div key={d} style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textAlign: 'center', paddingBottom: '4px' }}>{d}</div>
-          ))}
-          {CHAIR_UTILIZATION_HOURS.map((hour, hi) => (
-            <Fragment key={hour}>
-              <div style={{ fontSize: '10.5px', color: t.muted, display: 'flex', alignItems: 'center' }}>{hour}</div>
-              {CHAIR_UTILIZATION_DAYS.map((day, di) => {
-                const rate = CHAIR_UTILIZATION_GRID[hi][di];
-                return (
-                  <div
-                    key={day}
-                    title={rate == null ? 'Closed' : `${day} ${hour}: ${rate}% booked`}
-                    style={{ height: '22px', borderRadius: '5px', background: heatColor(rate, t) }}
-                  />
-                );
-              })}
-            </Fragment>
-          ))}
-        </div>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', marginTop: '14px', fontSize: '11px', color: t.mid }}>
-        {[['80-100%', t.green], ['60-79%', withAlpha(t.accentGreen, .38)], ['40-59%', t.amber], ['20-39%', withAlpha(t.accentRed, .3)], ['0-19%', t.red]].map(([label, color], i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: color, display: 'inline-block' }} />
-            {label}
-          </div>
-        ))}
-      </div>
-      {min !== null && (
-        <div style={{ marginTop: '14px', padding: '10px 14px', background: t.brandL, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: '12.5px', color: t.brand, display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <Sparkles size={13} /> Your emptiest slot is {minDay} {minHour} ({min}% booked) — consider targeting it with a campaign.
-          </div>
-          <Btn small primary onClick={() => onUseInsight({
-            name: `Fill the ${minDay} ${minHour} lull`,
-            message: `We noticed openings ${minDay} around ${minHour} — want to grab one? Reply YES and we'll get you booked.`,
-          })}>Use this insight</Btn>
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function Reports({ onSuggestCampaign }) {
+function Reports() {
   const t = useTheme();
   const colorMap = { brand: t.brand, green: t.green, teal: t.teal, amber: t.amber, pink: t.pink, orange: t.orange, purple: t.purple };
   const accentMap = { brand: t.accentBlue, green: t.accentGreen, teal: t.accentTeal, amber: t.accentAmber, pink: t.accentPink, orange: t.accentOrange, purple: t.accentPurple };
@@ -4205,7 +4111,6 @@ function Reports({ onSuggestCampaign }) {
           <StatCard key={i} label={label} value={value} color={colorMap[color]} accent={accentMap[color]} sub={sub} />
         ))}
       </div>
-      <ChairUtilization onUseInsight={onSuggestCampaign} />
       <Card>
         <CardTitle>Monthly performance breakdown</CardTitle>
         {data.metrics.map(([label, val, color], i) => (
@@ -5004,7 +4909,7 @@ function ActivityLog() {
               <div style={{ width: '128px', flexShrink: 0, fontSize: '12px', color: t.muted }}>{formatTs(a.ts)}</div>
               <Ava initials={initialsOf(a.user)} bg={a.suspicious ? t.redL : t.brandL} color={a.suspicious ? t.red : t.brand} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{a.action}{a.patient ? ` · ${a.patient}` : ''}</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{a.action}{a.patient ? <> · <PII>{a.patient}</PII></> : ''}</div>
                 <div style={{ fontSize: '11.5px', color: t.muted, display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
                   {a.user} <Pill label={a.role} color={rc.color} bg={rc.bg} />
                 </div>
