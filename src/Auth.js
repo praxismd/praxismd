@@ -9,7 +9,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider, isFirebaseConfigured } from './firebase';
 import { light, withAlpha } from './theme';
-import { ArrowLeft, Eye, EyeOff, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 const t = light;
 
@@ -76,6 +76,13 @@ function Auth() {
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [patientDob, setPatientDob] = useState('');
+
+  const [needs2FA, setNeeds2FA] = useState(false);
+  const [pendingNavTarget, setPendingNavTarget] = useState(null);
+  const [twoFACode, setTwoFACode] = useState('');
+  const [useBackupCode, setUseBackupCode] = useState(false);
+  const [backupCodeValue, setBackupCodeValue] = useState('');
+  const [twoFAError, setTwoFAError] = useState('');
 
   if (!isFirebaseConfigured) {
     return (
@@ -160,12 +167,30 @@ function Auth() {
       }
       const snap = await getDoc(doc(db, 'practices', cred.user.uid));
       const onboardingComplete = snap.exists() && snap.data().onboardingComplete;
-      navigate(onboardingComplete ? '/dashboard' : '/onboarding');
+      const target = onboardingComplete ? '/dashboard' : '/onboarding';
+      if (window.localStorage.getItem('praxismd-2fa-enabled') === 'on') {
+        setPendingNavTarget(target);
+        setNeeds2FA(true);
+        return;
+      }
+      navigate(target);
     } catch (err) {
       setError(friendlyError(err.code));
     } finally {
       setLoading(false);
     }
+  }
+
+  function verify2FA(e) {
+    e.preventDefault();
+    setTwoFAError('');
+    if (useBackupCode) {
+      if (!backupCodeValue.trim()) { setTwoFAError('Enter one of your backup codes.'); return; }
+    } else if (twoFACode.trim().length !== 6) {
+      setTwoFAError('Enter the 6-digit code.');
+      return;
+    }
+    navigate(pendingNavTarget || '/dashboard');
   }
 
   async function handleSignup(e) {
@@ -253,6 +278,52 @@ function Auth() {
           <span style={{ fontSize: '19px', fontWeight: '700', color: t.ink }}>PraxisMD</span>
         </Link>
 
+        {needs2FA ? (
+          <div style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '16px', padding: '30px 30px 26px', boxShadow: '0 10px 30px rgba(0,0,0,.06)', textAlign: 'center' }}>
+            <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <ShieldCheck size={22} color={t.brand} />
+            </div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: t.ink, marginBottom: '6px' }}>Two-factor verification</div>
+            <div style={{ fontSize: '13px', color: t.muted, marginBottom: '22px', textAlign: 'center' }}>
+              {useBackupCode ? 'Enter one of your 8-character backup codes.' : 'Enter the 6-digit code from your authenticator app or text message.'}
+            </div>
+
+            {twoFAError && (
+              <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '16px', textAlign: 'left' }}>{twoFAError}</div>
+            )}
+
+            <form onSubmit={verify2FA}>
+              {useBackupCode ? (
+                <input
+                  value={backupCodeValue}
+                  onChange={e => setBackupCodeValue(e.target.value)}
+                  placeholder="XXXX-XXXX"
+                  style={{ ...inputStyle, textAlign: 'center', fontSize: '16px', fontFamily: 'monospace', marginBottom: '18px' }}
+                />
+              ) : (
+                <input
+                  value={twoFACode}
+                  onChange={e => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  style={{ ...inputStyle, textAlign: 'center', fontSize: '22px', letterSpacing: '8px', fontFamily: 'monospace', marginBottom: '18px' }}
+                />
+              )}
+              <button type="submit" className="px-btn" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '11px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', cursor: 'pointer', marginBottom: '14px' }}>
+                Verify
+              </button>
+            </form>
+            <button
+              type="button"
+              onClick={() => { setUseBackupCode(v => !v); setTwoFAError(''); setTwoFACode(''); setBackupCodeValue(''); }}
+              className="px-authlink"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '12.5px' }}
+            >
+              {useBackupCode ? 'Use verification code instead' : 'Use backup code'}
+            </button>
+          </div>
+        ) : (
+        <>
         <div style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '16px', padding: '30px 30px 26px', boxShadow: '0 10px 30px rgba(0,0,0,.06)' }}>
           {mode === 'forgot' && (
             <button onClick={() => switchMode('login')} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: t.mid, fontSize: '12.5px', cursor: 'pointer', padding: 0, marginBottom: '14px' }}>
@@ -414,6 +485,8 @@ function Auth() {
               <>Already have an account? <button onClick={() => switchMode('login')} className="px-authlink" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px' }}>Sign in</button></>
             )}
           </div>
+        )}
+        </>
         )}
       </div>
     </div>

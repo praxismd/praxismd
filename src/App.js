@@ -15,6 +15,7 @@ import {
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
   Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
   CalendarPlus, BadgeCheck, Award, Flag, MessageCircle, Camera, EyeOff, Monitor, Smartphone,
+  QrCode, Copy, ShieldCheck, KeyRound,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -4210,6 +4211,73 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
   const [briefingTestSent, setBriefingTestSent] = useState(false);
   const [sessions, setSessions] = useState(ACTIVE_SESSIONS_SEED);
   const [sessionNotice, setSessionNotice] = useState('');
+  const [twoFAEnabled, setTwoFAEnabled] = useState(() => typeof window !== 'undefined' && window.localStorage.getItem('praxismd-2fa-enabled') === 'on');
+  const [twoFAMethod, setTwoFAMethod] = useState(() => (typeof window !== 'undefined' && window.localStorage.getItem('praxismd-2fa-method')) || 'app');
+  const [show2FAWizard, setShow2FAWizard] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [wizardMethod, setWizardMethod] = useState('app');
+  const [wizardPhone, setWizardPhone] = useState('');
+  const [wizardCode, setWizardCode] = useState('');
+  const [wizardCodeError, setWizardCodeError] = useState('');
+  const [backupCodes, setBackupCodes] = useState([]);
+  const [backupCopied, setBackupCopied] = useState(false);
+  const [twoFANotice, setTwoFANotice] = useState('');
+
+  function generateBackupCodes() {
+    const seg = () => Math.random().toString(36).slice(2, 6).toUpperCase();
+    return Array.from({ length: 8 }, () => `${seg()}-${seg()}`);
+  }
+
+  function openWizard() {
+    setWizardStep(1);
+    setWizardMethod('app');
+    setWizardPhone('');
+    setWizardCode('');
+    setWizardCodeError('');
+    setShow2FAWizard(true);
+  }
+
+  function wizardNext() {
+    if (wizardStep === 2 && wizardMethod === 'sms' && !wizardPhone.trim()) return;
+    if (wizardStep === 3) {
+      if (wizardCode.trim().length !== 6) { setWizardCodeError('Enter the 6-digit code from your app or text message.'); return; }
+      setBackupCodes(generateBackupCodes());
+    }
+    setWizardStep(s => s + 1);
+  }
+
+  function finishWizard() {
+    window.localStorage.setItem('praxismd-2fa-enabled', 'on');
+    window.localStorage.setItem('praxismd-2fa-method', wizardMethod);
+    setTwoFAEnabled(true);
+    setTwoFAMethod(wizardMethod);
+    setShow2FAWizard(false);
+    setTwoFANotice('Two-factor authentication is now on.');
+    setTimeout(() => setTwoFANotice(''), 3000);
+  }
+
+  function disable2FA() {
+    window.localStorage.setItem('praxismd-2fa-enabled', 'off');
+    setTwoFAEnabled(false);
+    setTwoFANotice('Two-factor authentication turned off.');
+    setTimeout(() => setTwoFANotice(''), 3000);
+  }
+
+  function copyBackupCodes() {
+    if (navigator.clipboard) navigator.clipboard.writeText(backupCodes.join('\n')).catch(() => {});
+    setBackupCopied(true);
+    setTimeout(() => setBackupCopied(false), 2000);
+  }
+
+  function downloadBackupCodes() {
+    const blob = new Blob([backupCodes.join('\n')], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'praxismd-backup-codes.txt';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   function revokeSession(id) {
     setSessions(list => list.filter(s => s.id !== id));
@@ -4550,6 +4618,30 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
 
       <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, margin: '18px 0 10px' }}>Security</div>
 
+      {twoFANotice && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '10px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{twoFANotice}</div>
+      )}
+
+      <Card style={{ marginBottom: '18px' }}>
+        <CardTitle>Two-factor authentication</CardTitle>
+        <RowItem style={{ justifyContent: 'space-between', background: twoFAEnabled ? t.greenL : t.bgRow, borderColor: twoFAEnabled ? withAlpha(t.accentGreen, .15) : t.border2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: twoFAEnabled ? t.greenL : t.bgCard, border: twoFAEnabled ? 'none' : `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              {twoFAEnabled ? <ShieldCheck size={17} color={t.green} /> : <Shield size={17} color={t.muted} />}
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>
+                {twoFAEnabled ? `Enabled via ${twoFAMethod === 'app' ? 'authenticator app' : 'text message'}` : 'Not enabled'}
+              </div>
+              <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>
+                {twoFAEnabled ? 'Your account requires a code at sign-in.' : 'Add a second step to protect your account.'}
+              </div>
+            </div>
+          </div>
+          {twoFAEnabled ? <Btn small onClick={disable2FA}>Disable</Btn> : <Btn small primary onClick={openWizard}><ShieldCheck size={13} /> Enable 2FA</Btn>}
+        </RowItem>
+      </Card>
+
       <Card style={{ marginBottom: '18px' }}>
         <CardTitle>Active sessions</CardTitle>
         {sessionNotice && (
@@ -4638,6 +4730,104 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
             <Btn onClick={() => setPermEditorRole(null)}>Cancel</Btn>
           </div>
         </SlidePanel>
+      )}
+
+      {show2FAWizard && (
+        <Modal title="Enable two-factor authentication" onClose={() => setShow2FAWizard(false)}>
+          <div style={{ display: 'flex', gap: '5px', marginBottom: '18px' }}>
+            {[1, 2, 3, 4].map(step => (
+              <div key={step} style={{ flex: 1, height: '4px', borderRadius: '2px', background: step <= wizardStep ? t.brand : t.border2 }} />
+            ))}
+          </div>
+
+          {wizardStep === 1 && (
+            <>
+              <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '14px' }}>Choose how you'd like to receive your verification codes.</div>
+              {[['app', 'Authenticator app', 'Use Google Authenticator, Authy, or a similar app', QrCode], ['sms', 'Text message (SMS)', "We'll text a code to your phone", Smartphone]].map(([key, label, sub, Icon]) => (
+                <div
+                  key={key}
+                  onClick={() => setWizardMethod(key)}
+                  className="px-row"
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px', borderRadius: '10px', marginBottom: '10px', cursor: 'pointer', border: `2px solid ${wizardMethod === key ? t.brand : t.border2}`, background: wizardMethod === key ? t.brandL : t.bgRow }}
+                >
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: t.bgCard, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={18} color={wizardMethod === key ? t.brand : t.muted} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink2 }}>{label}</div>
+                    <div style={{ fontSize: '11.5px', color: t.muted }}>{sub}</div>
+                  </div>
+                </div>
+              ))}
+              <Btn primary onClick={wizardNext} style={{ width: '100%', justifyContent: 'center', marginTop: '6px' }}>Continue</Btn>
+            </>
+          )}
+
+          {wizardStep === 2 && wizardMethod === 'app' && (
+            <>
+              <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '14px' }}>Scan this QR code with your authenticator app, or enter the key manually.</div>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+                <div style={{ width: '160px', height: '160px', borderRadius: '12px', border: `1px solid ${t.border}`, background: t.bgRow, display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gridTemplateRows: 'repeat(7, 1fr)', gap: '2px', padding: '10px' }}>
+                  {Array.from({ length: 49 }).map((_, i) => (
+                    <div key={i} style={{ background: (i * 37 + 11) % 5 < 2 ? t.ink : 'transparent', borderRadius: '1px' }} />
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '10px', marginBottom: '18px' }}>
+                <span style={{ fontSize: '12.5px', color: t.ink2, fontFamily: 'monospace', letterSpacing: '.5px' }}>JBSW Y3DP EHPK 3PXP</span>
+                <KeyRound size={14} color={t.muted} />
+              </div>
+              <Btn primary onClick={wizardNext} style={{ width: '100%', justifyContent: 'center' }}>Continue</Btn>
+            </>
+          )}
+
+          {wizardStep === 2 && wizardMethod === 'sms' && (
+            <>
+              <div style={{ marginBottom: '18px' }}>
+                <label style={labelStyle}>Phone number</label>
+                <input value={wizardPhone} onChange={e => setWizardPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
+              </div>
+              <Btn primary onClick={wizardNext} disabled={!wizardPhone.trim()} style={{ width: '100%', justifyContent: 'center' }}>Send code</Btn>
+            </>
+          )}
+
+          {wizardStep === 3 && (
+            <>
+              <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '14px' }}>
+                Enter the 6-digit code {wizardMethod === 'app' ? 'from your authenticator app' : `we texted to ${wizardPhone || 'your phone'}`}.
+              </div>
+              <div style={{ marginBottom: '10px' }}>
+                <input
+                  value={wizardCode}
+                  onChange={e => { setWizardCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setWizardCodeError(''); }}
+                  placeholder="000000"
+                  inputMode="numeric"
+                  style={{ ...inputStyle, textAlign: 'center', fontSize: '22px', letterSpacing: '8px', fontFamily: 'monospace' }}
+                />
+              </div>
+              {wizardCodeError && <div style={{ fontSize: '12px', color: t.red, marginBottom: '10px' }}>{wizardCodeError}</div>}
+              <Btn primary onClick={wizardNext} style={{ width: '100%', justifyContent: 'center' }}>Verify</Btn>
+            </>
+          )}
+
+          {wizardStep === 4 && (
+            <>
+              <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '14px' }}>
+                Save these backup codes somewhere safe. Each one can be used once if you lose access to your {wizardMethod === 'app' ? 'authenticator app' : 'phone'}.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
+                {backupCodes.map((code, i) => (
+                  <div key={i} style={{ padding: '8px 10px', background: t.bgRow, borderRadius: '8px', fontSize: '12.5px', fontFamily: 'monospace', color: t.ink2, textAlign: 'center' }}>{code}</div>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '18px' }}>
+                <Btn small onClick={copyBackupCodes}>{backupCopied ? <Check size={12} /> : <Copy size={12} />} {backupCopied ? 'Copied' : 'Copy all'}</Btn>
+                <Btn small onClick={downloadBackupCodes}><Download size={12} /> Download</Btn>
+              </div>
+              <Btn primary onClick={finishWizard} style={{ width: '100%', justifyContent: 'center' }}>Done</Btn>
+            </>
+          )}
+        </Modal>
       )}
     </div>
   );
