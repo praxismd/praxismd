@@ -444,6 +444,9 @@ function App() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
   const [privacyMode, setPrivacyMode] = useState(getInitialPrivacyMode);
+  const [isMobileView, setIsMobileView] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [appBannerDismissed, setAppBannerDismissed] = useState(() => typeof window !== 'undefined' && window.sessionStorage.getItem('praxismd-app-banner-dismissed') === '1');
   const [idleWarningOpen, setIdleWarningOpen] = useState(false);
   const [idleCountdown, setIdleCountdown] = useState(60);
   const lastActivityRef = useRef(Date.now());
@@ -456,7 +459,7 @@ function App() {
     setRolePermissions(rp => ({ ...rp, [role]: perms }));
   }
   const t = getTheme(mode, brandColor);
-  const showFull = !collapsed || sidebarHover;
+  const showFull = isMobileView ? true : (!collapsed || sidebarHover);
   const suppressHoverRef = useRef(false);
 
   function toggleCollapsed() {
@@ -464,6 +467,16 @@ function App() {
     setSidebarHover(false);
     suppressHoverRef.current = true;
     window.setTimeout(() => { suppressHoverRef.current = false; }, 400);
+  }
+
+  function navigateTo(tab) {
+    setActiveTab(tab);
+    setMobileDrawerOpen(false);
+  }
+
+  function dismissAppBanner() {
+    setAppBannerDismissed(true);
+    window.sessionStorage.setItem('praxismd-app-banner-dismissed', '1');
   }
 
   async function handleLogout() {
@@ -549,6 +562,12 @@ function App() {
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    function onResize() { setIsMobileView(window.innerWidth < 768); }
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   useEffect(() => {
@@ -670,15 +689,23 @@ function App() {
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
 
       {/* SIDEBAR */}
+      {isMobileView && mobileDrawerOpen && (
+        <div
+          onClick={() => setMobileDrawerOpen(false)}
+          className="px-panel-backdrop"
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 90 }}
+        />
+      )}
       <div
-        onMouseEnter={() => { if (!suppressHoverRef.current) setSidebarHover(true); }}
+        onMouseEnter={() => { if (!isMobileView && !suppressHoverRef.current) setSidebarHover(true); }}
         onMouseLeave={() => setSidebarHover(false)}
         style={{
-          width: showFull ? '240px' : '72px', background: t.bgSidebar, borderRight: `1px solid ${t.border}`,
+          width: isMobileView ? '240px' : (showFull ? '240px' : '72px'), background: t.bgSidebar, borderRight: `1px solid ${t.border}`,
           display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh', overflow: 'hidden',
-          zIndex: collapsed && sidebarHover ? 60 : 40,
-          boxShadow: collapsed && sidebarHover ? '4px 0 24px rgba(0,0,0,.18)' : 'none',
-          transition: 'width .18s ease, box-shadow .18s ease',
+          zIndex: isMobileView ? 100 : (collapsed && sidebarHover ? 60 : 40),
+          boxShadow: isMobileView ? (mobileDrawerOpen ? '4px 0 24px rgba(0,0,0,.25)' : 'none') : (collapsed && sidebarHover ? '4px 0 24px rgba(0,0,0,.18)' : 'none'),
+          transform: isMobileView ? (mobileDrawerOpen ? 'translateX(0)' : 'translateX(-100%)') : 'none',
+          transition: 'width .18s ease, box-shadow .18s ease, transform .2s ease',
         }}
       >
         <div style={{ padding: showFull ? '20px 20px 16px' : '18px 0 14px', borderBottom: `1px solid ${t.border2}` }}>
@@ -703,30 +730,30 @@ function App() {
 
         <nav style={{ padding: showFull ? '8px 12px' : '8px 8px', flex: 1, overflowY: 'auto' }}>
           {MAIN_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Main" collapsed={!showFull} />}
-          {isTabVisible('overview', userRole, rolePermissions) && <NavItem label="Overview" Icon={LayoutDashboard} tab="overview" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('inbox', userRole, rolePermissions) && <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={setActiveTab} badge="4" badgeColor={t.red} collapsed={!showFull} />}
-          {isTabVisible('campaigns', userRole, rolePermissions) && <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('recall', userRole, rolePermissions) && <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={setActiveTab} badge="89" badgeColor={t.amber} collapsed={!showFull} />}
-          {isTabVisible('calendar', userRole, rolePermissions) && <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('appointmentrequests', userRole, rolePermissions) && <NavItem label="Appointment Requests" Icon={CalendarPlus} tab="appointmentrequests" active={activeTab} onClick={setActiveTab} badge={String(APPOINTMENT_REQUESTS_SEED.filter(r => r.status === 'pending').length)} badgeColor={t.amber} collapsed={!showFull} />}
-          {isTabVisible('waitlist', userRole, rolePermissions) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={setActiveTab} badge="12" badgeColor={t.teal} collapsed={!showFull} />}
+          {isTabVisible('overview', userRole, rolePermissions) && <NavItem label="Overview" Icon={LayoutDashboard} tab="overview" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('inbox', userRole, rolePermissions) && <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={navigateTo} badge="4" badgeColor={t.red} collapsed={!showFull} />}
+          {isTabVisible('campaigns', userRole, rolePermissions) && <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('recall', userRole, rolePermissions) && <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={navigateTo} badge="89" badgeColor={t.amber} collapsed={!showFull} />}
+          {isTabVisible('calendar', userRole, rolePermissions) && <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('appointmentrequests', userRole, rolePermissions) && <NavItem label="Appointment Requests" Icon={CalendarPlus} tab="appointmentrequests" active={activeTab} onClick={navigateTo} badge={String(APPOINTMENT_REQUESTS_SEED.filter(r => r.status === 'pending').length)} badgeColor={t.amber} collapsed={!showFull} />}
+          {isTabVisible('waitlist', userRole, rolePermissions) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={navigateTo} badge="12" badgeColor={t.teal} collapsed={!showFull} />}
           {PRACTICE_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Practice" collapsed={!showFull} />}
-          {isTabVisible('patients', userRole, rolePermissions) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('portal', userRole, rolePermissions) && <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('eligibility', userRole, rolePermissions) && <NavItem label="Eligibility" Icon={Shield} tab="eligibility" active={activeTab} onClick={setActiveTab} badge="3" badgeColor={t.amber} collapsed={!showFull} />}
-          {isTabVisible('reviews', userRole, rolePermissions) && <NavItem label="Reputation Center" Icon={Award} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('surveys', userRole, rolePermissions) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('aifrontdesk', userRole, rolePermissions) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
-          {isTabVisible('documents', userRole, rolePermissions) && <NavItem label="Documents" Icon={FileArchive} tab="documents" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('treatmentplans', userRole, rolePermissions) && <NavItem label="Treatment Plans" Icon={ClipboardList} tab="treatmentplans" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('patients', userRole, rolePermissions) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('portal', userRole, rolePermissions) && <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('eligibility', userRole, rolePermissions) && <NavItem label="Eligibility" Icon={Shield} tab="eligibility" active={activeTab} onClick={navigateTo} badge="3" badgeColor={t.amber} collapsed={!showFull} />}
+          {isTabVisible('reviews', userRole, rolePermissions) && <NavItem label="Reputation Center" Icon={Award} tab="reviews" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('surveys', userRole, rolePermissions) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('aifrontdesk', userRole, rolePermissions) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={navigateTo} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
+          {isTabVisible('documents', userRole, rolePermissions) && <NavItem label="Documents" Icon={FileArchive} tab="documents" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('treatmentplans', userRole, rolePermissions) && <NavItem label="Treatment Plans" Icon={ClipboardList} tab="treatmentplans" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
           {BILLINGSEC_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Billing" collapsed={!showFull} />}
-          {isTabVisible('billing', userRole, rolePermissions) && <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />}
-          {isTabVisible('membershipplans', userRole, rolePermissions) && <NavItem label="Membership Plans" Icon={BadgeCheck} tab="membershipplans" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('payments', userRole, rolePermissions) && <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('billing', userRole, rolePermissions) && <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={navigateTo} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />}
+          {isTabVisible('membershipplans', userRole, rolePermissions) && <NavItem label="Membership Plans" Icon={BadgeCheck} tab="membershipplans" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('payments', userRole, rolePermissions) && <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
           {ANALYTICS_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Analytics" collapsed={!showFull} />}
-          {isTabVisible('reports', userRole, rolePermissions) && <NavItem label="Reports" Icon={TrendingUp} tab="reports" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('activitylog', userRole, rolePermissions) && <NavItem label="Activity Log" Icon={Activity} tab="activitylog" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
-          {isTabVisible('settings', userRole, rolePermissions) && <NavItem label="Settings" Icon={SettingsIcon} tab="settings" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('reports', userRole, rolePermissions) && <NavItem label="Reports" Icon={TrendingUp} tab="reports" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('activitylog', userRole, rolePermissions) && <NavItem label="Activity Log" Icon={Activity} tab="activitylog" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
+          {isTabVisible('settings', userRole, rolePermissions) && <NavItem label="Settings" Icon={SettingsIcon} tab="settings" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
         </nav>
 
         <div style={{ padding: showFull ? '12px 16px' : '12px 0', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: showFull ? 'space-between' : 'center', gap: '10px' }}>
@@ -748,26 +775,53 @@ function App() {
       </div>
 
       {/* MAIN */}
-      <div style={{ marginLeft: collapsed ? '72px' : '240px', flex: 1, display: 'flex', flexDirection: 'column', background: t.bgPage, minHeight: '100vh', transition: 'margin-left .18s ease' }}>
+      <div style={{ marginLeft: isMobileView ? 0 : (collapsed ? '72px' : '240px'), flex: 1, display: 'flex', flexDirection: 'column', background: t.bgPage, minHeight: '100vh', transition: 'margin-left .18s ease' }}>
+
+        {!appBannerDismissed && isMobileView && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: t.brand, color: 'white' }}>
+            <Smartphone size={16} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '12.5px', fontWeight: '500' }}>Get the PraxisMD app for a faster, native experience.</span>
+            <button
+              type="button"
+              onClick={dismissAppBanner}
+              aria-label="Dismiss"
+              style={{ border: 'none', background: 'rgba(255,255,255,.2)', color: 'white', width: '22px', height: '22px', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )}
 
         {/* TOPBAR */}
         <div style={{ height: '64px', background: t.bgSidebar, borderBottom: `1px solid ${t.border}`, display: 'flex', alignItems: 'center', gap: '24px', padding: '0 26px', position: 'sticky', top: 0, zIndex: 50 }}>
+          {isMobileView && (
+            <button
+              type="button"
+              onClick={() => setMobileDrawerOpen(true)}
+              aria-label="Open menu"
+              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid, flexShrink: 0 }}
+            >
+              <Menu size={17} />
+            </button>
+          )}
           <div style={{ flexShrink: 0 }}>
             <div style={{ fontSize: '16px', fontWeight: '600', color: t.ink }}>{getPageTitle(activeTab, ownerDisplayName)}</div>
             <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · {practiceDisplayName}</div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setSearchOpen(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '260px', padding: '8px 10px 8px 12px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', fontFamily: 'inherit' }}
-          >
-            <Search size={15} color={t.muted} style={{ flexShrink: 0 }} />
-            <span style={{ flex: 1, textAlign: 'left', fontSize: '13px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Search patients, campaigns...</span>
-            <span style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, border: `1px solid ${t.border}`, borderRadius: '5px', padding: '1px 5px', flexShrink: 0 }}>Ctrl K</span>
-          </button>
+          {!isMobileView && (
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '260px', padding: '8px 10px 8px 12px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              <Search size={15} color={t.muted} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1, textAlign: 'left', fontSize: '13px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Search patients, campaigns...</span>
+              <span style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, border: `1px solid ${t.border}`, borderRadius: '5px', padding: '1px 5px', flexShrink: 0 }}>Ctrl K</span>
+            </button>
+          )}
 
-          <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', flexShrink: 0, overflowX: isMobileView ? 'auto' : 'visible', maxWidth: isMobileView ? '52vw' : 'none' }}>
             <button
               onClick={() => setPrivacyMode(p => !p)}
               aria-label="Toggle privacy mode"
