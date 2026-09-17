@@ -14,6 +14,7 @@ import {
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
   Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
+  CalendarPlus,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -317,10 +318,11 @@ function useGhlFetch(fetchFn) {
 const ROLES = ['Owner', 'Office Manager', 'Front Desk', 'Biller'];
 const EDITABLE_ROLES = ROLES.filter(r => r !== 'Owner');
 
-const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'billing', 'payments', 'reports', 'activitylog', 'settings'];
+const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'billing', 'payments', 'reports', 'activitylog', 'settings'];
 
 const TAB_LABELS = {
   overview: 'Overview', inbox: 'Inbox', campaigns: 'Campaigns', recall: 'Recall', calendar: 'Calendar',
+  appointmentrequests: 'Appointment Requests',
   waitlist: 'Waitlist', patients: 'Patients', portal: 'Patient Portal', eligibility: 'Eligibility',
   reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents', billing: 'Billing',
   payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
@@ -361,7 +363,7 @@ function roleColor(role, t) {
   }
 }
 
-const MAIN_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist'];
+const MAIN_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist'];
 const PRACTICE_TABS = ['patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents'];
 const BILLINGSEC_TABS = ['billing', 'payments'];
 const ANALYTICS_TABS = ['reports', 'settings', 'activitylog'];
@@ -636,6 +638,7 @@ function App() {
           {isTabVisible('campaigns', userRole, rolePermissions) && <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('recall', userRole, rolePermissions) && <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={setActiveTab} badge="89" badgeColor={t.amber} collapsed={!showFull} />}
           {isTabVisible('calendar', userRole, rolePermissions) && <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('appointmentrequests', userRole, rolePermissions) && <NavItem label="Appointment Requests" Icon={CalendarPlus} tab="appointmentrequests" active={activeTab} onClick={setActiveTab} badge={String(APPOINTMENT_REQUESTS_SEED.filter(r => r.status === 'pending').length)} badgeColor={t.amber} collapsed={!showFull} />}
           {isTabVisible('waitlist', userRole, rolePermissions) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={setActiveTab} badge="12" badgeColor={t.teal} collapsed={!showFull} />}
           {PRACTICE_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Practice" collapsed={!showFull} />}
           {isTabVisible('patients', userRole, rolePermissions) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
@@ -797,6 +800,7 @@ function App() {
           {gate('documents', <Documents contacts={contacts} userRole={userRole} />)}
           {gate('waitlist', <Waitlist userRole={userRole} />)}
           {gate('calendar', <Calendar userRole={userRole} />)}
+          {gate('appointmentrequests', <AppointmentRequests userRole={userRole} />)}
         </div>
       </div>
 
@@ -821,6 +825,7 @@ function getPageTitle(tab, ownerName) {
     campaigns: 'Campaigns',
     recall: 'Recall & Scheduling',
     calendar: 'Calendar',
+    appointmentrequests: 'Appointment Requests',
     waitlist: 'Smart Waitlist',
     patients: 'Patients',
     portal: 'Patient Portal',
@@ -3066,6 +3071,172 @@ function Calendar() {
   );
 }
 
+// ─── APPOINTMENT REQUESTS ──────────────────────────────────
+const DOCTORS_SEED = ['Dr. Rivera', 'Dr. Alvarez', 'Dr. Cho', 'Any available doctor'];
+const REQUEST_APPT_TYPES_SEED = ['Cleaning', 'Filling', 'Crown', 'Root Canal', 'Implant', 'Veneer', 'Emergency Exam', 'Consultation'];
+const DEPOSIT_TYPES = ['Crown', 'Implant', 'Veneer'];
+
+const APPOINTMENT_REQUESTS_SEED = [
+  { id: 'ar1', patientName: 'Sarah Malone', requestedDate: 'Sep 22, 2026', preferredTime: 'Morning (9–11am)', apptType: 'Cleaning', requestedDoctor: 'Dr. Rivera', insurance: 'Delta Dental — Active', notes: 'Prefers an early appointment, works nights.', status: 'pending', emergency: false, conflict: false },
+  { id: 'ar2', patientName: 'Tom Alvarez', requestedDate: 'Sep 20, 2026', preferredTime: 'ASAP', apptType: 'Emergency Exam', requestedDoctor: 'Any available doctor', insurance: 'Cigna Dental — Active', notes: 'Severe tooth pain since last night, possible abscess.', status: 'pending', emergency: true, conflict: false },
+  { id: 'ar3', patientName: 'Priya Patel', requestedDate: 'Sep 25, 2026', preferredTime: 'Afternoon (1–3pm)', apptType: 'Crown', requestedDoctor: 'Dr. Alvarez', insurance: 'Aetna — Active', notes: 'Follow-up on the temporary crown from last visit.', status: 'pending', emergency: false, conflict: false },
+  { id: 'ar4', patientName: 'James Coleman Jr.', requestedDate: 'Sep 19, 2026', preferredTime: 'Morning (9–11am)', apptType: 'Implant Consultation', requestedDoctor: 'Dr. Cho', insurance: 'No insurance on file', notes: 'Requested slot conflicts with Dr. Cho’s existing 9:30am booking — needs rescheduling.', status: 'pending', emergency: false, conflict: true },
+  { id: 'ar5', patientName: 'Angela Ruiz', requestedDate: 'Sep 15, 2026', preferredTime: 'Afternoon (1–3pm)', apptType: 'Cleaning', requestedDoctor: 'Any available doctor', insurance: 'MetLife — Active', notes: 'Regular 6-month cleaning.', status: 'confirmed', emergency: false, conflict: false },
+];
+
+function AppointmentRequests() {
+  const t = useTheme();
+  const [requests, setRequests] = useState(APPOINTMENT_REQUESTS_SEED);
+  const [filter, setFilter] = useState('All');
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [declineTarget, setDeclineTarget] = useState(null);
+  const [suggestTarget, setSuggestTarget] = useState(null);
+  const [confirmForm, setConfirmForm] = useState({ date: '', time: '', doctor: '', notes: '' });
+  const [declineMessage, setDeclineMessage] = useState('');
+  const [suggestTime, setSuggestTime] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
+
+  const confirmedCount = requests.filter(r => r.status === 'confirmed').length;
+  const declinedCount = requests.filter(r => r.status === 'declined').length;
+  const resolvedCount = confirmedCount + declinedCount;
+  const confirmationRate = resolvedCount > 0 ? Math.round((confirmedCount / resolvedCount) * 100) : 100;
+
+  const filtered = requests.filter(r => {
+    if (filter === 'Pending') return r.status === 'pending';
+    if (filter === 'Confirmed') return r.status === 'confirmed';
+    if (filter === 'Declined') return r.status === 'declined';
+    return true;
+  });
+
+  function openConfirm(r) {
+    setConfirmForm({ date: r.requestedDate, time: r.preferredTime, doctor: r.requestedDoctor, notes: '' });
+    setConfirmTarget(r);
+  }
+
+  function submitConfirm() {
+    setRequests(rs => rs.map(r => r.id === confirmTarget.id ? { ...r, status: 'confirmed', assignedDoctor: confirmForm.doctor } : r));
+    setNotice(`Confirmation sent to ${confirmTarget.patientName} for ${confirmForm.date}, ${confirmForm.time} with ${confirmForm.doctor}.`);
+    setConfirmTarget(null);
+    setTimeout(() => setNotice(''), 4000);
+  }
+
+  function submitDecline() {
+    setRequests(rs => rs.map(r => r.id === declineTarget.id ? { ...r, status: 'declined' } : r));
+    setNotice(`Decline sent to ${declineTarget.patientName}${declineMessage.trim() ? ' with your message.' : '.'}`);
+    setDeclineTarget(null);
+    setDeclineMessage('');
+    setTimeout(() => setNotice(''), 4000);
+  }
+
+  function submitSuggestion() {
+    setNotice(`Alternate time "${suggestTime}" suggested to ${suggestTarget.patientName}.`);
+    setSuggestTarget(null);
+    setSuggestTime('');
+    setTimeout(() => setNotice(''), 4000);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+        <StatCard label="Total requests this week" value={String(requests.length)} color={t.brand} accent={t.accentBlue} sub="Across all channels" />
+        <StatCard label="Average response time" value="38 min" color={t.teal} accent={t.accentTeal} sub="From request to reply" />
+        <StatCard label="Confirmation rate" value={`${confirmationRate}%`} color={t.green} accent={t.accentGreen} sub="Of resolved requests" />
+      </div>
+
+      {notice && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '10px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{notice}</div>
+      )}
+
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
+        <FilterPillGroup options={['All', 'Pending', 'Confirmed', 'Declined']} value={filter} onChange={setFilter} />
+      </div>
+
+      {filtered.length === 0 && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No requests match this filter.</Card>}
+
+      {filtered.map(r => (
+        <Card key={r.id} className="px-card" style={{ marginBottom: '12px', borderColor: r.emergency ? withAlpha(t.accentRed, .3) : undefined }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '13px' }}>
+            <Ava initials={initialsOf(r.patientName)} bg={r.emergency ? t.redL : t.brandL} color={r.emergency ? t.red : t.brand} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{r.patientName}</span>
+                {r.emergency && <Pill label="Emergency" color={t.red} bg={t.redL} />}
+                {r.conflict && <Pill label="Scheduling conflict" color={t.amber} bg={t.amberL} />}
+                {r.status !== 'pending' && <Pill label={r.status === 'confirmed' ? 'Confirmed' : 'Declined'} color={r.status === 'confirmed' ? t.green : t.muted} bg={r.status === 'confirmed' ? t.greenL : t.bgRow} />}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px 18px', fontSize: '12.5px', color: t.mid, marginBottom: '8px' }}>
+                <div><span style={{ color: t.muted }}>Requested:</span> {r.requestedDate} · {r.preferredTime}</div>
+                <div><span style={{ color: t.muted }}>Type:</span> {r.apptType}</div>
+                <div><span style={{ color: t.muted }}>Doctor requested:</span> {r.requestedDoctor}</div>
+                <div><span style={{ color: t.muted }}>Insurance:</span> {r.insurance}</div>
+              </div>
+              {r.notes && <div style={{ fontSize: '12.5px', color: t.ink2, background: t.bgRow, borderRadius: '8px', padding: '8px 11px', marginBottom: r.status === 'pending' ? '10px' : 0 }}>{r.notes}</div>}
+              {r.status === 'pending' && (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <Btn small primary onClick={() => openConfirm(r)}><Check size={12} /> Confirm</Btn>
+                  <Btn small onClick={() => setDeclineTarget(r)}>Decline</Btn>
+                  <Btn small onClick={() => setSuggestTarget(r)}><Clock size={12} /> Suggest different time</Btn>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      ))}
+
+      {confirmTarget && (
+        <Modal title={`Confirm — ${confirmTarget.patientName}`} onClose={() => setConfirmTarget(null)}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Date</label>
+            <input value={confirmForm.date} onChange={e => setConfirmForm(f => ({ ...f, date: e.target.value }))} style={inputStyle} />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Time</label>
+            <input value={confirmForm.time} onChange={e => setConfirmForm(f => ({ ...f, time: e.target.value }))} style={inputStyle} />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Assign to doctor</label>
+            <select value={confirmForm.doctor} onChange={e => setConfirmForm(f => ({ ...f, doctor: e.target.value }))} style={inputStyle}>
+              {DOCTORS_SEED.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={labelStyle}>Internal notes (optional)</label>
+            <textarea value={confirmForm.notes} onChange={e => setConfirmForm(f => ({ ...f, notes: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+          </div>
+          <Btn primary onClick={submitConfirm}><Send size={13} /> Send confirmation</Btn>
+        </Modal>
+      )}
+
+      {declineTarget && (
+        <Modal title={`Decline — ${declineTarget.patientName}`} onClose={() => setDeclineTarget(null)}>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={labelStyle}>Message to patient (optional)</label>
+            <textarea
+              value={declineMessage} onChange={e => setDeclineMessage(e.target.value)} rows={4}
+              placeholder="Explain why, and suggest they call the office to reschedule…"
+              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+            />
+          </div>
+          <Btn primary onClick={submitDecline}><Send size={13} /> Send decline</Btn>
+        </Modal>
+      )}
+
+      {suggestTarget && (
+        <Modal title={`Suggest a different time — ${suggestTarget.patientName}`} onClose={() => setSuggestTarget(null)}>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={labelStyle}>Suggested date & time</label>
+            <input value={suggestTime} onChange={e => setSuggestTime(e.target.value)} placeholder="e.g. Sep 23, 2:00pm" style={inputStyle} />
+          </div>
+          <Btn primary onClick={submitSuggestion} disabled={!suggestTime.trim()}><Send size={13} /> Send suggestion</Btn>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // ─── REPORTS ───────────────────────────────────────────────
 const REPORTS_PERIODS = ['September 2026', 'August', 'July', 'Q3 2026'];
 
@@ -3183,6 +3354,17 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
   const [editRoleValue, setEditRoleValue] = useState('');
   const [permEditorRole, setPermEditorRole] = useState(null);
   const [draftPerms, setDraftPerms] = useState({});
+  const [requestDoctors, setRequestDoctors] = useState(DOCTORS_SEED.filter(d => d !== 'Any available doctor'));
+  const [newDoctor, setNewDoctor] = useState('');
+  const [requestApptTypes, setRequestApptTypes] = useState(REQUEST_APPT_TYPES_SEED);
+  const [newApptType, setNewApptType] = useState('');
+  const [businessHours, setBusinessHours] = useState({
+    Mon: { open: true, from: '08:00', to: '17:00' }, Tue: { open: true, from: '08:00', to: '17:00' },
+    Wed: { open: true, from: '08:00', to: '17:00' }, Thu: { open: true, from: '08:00', to: '17:00' },
+    Fri: { open: true, from: '08:00', to: '15:00' }, Sat: { open: false, from: '09:00', to: '13:00' },
+    Sun: { open: false, from: '09:00', to: '13:00' },
+  });
+  const [depositRequired, setDepositRequired] = useState(true);
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
@@ -3363,6 +3545,72 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
             </div>
           );
         })}
+      </Card>
+
+      <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, margin: '18px 0 10px' }}>Appointment Request Settings</div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+        <Card>
+          <CardTitle>Doctors available for requests</CardTitle>
+          {requestDoctors.map(d => (
+            <RowItem key={d} style={{ justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: t.ink2 }}>{d}</span>
+              <button onClick={() => setRequestDoctors(list => list.filter(x => x !== d))} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+                <X size={14} />
+              </button>
+            </RowItem>
+          ))}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <input value={newDoctor} onChange={e => setNewDoctor(e.target.value)} placeholder="Add a doctor…" style={{ ...inputStyle, flex: 1 }} />
+            <Btn small onClick={() => { if (newDoctor.trim()) { setRequestDoctors(list => [...list, newDoctor.trim()]); setNewDoctor(''); } }}><Plus size={13} /> Add</Btn>
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle>Appointment types available</CardTitle>
+          {requestApptTypes.map(a => (
+            <RowItem key={a} style={{ justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: t.ink2 }}>{a}</span>
+              <button onClick={() => setRequestApptTypes(list => list.filter(x => x !== a))} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+                <X size={14} />
+              </button>
+            </RowItem>
+          ))}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <input value={newApptType} onChange={e => setNewApptType(e.target.value)} placeholder="Add an appointment type…" style={{ ...inputStyle, flex: 1 }} />
+            <Btn small onClick={() => { if (newApptType.trim()) { setRequestApptTypes(list => [...list, newApptType.trim()]); setNewApptType(''); } }}><Plus size={13} /> Add</Btn>
+          </div>
+        </Card>
+      </div>
+
+      <Card style={{ marginBottom: '14px' }}>
+        <CardTitle>Business hours for requests</CardTitle>
+        {Object.entries(businessHours).map(([day, hrs]) => (
+          <div key={day} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '9px 2px', borderBottom: `1px solid ${t.border2}` }}>
+            <div style={{ width: '42px', fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{day}</div>
+            <ToggleSwitch checked={hrs.open} onChange={() => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], open: !bh[day].open } }))} />
+            {hrs.open ? (
+              <>
+                <input type="time" value={hrs.from} onChange={e => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], from: e.target.value } }))} style={{ ...inputStyle, width: '120px' }} />
+                <span style={{ fontSize: '12px', color: t.muted }}>to</span>
+                <input type="time" value={hrs.to} onChange={e => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], to: e.target.value } }))} style={{ ...inputStyle, width: '120px' }} />
+              </>
+            ) : (
+              <span style={{ fontSize: '12.5px', color: t.muted }}>Closed</span>
+            )}
+          </div>
+        ))}
+      </Card>
+
+      <Card style={{ marginBottom: '18px' }}>
+        <CardTitle>Deposits</CardTitle>
+        <RowItem style={{ justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Require deposit for high-value appointments</div>
+            <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>Applies to: {DEPOSIT_TYPES.join(', ')}</div>
+          </div>
+          <ToggleSwitch checked={depositRequired} onChange={() => setDepositRequired(v => !v)} />
+        </RowItem>
       </Card>
 
       <Card>
