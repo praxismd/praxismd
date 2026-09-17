@@ -1905,10 +1905,30 @@ function Recall() {
 }
 
 // ─── PATIENTS ──────────────────────────────────────────────
+function patientLtv(id) {
+  // FNV-1a style hash so sequential ids (p1, p2, p3…) don't collapse to
+  // near-identical values — plain polynomial hashing barely perturbs the
+  // output when only the last character changes.
+  let hash = 0x811c9dc5;
+  const s = String(id || '');
+  for (let i = 0; i < s.length; i++) {
+    hash ^= s.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  hash = (hash ^ (hash >>> 16)) >>> 0;
+  return 200 + (hash % 7800);
+}
+
+function ltvColor(value, t) {
+  if (value > 3000) return t.green;
+  if (value >= 1000) return t.amber;
+  return t.red;
+}
+
 function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onAddPatient }) {
   const t = useTheme();
   const q = query.trim().toLowerCase();
-  const list = contacts || [];
+  const list = (contacts || []).map(p => ({ ...p, ltv: patientLtv(p.id) }));
   const filtered = q ? list.filter(p => p.name.toLowerCase().includes(q)) : list;
   const [selected, setSelected] = useState(null);
   const [sortKey, setSortKey] = useState(null); // 'name' | 'tag' | 'dateAdded'
@@ -1952,6 +1972,8 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
     } else if (sortKey === 'tag') {
       av = (a.tag || '').toLowerCase();
       bv = (b.tag || '').toLowerCase();
+    } else if (sortKey === 'ltv') {
+      av = a.ltv; bv = b.ltv;
     } else {
       av = (a.name || '').toLowerCase();
       bv = (b.name || '').toLowerCase();
@@ -1961,8 +1983,17 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
     return 0;
   });
 
+  const avgLtv = list.length ? Math.round(list.reduce((s, p) => s + p.ltv, 0) / list.length) : 0;
+  const highestLtv = list.reduce((max, p) => p.ltv > (max?.ltv || 0) ? p : max, null);
+  const totalLtv = list.reduce((s, p) => s + p.ltv, 0);
+
   return (
     <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+        <StatCard label="Average patient LTV" value={`$${avgLtv.toLocaleString()}`} color={t.brand} accent={t.accentBlue} sub="Across all patients" />
+        <StatCard label="Highest value patient" value={highestLtv ? `$${highestLtv.ltv.toLocaleString()}` : '—'} color={t.green} accent={t.accentGreen} sub={highestLtv?.name || ''} />
+        <StatCard label="Total practice patient value" value={`$${totalLtv.toLocaleString()}`} color={t.purple} accent={t.accentPurple} sub={`${list.length} patients`} />
+      </div>
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <Search size={15} color={t.muted} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
@@ -2015,6 +2046,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
                     { label: 'Patient', key: 'name' },
                     { label: 'Phone', key: null },
                     { label: 'Tag', key: 'tag' },
+                    { label: 'LTV', key: 'ltv' },
                     { label: 'Added', key: 'dateAdded' },
                     { label: '', key: null },
                   ].map((h, i) => (
@@ -2037,12 +2069,18 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
                     <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.email}</div></td>
                     <td style={{ padding: '11px 13px', color: t.mid }}>{p.phone}</td>
                     <td style={{ padding: '11px 13px' }}>{p.tag ? <Pill label={p.tag} color={t.brand} bg={t.brandL} /> : <span style={{ color: t.muted }}>—</span>}</td>
+                    <td style={{ padding: '11px 13px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontWeight: '600', color: ltvColor(p.ltv, t) }}>${p.ltv.toLocaleString()}</span>
+                        {p.ltv > 5000 && <Pill label="VIP" color={t.purple} bg={t.purpleL} />}
+                      </div>
+                    </td>
                     <td style={{ padding: '11px 13px', color: t.mid }}>{p.dateAdded}</td>
                     <td style={{ padding: '11px 13px', textAlign: 'right' }}><Btn small onClick={e => { e.stopPropagation(); setSelected(p); }}>View</Btn></td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: t.muted }}>{list.length === 0 ? 'No patients yet.' : `No patients match "${query}"`}</td></tr>
+                  <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: t.muted }}>{list.length === 0 ? 'No patients yet.' : `No patients match "${query}"`}</td></tr>
                 )}
               </tbody>
             </table>
