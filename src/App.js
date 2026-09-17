@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, Fragment } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
@@ -14,7 +14,7 @@ import {
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
   Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
-  CalendarPlus, BadgeCheck,
+  CalendarPlus, BadgeCheck, Award, Flag,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -324,7 +324,7 @@ const TAB_LABELS = {
   overview: 'Overview', inbox: 'Inbox', campaigns: 'Campaigns', recall: 'Recall', calendar: 'Calendar',
   appointmentrequests: 'Appointment Requests',
   waitlist: 'Waitlist', patients: 'Patients', portal: 'Patient Portal', eligibility: 'Eligibility',
-  reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents',
+  reviews: 'Reputation Center', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents',
   treatmentplans: 'Treatment Plans',
   billing: 'Billing', membershipplans: 'Membership Plans', payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
 };
@@ -421,6 +421,7 @@ function App() {
   const [notifReadIds, setNotifReadIds] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [patientQuery, setPatientQuery] = useState('');
+  const [campaignSuggestion, setCampaignSuggestion] = useState(null);
   const [userRole, setUserRole] = useState('Owner');
   const [rolePermissions, setRolePermissions] = useState(DEFAULT_ROLE_PERMISSIONS);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -645,7 +646,7 @@ function App() {
           {isTabVisible('patients', userRole, rolePermissions) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('portal', userRole, rolePermissions) && <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('eligibility', userRole, rolePermissions) && <NavItem label="Eligibility" Icon={Shield} tab="eligibility" active={activeTab} onClick={setActiveTab} badge="3" badgeColor={t.amber} collapsed={!showFull} />}
-          {isTabVisible('reviews', userRole, rolePermissions) && <NavItem label="Reviews" Icon={Star} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('reviews', userRole, rolePermissions) && <NavItem label="Reputation Center" Icon={Award} tab="reviews" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('surveys', userRole, rolePermissions) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('aifrontdesk', userRole, rolePermissions) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
           {isTabVisible('documents', userRole, rolePermissions) && <NavItem label="Documents" Icon={FileArchive} tab="documents" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
@@ -787,17 +788,17 @@ function App() {
         <div key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
           {gate('overview', <Overview setActiveTab={setActiveTab} userRole={userRole} />)}
           {gate('inbox', <Inbox contacts={contacts} userRole={userRole} />)}
-          {gate('campaigns', <Campaigns userRole={userRole} />)}
+          {gate('campaigns', <Campaigns userRole={userRole} suggestion={campaignSuggestion} onConsumeSuggestion={() => setCampaignSuggestion(null)} />)}
           {gate('recall', <Recall userRole={userRole} />)}
           {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />)}
           {gate('billing', <Billing userRole={userRole} />)}
           {gate('membershipplans', <MembershipPlans userRole={userRole} />)}
           {gate('payments', <Payments userRole={userRole} />)}
-          {gate('reports', <Reports userRole={userRole} />)}
+          {gate('reports', <Reports userRole={userRole} onSuggestCampaign={s => { setCampaignSuggestion(s); setActiveTab('campaigns'); }} />)}
           {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} brandColor={brandColor} onBrandColorChange={setBrandColor} />)}
           {gate('activitylog', <ActivityLog userRole={userRole} />)}
           {gate('aifrontdesk', <AIFrontDesk userRole={userRole} />)}
-          {gate('reviews', <Reviews userRole={userRole} />)}
+          {gate('reviews', <ReputationCenter userRole={userRole} />)}
           {gate('surveys', <Surveys userRole={userRole} />)}
           {gate('eligibility', <Eligibility userRole={userRole} />)}
           {gate('portal', <Portal userRole={userRole} />)}
@@ -836,7 +837,7 @@ function getPageTitle(tab, ownerName) {
     patients: 'Patients',
     portal: 'Patient Portal',
     eligibility: 'Insurance Eligibility',
-    reviews: 'Reviews',
+    reviews: 'Reputation Center',
     surveys: 'Patient Satisfaction',
     aifrontdesk: 'AI Front Desk',
     documents: 'Documents',
@@ -1621,7 +1622,7 @@ const CAMPAIGN_AUDIENCES = ['Inactive 3mo', 'Inactive 6mo', 'All patients', 'Cus
 const CAMPAIGN_TOUCHES = [3, 5, 7];
 const CAMPAIGN_CHANNELS = ['SMS', 'Email', 'Both'];
 
-function Campaigns() {
+function Campaigns({ suggestion, onConsumeSuggestion }) {
   const t = useTheme();
   const [campaigns, setCampaigns] = useState(CAMPAIGNS_DATA);
   const [selected, setSelected] = useState(null);
@@ -1629,6 +1630,14 @@ function Campaigns() {
   const [exported, setExported] = useState(false);
   const [form, setForm] = useState({ name: '', type: CAMPAIGN_TYPES[0], audience: CAMPAIGN_AUDIENCES[0], touches: CAMPAIGN_TOUCHES[1], channel: CAMPAIGN_CHANNELS[0], message: '' });
   const colorMap = { brand: t.brand, green: t.green, amber: t.amber, purple: t.purple, muted: t.muted };
+
+  useEffect(() => {
+    if (!suggestion) return;
+    setForm(f => ({ ...f, name: suggestion.name, message: suggestion.message }));
+    setShowForm(true);
+    onConsumeSuggestion && onConsumeSuggestion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suggestion]);
 
   function toggleStatus(name) {
     setCampaigns(cs => cs.map(c => c.name === name
@@ -1896,10 +1905,30 @@ function Recall() {
 }
 
 // ─── PATIENTS ──────────────────────────────────────────────
+function patientLtv(id) {
+  // FNV-1a style hash so sequential ids (p1, p2, p3…) don't collapse to
+  // near-identical values — plain polynomial hashing barely perturbs the
+  // output when only the last character changes.
+  let hash = 0x811c9dc5;
+  const s = String(id || '');
+  for (let i = 0; i < s.length; i++) {
+    hash ^= s.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  hash = (hash ^ (hash >>> 16)) >>> 0;
+  return 200 + (hash % 7800);
+}
+
+function ltvColor(value, t) {
+  if (value > 3000) return t.green;
+  if (value >= 1000) return t.amber;
+  return t.red;
+}
+
 function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onAddPatient }) {
   const t = useTheme();
   const q = query.trim().toLowerCase();
-  const list = contacts || [];
+  const list = (contacts || []).map(p => ({ ...p, ltv: patientLtv(p.id) }));
   const filtered = q ? list.filter(p => p.name.toLowerCase().includes(q)) : list;
   const [selected, setSelected] = useState(null);
   const [sortKey, setSortKey] = useState(null); // 'name' | 'tag' | 'dateAdded'
@@ -1943,6 +1972,8 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
     } else if (sortKey === 'tag') {
       av = (a.tag || '').toLowerCase();
       bv = (b.tag || '').toLowerCase();
+    } else if (sortKey === 'ltv') {
+      av = a.ltv; bv = b.ltv;
     } else {
       av = (a.name || '').toLowerCase();
       bv = (b.name || '').toLowerCase();
@@ -1952,8 +1983,17 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
     return 0;
   });
 
+  const avgLtv = list.length ? Math.round(list.reduce((s, p) => s + p.ltv, 0) / list.length) : 0;
+  const highestLtv = list.reduce((max, p) => p.ltv > (max?.ltv || 0) ? p : max, null);
+  const totalLtv = list.reduce((s, p) => s + p.ltv, 0);
+
   return (
     <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+        <StatCard label="Average patient LTV" value={`$${avgLtv.toLocaleString()}`} color={t.brand} accent={t.accentBlue} sub="Across all patients" />
+        <StatCard label="Highest value patient" value={highestLtv ? `$${highestLtv.ltv.toLocaleString()}` : '—'} color={t.green} accent={t.accentGreen} sub={highestLtv?.name || ''} />
+        <StatCard label="Total practice patient value" value={`$${totalLtv.toLocaleString()}`} color={t.purple} accent={t.accentPurple} sub={`${list.length} patients`} />
+      </div>
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
         <div style={{ position: 'relative', flex: 1 }}>
           <Search size={15} color={t.muted} style={{ position: 'absolute', left: '13px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
@@ -2006,6 +2046,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
                     { label: 'Patient', key: 'name' },
                     { label: 'Phone', key: null },
                     { label: 'Tag', key: 'tag' },
+                    { label: 'LTV', key: 'ltv' },
                     { label: 'Added', key: 'dateAdded' },
                     { label: '', key: null },
                   ].map((h, i) => (
@@ -2028,12 +2069,18 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
                     <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.email}</div></td>
                     <td style={{ padding: '11px 13px', color: t.mid }}>{p.phone}</td>
                     <td style={{ padding: '11px 13px' }}>{p.tag ? <Pill label={p.tag} color={t.brand} bg={t.brandL} /> : <span style={{ color: t.muted }}>—</span>}</td>
+                    <td style={{ padding: '11px 13px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontWeight: '600', color: ltvColor(p.ltv, t) }}>${p.ltv.toLocaleString()}</span>
+                        {p.ltv > 5000 && <Pill label="VIP" color={t.purple} bg={t.purpleL} />}
+                      </div>
+                    </td>
                     <td style={{ padding: '11px 13px', color: t.mid }}>{p.dateAdded}</td>
                     <td style={{ padding: '11px 13px', textAlign: 'right' }}><Btn small onClick={e => { e.stopPropagation(); setSelected(p); }}>View</Btn></td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: t.muted }}>{list.length === 0 ? 'No patients yet.' : `No patients match "${query}"`}</td></tr>
+                  <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: t.muted }}>{list.length === 0 ? 'No patients yet.' : `No patients match "${query}"`}</td></tr>
                 )}
               </tbody>
             </table>
@@ -2344,23 +2391,60 @@ function AIFrontDesk() {
   );
 }
 
-// ─── REVIEWS ───────────────────────────────────────────────
-const REVIEWS_DATA = [
-  { id: 'rv1', rating: 5, text: '"Dr. Rivera and the team are absolutely wonderful. The automated reminder texts are so convenient!"', author: '— Sarah M. · 2 days ago · Google', negative: false },
-  { id: 'rv2', rating: 3, text: '"Good dentist but the wait time was a bit long. Would appreciate better scheduling."', author: '— Anonymous · 1 week ago · Google', negative: true },
+// ─── REPUTATION CENTER ─────────────────────────────────────
+const REPUTATION_PLATFORMS_SEED = [
+  { id: 'Google', rating: 4.8, count: 142, lastReview: '2 days ago' },
+  { id: 'Yelp', rating: 4.2, count: 38, lastReview: '5 days ago' },
+  { id: 'Healthgrades', rating: 3.6, count: 21, lastReview: '1 week ago' },
+  { id: 'Facebook', rating: 4.9, count: 64, lastReview: '3 days ago' },
+  { id: 'Zocdoc', rating: 4.5, count: 29, lastReview: '4 days ago' },
 ];
 
-function Reviews() {
+const REVIEW_AUTOMATION_SEED = [
+  { platform: 'Google', sent: 64, converted: 22 },
+  { platform: 'Yelp', sent: 38, converted: 9 },
+  { platform: 'Healthgrades', sent: 21, converted: 4 },
+];
+
+const REVIEWS_DATA = [
+  { id: 'rv1', platform: 'Google', rating: 5, text: '"Dr. Rivera and the team are absolutely wonderful. The automated reminder texts are so convenient!"', author: 'Sarah M.', date: '2 days ago' },
+  { id: 'rv2', platform: 'Google', rating: 3, text: '"Good dentist but the wait time was a bit long. Would appreciate better scheduling."', author: 'Anonymous', date: '1 week ago' },
+  { id: 'rv3', platform: 'Yelp', rating: 5, text: '"Best cleaning I’ve ever had. Staff is so friendly!"', author: 'Tom R.', date: '4 days ago' },
+  { id: 'rv4', platform: 'Yelp', rating: 2, text: '"Billing was confusing and I was charged more than quoted."', author: 'Jamie K.', date: '5 days ago' },
+  { id: 'rv5', platform: 'Healthgrades', rating: 4, text: '"Professional office, good with kids."', author: 'Alicia P.', date: '6 days ago' },
+  { id: 'rv6', platform: 'Healthgrades', rating: 3, text: '"Appointment got moved twice without much notice."', author: 'Marcus D.', date: '1 week ago' },
+  { id: 'rv7', platform: 'Google', rating: 5, text: '"Painless root canal, highly recommend Dr. Alvarez."', author: 'Dana W.', date: '3 days ago' },
+  { id: 'rv8', platform: 'Yelp', rating: 4, text: '"Clean office, easy to book online."', author: 'Chris B.', date: '1 week ago' },
+];
+
+function ReputationCenter() {
   const t = useTheme();
+  const [reviews] = useState(REVIEWS_DATA);
+  const [platformFilter, setPlatformFilter] = useState('All');
+  const [starFilter, setStarFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [openId, setOpenId] = useState(null);
   const [drafts, setDrafts] = useState({});
   const [replied, setReplied] = useState({});
+  const [flagged, setFlagged] = useState({});
   const [aiDrafting, setAiDrafting] = useState(null);
+
+  const overallScore = Math.round((REPUTATION_PLATFORMS_SEED.reduce((s, p) => s + p.rating, 0) / REPUTATION_PLATFORMS_SEED.length) * 2 * 10) / 10;
+  const scoreColor = overallScore >= 8 ? t.green : overallScore >= 6 ? t.amber : t.red;
+  const lowPlatforms = REPUTATION_PLATFORMS_SEED.filter(p => p.rating < 4.0);
+
+  const filtered = reviews.filter(r => {
+    if (platformFilter !== 'All' && r.platform !== platformFilter) return false;
+    if (starFilter !== 'All' && r.rating !== Number(starFilter)) return false;
+    if (statusFilter === 'Replied' && !replied[r.id]) return false;
+    if (statusFilter === 'Needs reply' && replied[r.id]) return false;
+    return true;
+  });
 
   function draftWithAi(r) {
     setAiDrafting(r.id);
     setTimeout(() => {
-      setDrafts(d => ({ ...d, [r.id]: "Thank you for the feedback — we're sorry your wait ran long and are working on tightening up scheduling. We'd love the chance to give you a smoother visit next time." }));
+      setDrafts(d => ({ ...d, [r.id]: "Thank you for sharing this — we're sorry the experience fell short and we're already working on it. We'd love the chance to make it right on your next visit." }));
       setAiDrafting(null);
     }, 600);
   }
@@ -2373,29 +2457,81 @@ function Reviews() {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
-        <StatCard label="Google rating" value="4.8" icon={Star} color={t.amber} accent={t.accentAmber} sub="From 142 total reviews" />
-        <StatCard label="New this month" value="6" color={t.green} accent={t.accentGreen} sub="↑ 3 from last month" />
-        <StatCard label="Response rate" value="92%" color={t.brand} accent={t.accentBlue} sub="Industry avg is 54%" />
+      <Card style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ width: '84px', height: '84px', borderRadius: '50%', border: `6px solid ${scoreColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <span style={{ fontSize: '26px', fontWeight: '800', color: scoreColor }}>{overallScore}</span>
+        </div>
+        <div>
+          <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '4px' }}>Overall reputation score</div>
+          <div style={{ fontSize: '13px', color: t.mid }}>Weighted across Google, Yelp, Healthgrades, Facebook, and Zocdoc.</div>
+        </div>
+      </Card>
+
+      {lowPlatforms.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', background: t.redL, border: `1px solid ${withAlpha(t.red, .25)}`, borderRadius: '12px', marginBottom: '16px' }}>
+          <AlertTriangle size={18} color={t.red} style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: '13px', color: t.red, fontWeight: '500' }}>
+            {lowPlatforms.map(p => p.id).join(', ')} {lowPlatforms.length === 1 ? 'has' : 'have'} dropped below 4.0 stars — review recent feedback below.
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '10px', marginBottom: '16px' }}>
+        {REPUTATION_PLATFORMS_SEED.map(p => (
+          <Card key={p.id} style={{ padding: '16px' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, marginBottom: '8px' }}>{p.id}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+              <span style={{ fontSize: '20px', fontWeight: '800', color: p.rating < 4 ? t.red : t.ink }}>{p.rating}</span>
+              <Star size={13} color={t.amber} fill={t.amber} />
+            </div>
+            <div style={{ fontSize: '11px', color: t.muted }}>{p.count} reviews</div>
+            <div style={{ fontSize: '10.5px', color: t.muted, marginTop: '2px' }}>Last: {p.lastReview}</div>
+          </Card>
+        ))}
       </div>
+
+      <Card style={{ marginBottom: '16px' }}>
+        <CardTitle>Review request automation</CardTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+          {REVIEW_AUTOMATION_SEED.map(r => (
+            <div key={r.platform} style={{ padding: '12px', background: t.bgRow, borderRadius: '10px' }}>
+              <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, marginBottom: '6px' }}>{r.platform}</div>
+              <div style={{ fontSize: '11.5px', color: t.mid }}>{r.sent} sent this month</div>
+              <div style={{ fontSize: '11.5px', color: t.green, fontWeight: '600' }}>{Math.round((r.converted / r.sent) * 100)}% conversion</div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
       <Card>
-        <CardTitle>Recent reviews</CardTitle>
-        {REVIEWS_DATA.map(r => (
-          <div key={r.id} className="px-row" style={{ padding: '14px', borderRadius: '10px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.negative ? t.accentRed : t.accentAmber}` }}>
-            <div style={{ marginBottom: '5px' }}><StarRating rating={r.rating} /></div>
+        <CardTitle>All reviews</CardTitle>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+          <FilterPillGroup options={['All', ...REPUTATION_PLATFORMS_SEED.map(p => p.id)]} value={platformFilter} onChange={setPlatformFilter} />
+          <FilterPillGroup options={['All', '5', '4', '3', '2', '1']} value={starFilter} onChange={setStarFilter} />
+          <FilterPillGroup options={['All', 'Replied', 'Needs reply']} value={statusFilter} onChange={setStatusFilter} />
+        </div>
+        {filtered.length === 0 && <div style={{ fontSize: '13px', color: t.muted, textAlign: 'center', padding: '20px 0' }}>No reviews match these filters.</div>}
+        {filtered.map(r => (
+          <div key={r.id} className="px-row" style={{ padding: '14px', borderRadius: '10px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.rating < 4 ? t.accentRed : t.accentAmber}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
+              <StarRating rating={r.rating} />
+              <Pill label={r.platform} color={t.brand} bg={t.brandL} />
+              {flagged[r.id] && <Pill label="Flagged" color={t.red} bg={t.redL} />}
+            </div>
             <div style={{ fontSize: '12.5px', color: t.mid, lineHeight: '1.6' }}>{r.text}</div>
-            <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '7px' }}>{r.author}</div>
+            <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '7px' }}>— {r.author} · {r.date}</div>
             {replied[r.id] ? (
               <div style={{ marginTop: '8px' }}><Pill label="Replied" color={t.green} bg={t.greenL} /></div>
             ) : (
               <>
                 <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                  {r.negative && (
+                  {r.rating < 4 && (
                     <Btn small primary onClick={() => { setOpenId(r.id); draftWithAi(r); }} disabled={aiDrafting === r.id}>
                       {aiDrafting === r.id ? <Loader2 size={13} className="px-spin" /> : <Bot size={13} />} AI draft response
                     </Btn>
                   )}
                   <Btn small onClick={() => setOpenId(id => (id === r.id ? null : r.id))}>Reply</Btn>
+                  <Btn small onClick={() => setFlagged(f => ({ ...f, [r.id]: !f[r.id] }))}><Flag size={12} /> {flagged[r.id] ? 'Unflag' : 'Flag'}</Btn>
                 </div>
                 {openId === r.id && (
                   <div className="px-expand" style={{ marginTop: '10px' }}>
@@ -3650,7 +3786,92 @@ const REPORTS_DATA = {
   },
 };
 
-function Reports() {
+// Rows = hourly slots (8am-8pm), columns = Mon-Sun. null = closed.
+const CHAIR_UTILIZATION_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const CHAIR_UTILIZATION_HOURS = ['8am', '9am', '10am', '11am', '12pm', '1pm', '2pm', '3pm', '4pm', '5pm', '6pm', '7pm'];
+const CHAIR_UTILIZATION_GRID = [
+  [22, 45, 40, 38, 30, null, null],
+  [65, 78, 72, 68, 55, null, null],
+  [88, 92, 85, 90, 78, null, null],
+  [95, 88, 91, 87, 82, null, null],
+  [58, 62, 55, 60, 48, null, null],
+  [72, 80, 76, 74, 65, null, null],
+  [90, 94, 89, 92, 70, null, null],
+  [93, 96, 91, 95, 42, null, null],
+  [85, 82, 88, 80, null, null, null],
+  [50, 55, 48, 52, null, null, null],
+  [null, null, null, null, null, null, null],
+  [null, null, null, null, null, null, null],
+];
+
+function heatColor(rate, t) {
+  if (rate == null) return t.bgRow;
+  if (rate >= 80) return t.green;
+  if (rate >= 60) return withAlpha(t.accentGreen, .38);
+  if (rate >= 40) return t.amber;
+  if (rate >= 20) return withAlpha(t.accentRed, .3);
+  return t.red;
+}
+
+function ChairUtilization({ onUseInsight }) {
+  const t = useTheme();
+  let min = null, minHour = null, minDay = null;
+  CHAIR_UTILIZATION_GRID.forEach((row, hi) => {
+    row.forEach((rate, di) => {
+      if (rate != null && (min === null || rate < min)) { min = rate; minHour = CHAIR_UTILIZATION_HOURS[hi]; minDay = CHAIR_UTILIZATION_DAYS[di]; }
+    });
+  });
+
+  return (
+    <Card style={{ marginBottom: '16px' }}>
+      <CardTitle>Chair utilization</CardTitle>
+      <div style={{ overflowX: 'auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `56px repeat(${CHAIR_UTILIZATION_DAYS.length}, 1fr)`, gap: '4px', minWidth: '520px' }}>
+          <div />
+          {CHAIR_UTILIZATION_DAYS.map(d => (
+            <div key={d} style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textAlign: 'center', paddingBottom: '4px' }}>{d}</div>
+          ))}
+          {CHAIR_UTILIZATION_HOURS.map((hour, hi) => (
+            <Fragment key={hour}>
+              <div style={{ fontSize: '10.5px', color: t.muted, display: 'flex', alignItems: 'center' }}>{hour}</div>
+              {CHAIR_UTILIZATION_DAYS.map((day, di) => {
+                const rate = CHAIR_UTILIZATION_GRID[hi][di];
+                return (
+                  <div
+                    key={day}
+                    title={rate == null ? 'Closed' : `${day} ${hour}: ${rate}% booked`}
+                    style={{ height: '22px', borderRadius: '5px', background: heatColor(rate, t) }}
+                  />
+                );
+              })}
+            </Fragment>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', marginTop: '14px', fontSize: '11px', color: t.mid }}>
+        {[['80-100%', t.green], ['60-79%', withAlpha(t.accentGreen, .38)], ['40-59%', t.amber], ['20-39%', withAlpha(t.accentRed, .3)], ['0-19%', t.red]].map(([label, color], i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <span style={{ width: '12px', height: '12px', borderRadius: '3px', background: color, display: 'inline-block' }} />
+            {label}
+          </div>
+        ))}
+      </div>
+      {min !== null && (
+        <div style={{ marginTop: '14px', padding: '10px 14px', background: t.brandL, borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '12.5px', color: t.brand, display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <Sparkles size={13} /> Your emptiest slot is {minDay} {minHour} ({min}% booked) — consider targeting it with a campaign.
+          </div>
+          <Btn small primary onClick={() => onUseInsight({
+            name: `Fill the ${minDay} ${minHour} lull`,
+            message: `We noticed openings ${minDay} around ${minHour} — want to grab one? Reply YES and we'll get you booked.`,
+          })}>Use this insight</Btn>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+function Reports({ onSuggestCampaign }) {
   const t = useTheme();
   const colorMap = { brand: t.brand, green: t.green, teal: t.teal, amber: t.amber, pink: t.pink, orange: t.orange, purple: t.purple };
   const accentMap = { brand: t.accentBlue, green: t.accentGreen, teal: t.accentTeal, amber: t.accentAmber, pink: t.accentPink, orange: t.accentOrange, purple: t.accentPurple };
@@ -3672,6 +3893,7 @@ function Reports() {
           <StatCard key={i} label={label} value={value} color={colorMap[color]} accent={accentMap[color]} sub={sub} />
         ))}
       </div>
+      <ChairUtilization onUseInsight={onSuggestCampaign} />
       <Card>
         <CardTitle>Monthly performance breakdown</CardTitle>
         {data.metrics.map(([label, val, color], i) => (
