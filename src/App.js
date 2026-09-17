@@ -14,11 +14,27 @@ import {
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
   Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
-  CalendarPlus, BadgeCheck, Award, Flag, MessageCircle, Camera,
+  CalendarPlus, BadgeCheck, Award, Flag, MessageCircle, Camera, EyeOff, Monitor, Smartphone,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
 export const useTheme = () => useContext(ThemeContext);
+
+const PrivacyContext = createContext(false);
+const usePrivacy = () => useContext(PrivacyContext);
+
+function PII({ children, style }) {
+  const privacyOn = usePrivacy();
+  return (
+    <span style={{ filter: privacyOn ? 'blur(6px)' : 'none', transition: 'filter .15s ease', ...style }}>
+      {children}
+    </span>
+  );
+}
+
+function getInitialPrivacyMode() {
+  return typeof window !== 'undefined' && window.localStorage.getItem('praxismd-privacy') === 'on';
+}
 
 function getInitialMode() {
   const stored = typeof window !== 'undefined' ? window.localStorage.getItem('praxismd-theme') : null;
@@ -426,6 +442,11 @@ function App() {
   const [rolePermissions, setRolePermissions] = useState(DEFAULT_ROLE_PERMISSIONS);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [switchOpen, setSwitchOpen] = useState(false);
+  const [privacyMode, setPrivacyMode] = useState(getInitialPrivacyMode);
+  const [idleWarningOpen, setIdleWarningOpen] = useState(false);
+  const [idleCountdown, setIdleCountdown] = useState(60);
+  const lastActivityRef = useRef(Date.now());
+  const idleWarningOpenRef = useRef(false);
   const ownerDisplayName = profile?.ownerName || (profile?.email ? profile.email.split('@')[0] : 'Owner');
   const practiceDisplayName = profile?.practiceName || 'Your Practice';
   const currentUser = { name: ownerDisplayName, role: userRole };
@@ -463,6 +484,51 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem('praxismd-brand-color', brandColor);
   }, [brandColor]);
+
+  useEffect(() => {
+    window.localStorage.setItem('praxismd-privacy', privacyMode ? 'on' : 'off');
+  }, [privacyMode]);
+
+  function staySignedIn() {
+    lastActivityRef.current = Date.now();
+    idleWarningOpenRef.current = false;
+    setIdleWarningOpen(false);
+    setIdleCountdown(60);
+  }
+
+  useEffect(() => {
+    const IDLE_WARNING_MS = 14 * 60 * 1000;
+    const IDLE_LOGOUT_MS = 15 * 60 * 1000;
+
+    function resetActivity() {
+      if (idleWarningOpenRef.current) return;
+      lastActivityRef.current = Date.now();
+    }
+    window.addEventListener('mousemove', resetActivity);
+    window.addEventListener('keydown', resetActivity);
+    window.addEventListener('click', resetActivity);
+
+    const tick = window.setInterval(() => {
+      const elapsed = Date.now() - lastActivityRef.current;
+      if (elapsed >= IDLE_LOGOUT_MS) {
+        idleWarningOpenRef.current = false;
+        setIdleWarningOpen(false);
+        handleLogout();
+      } else if (elapsed >= IDLE_WARNING_MS) {
+        idleWarningOpenRef.current = true;
+        setIdleWarningOpen(true);
+        setIdleCountdown(Math.max(0, Math.ceil((IDLE_LOGOUT_MS - elapsed) / 1000)));
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener('mousemove', resetActivity);
+      window.removeEventListener('keydown', resetActivity);
+      window.removeEventListener('click', resetActivity);
+      window.clearInterval(tick);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     function onDocClick(e) {
@@ -569,6 +635,7 @@ function App() {
   }
 
   return (
+    <PrivacyContext.Provider value={privacyMode}>
     <ThemeContext.Provider value={t}>
     <style>{`
       @keyframes pxFadeSlide { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -701,6 +768,14 @@ function App() {
 
           <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', flexShrink: 0 }}>
             <button
+              onClick={() => setPrivacyMode(p => !p)}
+              aria-label="Toggle privacy mode"
+              title={privacyMode ? 'Privacy mode on — click to show patient info' : 'Blur patient names, emails, and phone numbers'}
+              style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 13px', borderRadius: '10px', border: `1px solid ${privacyMode ? t.red : t.border}`, background: privacyMode ? t.redL : t.bgCard, cursor: 'pointer', color: privacyMode ? t.red : t.mid, fontSize: '12.5px', fontWeight: '500', fontFamily: 'inherit' }}
+            >
+              <EyeOff size={15} /> {privacyMode && 'Privacy on'}
+            </button>
+            <button
               onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle dark mode"
               title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -818,8 +893,20 @@ function App() {
         setQuery={setPatientQuery}
         setActiveTab={setActiveTab}
       />
+      {idleWarningOpen && (
+        <Modal title="Still there?" onClose={staySignedIn}>
+          <div style={{ fontSize: '13px', color: t.mid, lineHeight: '1.6', marginBottom: '16px' }}>
+            For your security, you'll be signed out in <strong style={{ color: t.red }}>{idleCountdown}s</strong> due to inactivity.
+          </div>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <Btn primary onClick={staySignedIn}>Stay signed in</Btn>
+            <Btn onClick={handleLogout}>Sign out now</Btn>
+          </div>
+        </Modal>
+      )}
     </div>
     </ThemeContext.Provider>
+    </PrivacyContext.Provider>
   );
 }
 
@@ -1430,7 +1517,7 @@ function Inbox({ contacts }) {
                   <Ava initials={initialsOf(c.name)} bg={bg} color={color} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                      <div style={{ fontSize: '13px', fontWeight: c.unread ? '700' : '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                      <div style={{ fontSize: '13px', fontWeight: c.unread ? '700' : '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><PII>{c.name}</PII></div>
                       <div style={{ fontSize: '10.5px', color: t.muted, flexShrink: 0 }}>{last?.time || ''}</div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1483,8 +1570,8 @@ function Inbox({ contacts }) {
                   </button>
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{selected.name}</div>
-                  <div style={{ fontSize: '11px', color: t.muted }}>{matchedContact?.phone ? `${matchedContact.phone} · ` : ''}{selected.channel}</div>
+                  <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}><PII>{selected.name}</PII></div>
+                  <div style={{ fontSize: '11px', color: t.muted }}>{matchedContact?.phone ? <><PII>{matchedContact.phone}</PII>{' · '}</> : ''}{selected.channel}</div>
                 </div>
                 <Pill label={selected.channel} color={t.brand} bg={t.brandL} />
               </div>
@@ -1913,7 +2000,7 @@ function Recall() {
           {OVERDUE_PATIENTS.map(p => (
             <RowItem key={p.id} style={{ background: bgMap[p.bg], borderColor: withAlpha(t.accentRed, .15) }}>
               <Ava initials={p.ini} bg={bgMap[p.bg]} color={colorMap[p.c]} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{p.sub}</div></div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{p.name}</PII></div><div style={{ fontSize: '11.5px', color: t.muted }}>{p.sub}</div></div>
               {sent[p.id] ? <Pill label="Sent" color={t.green} bg={t.greenL} /> : <Btn small onClick={() => setSent(s => ({ ...s, [p.id]: true }))}>Send recall</Btn>}
             </RowItem>
           ))}
@@ -2013,7 +2100,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
         <StatCard label="Average patient LTV" value={`$${avgLtv.toLocaleString()}`} color={t.brand} accent={t.accentBlue} sub="Across all patients" />
-        <StatCard label="Highest value patient" value={highestLtv ? `$${highestLtv.ltv.toLocaleString()}` : '—'} color={t.green} accent={t.accentGreen} sub={highestLtv?.name || ''} />
+        <StatCard label="Highest value patient" value={highestLtv ? `$${highestLtv.ltv.toLocaleString()}` : '—'} color={t.green} accent={t.accentGreen} sub={highestLtv ? <PII>{highestLtv.name}</PII> : ''} />
         <StatCard label="Total practice patient value" value={`$${totalLtv.toLocaleString()}`} color={t.purple} accent={t.accentPurple} sub={`${list.length} patients`} />
       </div>
       <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
@@ -2088,8 +2175,8 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
               <tbody>
                 {sorted.map((p, i) => (
                   <tr key={p.id || i} onClick={() => setSelected(p)} className="px-row" style={{ borderBottom: `1px solid ${t.border2}`, cursor: 'pointer' }}>
-                    <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}>{p.name}</div><div style={{ fontSize: '11px', color: t.muted }}>{p.email}</div></td>
-                    <td style={{ padding: '11px 13px', color: t.mid }}>{p.phone}</td>
+                    <td style={{ padding: '11px 13px' }}><div style={{ fontWeight: '500', color: t.ink2 }}><PII>{p.name}</PII></div><div style={{ fontSize: '11px', color: t.muted }}><PII>{p.email}</PII></div></td>
+                    <td style={{ padding: '11px 13px', color: t.mid }}><PII>{p.phone}</PII></td>
                     <td style={{ padding: '11px 13px' }}>{p.tag ? <Pill label={p.tag} color={t.brand} bg={t.brandL} /> : <span style={{ color: t.muted }}>—</span>}</td>
                     <td style={{ padding: '11px 13px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -2115,12 +2202,12 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '22px' }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: t.brandL, color: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '17px', fontWeight: '700' }}>{initialsOf(selected.name)}</div>
             <div>
-              <div style={{ fontSize: '16px', fontWeight: '700', color: t.ink }}>{selected.name}</div>
+              <div style={{ fontSize: '16px', fontWeight: '700', color: t.ink }}><PII>{selected.name}</PII></div>
               {selected.tag && <div style={{ marginTop: '4px' }}><Pill label={selected.tag} color={t.brand} bg={t.brandL} /></div>}
             </div>
           </div>
-          <DetailRow label="Email" value={selected.email} />
-          <DetailRow label="Phone" value={selected.phone} />
+          <DetailRow label="Email" value={<PII>{selected.email}</PII>} />
+          <DetailRow label="Phone" value={<PII>{selected.phone}</PII>} />
           <DetailRow label="Patient since" value={selected.dateAdded} />
           <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>APPOINTMENT HISTORY</div>
@@ -2929,7 +3016,7 @@ function Documents({ contacts }) {
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.name}</div>
-              <div style={{ fontSize: '11.5px', color: t.muted }}>{tab === 'received' ? 'From' : 'To'} {doc.who} · {doc.date} · {doc.size}</div>
+              <div style={{ fontSize: '11.5px', color: t.muted }}>{tab === 'received' ? 'From' : 'To'} <PII>{doc.who}</PII> · {doc.date} · {doc.size}</div>
             </div>
             <Pill label={doc.category} color={t.brand} bg={t.brandL} />
             <Btn small onClick={() => handleShare(doc)}><Send size={12} /> Share</Btn>
@@ -3046,7 +3133,7 @@ function Waitlist() {
                   <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: t.brandL, color: t.brand, fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</div>
                   <Ava initials={p.ini} bg={bgMap[p.bg]} color={colorMap[p.c]} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{p.name}</div>
+                    <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{p.name}</PII></div>
                     <div style={{ fontSize: '11.5px', color: t.muted }}>{p.service} · {p.pref}</div>
                   </div>
                   <Pill label={pillLabel} color={pillColor} bg={pillBg} />
@@ -3054,7 +3141,7 @@ function Waitlist() {
                 </div>
                 {isExpanded && (
                   <div className="px-expand" style={{ padding: '0 0 14px 60px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    <DetailRow label="Phone" value={p.phone} />
+                    <DetailRow label="Phone" value={<PII>{p.phone}</PII>} />
                     <DetailRow label="Waiting since" value={p.waitingSince} />
                     <div style={{ gridColumn: '1 / -1' }}><DetailRow label="Notes" value={p.notes} /></div>
                   </div>
@@ -3200,7 +3287,7 @@ function Calendar() {
               <div style={{ fontSize: '11.5px', color: t.muted, width: '60px', flexShrink: 0, fontWeight: '500' }}>{appt.time}</div>
               <Ava initials={initialsOf(appt.patient)} bg={bg} color={color} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{appt.patient}</div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{appt.patient}</PII></div>
                 <div style={{ fontSize: '11.5px', color: t.muted }}>{appt.type} · {appt.duration} min</div>
               </div>
               <button onClick={() => removeAppointment(appt.id)} title="Remove" style={{ background: 'none', border: 'none', color: t.muted, cursor: 'pointer', padding: '4px', display: 'flex' }}>
@@ -3248,6 +3335,12 @@ const BRIEFING_ITEM_META = [
   { key: 'claims', label: 'Pending claims', value: 5, format: n => `${n} pending claims` },
   { key: 'revenue', label: 'Revenue recovered yesterday', value: 1200, format: n => `$${n.toLocaleString()} recovered yesterday` },
   { key: 'security', label: 'Security events', value: 1, format: n => `${n} security event${n === 1 ? '' : 's'} flagged` },
+];
+
+const ACTIVE_SESSIONS_SEED = [
+  { id: 's1', device: 'desktop', browser: 'Chrome on macOS', location: 'Tampa, FL', lastActive: 'Active now', current: true },
+  { id: 's2', device: 'mobile', browser: 'Safari on iPhone', location: 'Tampa, FL', lastActive: '2 hours ago', current: false },
+  { id: 's3', device: 'desktop', browser: 'Chrome on Windows', location: 'Orlando, FL', lastActive: 'Yesterday at 4:12 PM', current: false },
 ];
 
 function formatTime12h(time24) {
@@ -3343,7 +3436,7 @@ function AppointmentRequests() {
             <Ava initials={initialsOf(r.patientName)} bg={r.emergency ? t.redL : t.brandL} color={r.emergency ? t.red : t.brand} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{r.patientName}</span>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}><PII>{r.patientName}</PII></span>
                 {r.emergency && <Pill label="Emergency" color={t.red} bg={t.redL} />}
                 {r.conflict && <Pill label="Scheduling conflict" color={t.amber} bg={t.amberL} />}
                 {r.status !== 'pending' && <Pill label={r.status === 'confirmed' ? 'Confirmed' : 'Declined'} color={r.status === 'confirmed' ? t.green : t.muted} bg={r.status === 'confirmed' ? t.greenL : t.bgRow} />}
@@ -3545,7 +3638,7 @@ function TreatmentPlans({ contacts }) {
               <Ava initials={initialsOf(p.patientName)} bg={t.brandL} color={t.brand} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{p.patientName}</span>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}><PII>{p.patientName}</PII></span>
                   <span style={{ fontSize: '12.5px', color: t.muted }}>· {p.planName}</span>
                 </div>
                 <div style={{ fontSize: '11.5px', color: t.muted }}>${p.totalValue.toLocaleString()} · {total} procedure{total === 1 ? '' : 's'} · Created {p.createdDate}</div>
@@ -3722,7 +3815,7 @@ function MembershipPlans() {
             <div key={m.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', alignItems: 'center', padding: '10px 4px', borderRadius: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
                 <Ava initials={initialsOf(m.patientName)} bg={t.brandL} color={t.brand} />
-                <span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.patientName}</span>
+                <span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{m.patientName}</PII></span>
               </div>
               <div style={{ fontSize: '12.5px', color: t.mid }}>{plan?.name}</div>
               <div style={{ fontSize: '12.5px', color: t.ink2 }}>${plan?.monthlyPrice}</div>
@@ -4115,6 +4208,18 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
     appointments: true, messages: true, recall: true, claims: true, revenue: true, security: true,
   });
   const [briefingTestSent, setBriefingTestSent] = useState(false);
+  const [sessions, setSessions] = useState(ACTIVE_SESSIONS_SEED);
+  const [sessionNotice, setSessionNotice] = useState('');
+
+  function revokeSession(id) {
+    setSessions(list => list.filter(s => s.id !== id));
+  }
+
+  function signOutAllOthers() {
+    setSessions(list => list.filter(s => s.current));
+    setSessionNotice('Signed out of all other devices.');
+    setTimeout(() => setSessionNotice(''), 3000);
+  }
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
@@ -4440,6 +4545,35 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
               {briefingTestSent && <span style={{ fontSize: '12.5px', color: t.green, display: 'flex', alignItems: 'center', gap: '5px' }}><Check size={13} /> Test briefing sent!</span>}
             </div>
           </>
+        )}
+      </Card>
+
+      <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, margin: '18px 0 10px' }}>Security</div>
+
+      <Card style={{ marginBottom: '18px' }}>
+        <CardTitle>Active sessions</CardTitle>
+        {sessionNotice && (
+          <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '10px', fontSize: '12px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sessionNotice}</div>
+        )}
+        {sessions.map(s => (
+          <RowItem key={s.id} style={{ justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {s.device === 'mobile' ? <Smartphone size={16} color={t.brand} /> : <Monitor size={16} color={t.brand} />}
+              </div>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2, display: 'flex', alignItems: 'center', gap: '7px' }}>
+                  {s.browser}
+                  {s.current && <Pill label="This device" color={t.green} bg={t.greenL} />}
+                </div>
+                <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{s.location} · {s.lastActive}</div>
+              </div>
+            </div>
+            {!s.current && <Btn small onClick={() => revokeSession(s.id)}><X size={12} /> Revoke</Btn>}
+          </RowItem>
+        ))}
+        {sessions.length > 1 && (
+          <Btn style={{ marginTop: '8px' }} onClick={signOutAllOthers}><LogOut size={13} /> Sign out all other devices</Btn>
         )}
       </Card>
 
