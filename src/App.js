@@ -3219,6 +3219,22 @@ const DOCTORS_SEED = ['Dr. Rivera', 'Dr. Alvarez', 'Dr. Cho', 'Any available doc
 const REQUEST_APPT_TYPES_SEED = ['Cleaning', 'Filling', 'Crown', 'Root Canal', 'Implant', 'Veneer', 'Emergency Exam', 'Consultation'];
 const DEPOSIT_TYPES = ['Crown', 'Implant', 'Veneer'];
 
+const BRIEFING_ITEM_META = [
+  { key: 'appointments', label: "Today's appointments count", value: 4, format: n => `${n} appointments today` },
+  { key: 'messages', label: 'Unread messages', value: 4, format: n => `${n} unread messages` },
+  { key: 'recall', label: 'Patients due for recall today', value: 3, format: n => `${n} patients due for recall` },
+  { key: 'claims', label: 'Pending claims', value: 5, format: n => `${n} pending claims` },
+  { key: 'revenue', label: 'Revenue recovered yesterday', value: 1200, format: n => `$${n.toLocaleString()} recovered yesterday` },
+  { key: 'security', label: 'Security events', value: 1, format: n => `${n} security event${n === 1 ? '' : 's'} flagged` },
+];
+
+function formatTime12h(time24) {
+  const [h, m] = time24.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
+}
+
 const APPOINTMENT_REQUESTS_SEED = [
   { id: 'ar1', patientName: 'Sarah Malone', requestedDate: 'Sep 22, 2026', preferredTime: 'Morning (9–11am)', apptType: 'Cleaning', requestedDoctor: 'Dr. Rivera', insurance: 'Delta Dental — Active', notes: 'Prefers an early appointment, works nights.', status: 'pending', emergency: false, conflict: false },
   { id: 'ar2', patientName: 'Tom Alvarez', requestedDate: 'Sep 20, 2026', preferredTime: 'ASAP', apptType: 'Emergency Exam', requestedDoctor: 'Any available doctor', insurance: 'Cigna Dental — Active', notes: 'Severe tooth pain since last night, possible abscess.', status: 'pending', emergency: true, conflict: false },
@@ -3942,6 +3958,13 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
     Sun: { open: false, from: '09:00', to: '13:00' },
   });
   const [depositRequired, setDepositRequired] = useState(true);
+  const [briefingEnabled, setBriefingEnabled] = useState(true);
+  const [briefingTime, setBriefingTime] = useState('07:00');
+  const [briefingDelivery, setBriefingDelivery] = useState('Both');
+  const [briefingIncludes, setBriefingIncludes] = useState({
+    appointments: true, messages: true, recall: true, claims: true, revenue: true, security: true,
+  });
+  const [briefingTestSent, setBriefingTestSent] = useState(false);
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
@@ -4188,6 +4211,86 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           </div>
           <ToggleSwitch checked={depositRequired} onChange={() => setDepositRequired(v => !v)} />
         </RowItem>
+      </Card>
+
+      <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, margin: '18px 0 10px' }}>Morning Briefing</div>
+
+      <Card style={{ marginBottom: '18px' }}>
+        <RowItem style={{ justifyContent: 'space-between', marginBottom: '14px' }}>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Send a daily morning briefing</div>
+            <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>A quick summary of yesterday and today, delivered before the day starts.</div>
+          </div>
+          <ToggleSwitch checked={briefingEnabled} onChange={() => setBriefingEnabled(v => !v)} />
+        </RowItem>
+
+        {briefingEnabled && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+              <div>
+                <label style={labelStyle}>Send time</label>
+                <input type="time" value={briefingTime} onChange={e => setBriefingTime(e.target.value)} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Delivery method</label>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {['SMS', 'Email', 'Both'].map(method => (
+                    <button
+                      key={method} type="button" onClick={() => setBriefingDelivery(method)}
+                      style={{ flex: 1, padding: '8px', borderRadius: '10px', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', border: briefingDelivery === method ? 'none' : `1px solid ${t.border}`, background: briefingDelivery === method ? t.brand : t.bgCard, color: briefingDelivery === method ? 'white' : t.mid, fontFamily: 'inherit' }}
+                    >{method}</button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <label style={labelStyle}>Include in briefing</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '18px' }}>
+              {BRIEFING_ITEM_META.map(item => (
+                <label key={item.key} style={{ display: 'flex', alignItems: 'center', gap: '9px', fontSize: '13px', color: t.ink2, cursor: 'pointer', padding: '8px 10px', background: t.bgRow, borderRadius: '9px' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!briefingIncludes[item.key]}
+                    onChange={() => setBriefingIncludes(inc => ({ ...inc, [item.key]: !inc[item.key] }))}
+                    style={{ width: '15px', height: '15px', flexShrink: 0, accentColor: t.brand }}
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+
+            <label style={labelStyle}>Live preview</label>
+            {briefingDelivery !== 'SMS' && (
+              <div style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: '12px', padding: '16px', marginBottom: briefingDelivery === 'Both' ? '10px' : '18px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '8px' }}>Email · {formatTime12h(briefingTime)}</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: t.ink, marginBottom: '10px' }}>Your morning briefing for {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {BRIEFING_ITEM_META.filter(item => briefingIncludes[item.key]).map(item => (
+                    <div key={item.key} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', color: t.mid }}>
+                      <Check size={13} color={t.green} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      {item.format(item.value)}
+                    </div>
+                  ))}
+                  {Object.values(briefingIncludes).every(v => !v) && <div style={{ fontSize: '12.5px', color: t.muted }}>Nothing selected — pick at least one item above.</div>}
+                </div>
+              </div>
+            )}
+            {briefingDelivery !== 'Email' && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '18px' }}>
+                <div style={{ maxWidth: '80%', background: t.brand, color: 'white', borderRadius: '14px', padding: '10px 13px', fontSize: '12.5px', lineHeight: 1.5 }}>
+                  Good morning! {BRIEFING_ITEM_META.filter(item => briefingIncludes[item.key]).map(item => item.format(item.value)).join(' · ') || 'No items selected.'}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Btn primary onClick={() => { setBriefingTestSent(true); setTimeout(() => setBriefingTestSent(false), 3000); }}>
+                <Send size={13} /> Send test briefing
+              </Btn>
+              {briefingTestSent && <span style={{ fontSize: '12.5px', color: t.green, display: 'flex', alignItems: 'center', gap: '5px' }}><Check size={13} /> Test briefing sent!</span>}
+            </div>
+          </>
+        )}
       </Card>
 
       <Card>
