@@ -14,6 +14,7 @@ import {
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
   Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
+  CalendarPlus, BadgeCheck,
 } from 'lucide-react';
 
 export const ThemeContext = createContext(light);
@@ -317,13 +318,15 @@ function useGhlFetch(fetchFn) {
 const ROLES = ['Owner', 'Office Manager', 'Front Desk', 'Biller'];
 const EDITABLE_ROLES = ROLES.filter(r => r !== 'Owner');
 
-const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'billing', 'payments', 'reports', 'activitylog', 'settings'];
+const ALL_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist', 'patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'treatmentplans', 'billing', 'membershipplans', 'payments', 'reports', 'activitylog', 'settings'];
 
 const TAB_LABELS = {
   overview: 'Overview', inbox: 'Inbox', campaigns: 'Campaigns', recall: 'Recall', calendar: 'Calendar',
+  appointmentrequests: 'Appointment Requests',
   waitlist: 'Waitlist', patients: 'Patients', portal: 'Patient Portal', eligibility: 'Eligibility',
-  reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents', billing: 'Billing',
-  payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
+  reviews: 'Reviews', surveys: 'Surveys', aifrontdesk: 'AI Front Desk', documents: 'Documents',
+  treatmentplans: 'Treatment Plans',
+  billing: 'Billing', membershipplans: 'Membership Plans', payments: 'Payments', reports: 'Reports', activitylog: 'Activity Log', settings: 'Settings',
 };
 
 function buildPermissions(onTabs) {
@@ -361,9 +364,9 @@ function roleColor(role, t) {
   }
 }
 
-const MAIN_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'waitlist'];
-const PRACTICE_TABS = ['patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents'];
-const BILLINGSEC_TABS = ['billing', 'payments'];
+const MAIN_TABS = ['overview', 'inbox', 'campaigns', 'recall', 'calendar', 'appointmentrequests', 'waitlist'];
+const PRACTICE_TABS = ['patients', 'portal', 'eligibility', 'reviews', 'surveys', 'aifrontdesk', 'documents', 'treatmentplans'];
+const BILLINGSEC_TABS = ['billing', 'membershipplans', 'payments'];
 const ANALYTICS_TABS = ['reports', 'settings', 'activitylog'];
 
 const STAFF_MEMBERS = [
@@ -636,6 +639,7 @@ function App() {
           {isTabVisible('campaigns', userRole, rolePermissions) && <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('recall', userRole, rolePermissions) && <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={setActiveTab} badge="89" badgeColor={t.amber} collapsed={!showFull} />}
           {isTabVisible('calendar', userRole, rolePermissions) && <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('appointmentrequests', userRole, rolePermissions) && <NavItem label="Appointment Requests" Icon={CalendarPlus} tab="appointmentrequests" active={activeTab} onClick={setActiveTab} badge={String(APPOINTMENT_REQUESTS_SEED.filter(r => r.status === 'pending').length)} badgeColor={t.amber} collapsed={!showFull} />}
           {isTabVisible('waitlist', userRole, rolePermissions) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={setActiveTab} badge="12" badgeColor={t.teal} collapsed={!showFull} />}
           {PRACTICE_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Practice" collapsed={!showFull} />}
           {isTabVisible('patients', userRole, rolePermissions) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
@@ -645,8 +649,10 @@ function App() {
           {isTabVisible('surveys', userRole, rolePermissions) && <NavItem label="Surveys" Icon={Smile} tab="surveys" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('aifrontdesk', userRole, rolePermissions) && <NavItem label="AI Front Desk" Icon={Bot} tab="aifrontdesk" active={activeTab} onClick={setActiveTab} badge="Live" badgeColor={t.purple} collapsed={!showFull} />}
           {isTabVisible('documents', userRole, rolePermissions) && <NavItem label="Documents" Icon={FileArchive} tab="documents" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
+          {isTabVisible('treatmentplans', userRole, rolePermissions) && <NavItem label="Treatment Plans" Icon={ClipboardList} tab="treatmentplans" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {BILLINGSEC_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Billing" collapsed={!showFull} />}
           {isTabVisible('billing', userRole, rolePermissions) && <NavItem label="Billing" Icon={Receipt} tab="billing" active={activeTab} onClick={setActiveTab} badge="Pro" badgeColor={t.purple} collapsed={!showFull} />}
+          {isTabVisible('membershipplans', userRole, rolePermissions) && <NavItem label="Membership Plans" Icon={BadgeCheck} tab="membershipplans" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {isTabVisible('payments', userRole, rolePermissions) && <NavItem label="Payments" Icon={CreditCard} tab="payments" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
           {ANALYTICS_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Analytics" collapsed={!showFull} />}
           {isTabVisible('reports', userRole, rolePermissions) && <NavItem label="Reports" Icon={TrendingUp} tab="reports" active={activeTab} onClick={setActiveTab} collapsed={!showFull} />}
@@ -785,6 +791,7 @@ function App() {
           {gate('recall', <Recall userRole={userRole} />)}
           {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />)}
           {gate('billing', <Billing userRole={userRole} />)}
+          {gate('membershipplans', <MembershipPlans userRole={userRole} />)}
           {gate('payments', <Payments userRole={userRole} />)}
           {gate('reports', <Reports userRole={userRole} />)}
           {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} brandColor={brandColor} onBrandColorChange={setBrandColor} />)}
@@ -795,8 +802,10 @@ function App() {
           {gate('eligibility', <Eligibility userRole={userRole} />)}
           {gate('portal', <Portal userRole={userRole} />)}
           {gate('documents', <Documents contacts={contacts} userRole={userRole} />)}
+          {gate('treatmentplans', <TreatmentPlans contacts={contacts} userRole={userRole} />)}
           {gate('waitlist', <Waitlist userRole={userRole} />)}
           {gate('calendar', <Calendar userRole={userRole} />)}
+          {gate('appointmentrequests', <AppointmentRequests userRole={userRole} />)}
         </div>
       </div>
 
@@ -821,6 +830,8 @@ function getPageTitle(tab, ownerName) {
     campaigns: 'Campaigns',
     recall: 'Recall & Scheduling',
     calendar: 'Calendar',
+    appointmentrequests: 'Appointment Requests',
+    treatmentplans: 'Treatment Plans',
     waitlist: 'Smart Waitlist',
     patients: 'Patients',
     portal: 'Patient Portal',
@@ -831,6 +842,7 @@ function getPageTitle(tab, ownerName) {
     documents: 'Documents',
     billing: 'Billing Automation',
     payments: 'Payments & Plans',
+    membershipplans: 'Membership Plans',
     reports: 'Reports',
     settings: 'Settings',
     activitylog: 'Activity Log',
@@ -3066,6 +3078,520 @@ function Calendar() {
   );
 }
 
+// ─── APPOINTMENT REQUESTS ──────────────────────────────────
+const DOCTORS_SEED = ['Dr. Rivera', 'Dr. Alvarez', 'Dr. Cho', 'Any available doctor'];
+const REQUEST_APPT_TYPES_SEED = ['Cleaning', 'Filling', 'Crown', 'Root Canal', 'Implant', 'Veneer', 'Emergency Exam', 'Consultation'];
+const DEPOSIT_TYPES = ['Crown', 'Implant', 'Veneer'];
+
+const APPOINTMENT_REQUESTS_SEED = [
+  { id: 'ar1', patientName: 'Sarah Malone', requestedDate: 'Sep 22, 2026', preferredTime: 'Morning (9–11am)', apptType: 'Cleaning', requestedDoctor: 'Dr. Rivera', insurance: 'Delta Dental — Active', notes: 'Prefers an early appointment, works nights.', status: 'pending', emergency: false, conflict: false },
+  { id: 'ar2', patientName: 'Tom Alvarez', requestedDate: 'Sep 20, 2026', preferredTime: 'ASAP', apptType: 'Emergency Exam', requestedDoctor: 'Any available doctor', insurance: 'Cigna Dental — Active', notes: 'Severe tooth pain since last night, possible abscess.', status: 'pending', emergency: true, conflict: false },
+  { id: 'ar3', patientName: 'Priya Patel', requestedDate: 'Sep 25, 2026', preferredTime: 'Afternoon (1–3pm)', apptType: 'Crown', requestedDoctor: 'Dr. Alvarez', insurance: 'Aetna — Active', notes: 'Follow-up on the temporary crown from last visit.', status: 'pending', emergency: false, conflict: false },
+  { id: 'ar4', patientName: 'James Coleman Jr.', requestedDate: 'Sep 19, 2026', preferredTime: 'Morning (9–11am)', apptType: 'Implant Consultation', requestedDoctor: 'Dr. Cho', insurance: 'No insurance on file', notes: 'Requested slot conflicts with Dr. Cho’s existing 9:30am booking — needs rescheduling.', status: 'pending', emergency: false, conflict: true },
+  { id: 'ar5', patientName: 'Angela Ruiz', requestedDate: 'Sep 15, 2026', preferredTime: 'Afternoon (1–3pm)', apptType: 'Cleaning', requestedDoctor: 'Any available doctor', insurance: 'MetLife — Active', notes: 'Regular 6-month cleaning.', status: 'confirmed', emergency: false, conflict: false },
+];
+
+function AppointmentRequests() {
+  const t = useTheme();
+  const [requests, setRequests] = useState(APPOINTMENT_REQUESTS_SEED);
+  const [filter, setFilter] = useState('All');
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [declineTarget, setDeclineTarget] = useState(null);
+  const [suggestTarget, setSuggestTarget] = useState(null);
+  const [confirmForm, setConfirmForm] = useState({ date: '', time: '', doctor: '', notes: '' });
+  const [declineMessage, setDeclineMessage] = useState('');
+  const [suggestTime, setSuggestTime] = useState('');
+  const [notice, setNotice] = useState('');
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
+
+  const confirmedCount = requests.filter(r => r.status === 'confirmed').length;
+  const declinedCount = requests.filter(r => r.status === 'declined').length;
+  const resolvedCount = confirmedCount + declinedCount;
+  const confirmationRate = resolvedCount > 0 ? Math.round((confirmedCount / resolvedCount) * 100) : 100;
+
+  const filtered = requests.filter(r => {
+    if (filter === 'Pending') return r.status === 'pending';
+    if (filter === 'Confirmed') return r.status === 'confirmed';
+    if (filter === 'Declined') return r.status === 'declined';
+    return true;
+  });
+
+  function openConfirm(r) {
+    setConfirmForm({ date: r.requestedDate, time: r.preferredTime, doctor: r.requestedDoctor, notes: '' });
+    setConfirmTarget(r);
+  }
+
+  function submitConfirm() {
+    setRequests(rs => rs.map(r => r.id === confirmTarget.id ? { ...r, status: 'confirmed', assignedDoctor: confirmForm.doctor } : r));
+    setNotice(`Confirmation sent to ${confirmTarget.patientName} for ${confirmForm.date}, ${confirmForm.time} with ${confirmForm.doctor}.`);
+    setConfirmTarget(null);
+    setTimeout(() => setNotice(''), 4000);
+  }
+
+  function submitDecline() {
+    setRequests(rs => rs.map(r => r.id === declineTarget.id ? { ...r, status: 'declined' } : r));
+    setNotice(`Decline sent to ${declineTarget.patientName}${declineMessage.trim() ? ' with your message.' : '.'}`);
+    setDeclineTarget(null);
+    setDeclineMessage('');
+    setTimeout(() => setNotice(''), 4000);
+  }
+
+  function submitSuggestion() {
+    setNotice(`Alternate time "${suggestTime}" suggested to ${suggestTarget.patientName}.`);
+    setSuggestTarget(null);
+    setSuggestTime('');
+    setTimeout(() => setNotice(''), 4000);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+        <StatCard label="Total requests this week" value={String(requests.length)} color={t.brand} accent={t.accentBlue} sub="Across all channels" />
+        <StatCard label="Average response time" value="38 min" color={t.teal} accent={t.accentTeal} sub="From request to reply" />
+        <StatCard label="Confirmation rate" value={`${confirmationRate}%`} color={t.green} accent={t.accentGreen} sub="Of resolved requests" />
+      </div>
+
+      {notice && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '10px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{notice}</div>
+      )}
+
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
+        <FilterPillGroup options={['All', 'Pending', 'Confirmed', 'Declined']} value={filter} onChange={setFilter} />
+      </div>
+
+      {filtered.length === 0 && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No requests match this filter.</Card>}
+
+      {filtered.map(r => (
+        <Card key={r.id} className="px-card" style={{ marginBottom: '12px', borderColor: r.emergency ? withAlpha(t.accentRed, .3) : undefined }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '13px' }}>
+            <Ava initials={initialsOf(r.patientName)} bg={r.emergency ? t.redL : t.brandL} color={r.emergency ? t.red : t.brand} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{r.patientName}</span>
+                {r.emergency && <Pill label="Emergency" color={t.red} bg={t.redL} />}
+                {r.conflict && <Pill label="Scheduling conflict" color={t.amber} bg={t.amberL} />}
+                {r.status !== 'pending' && <Pill label={r.status === 'confirmed' ? 'Confirmed' : 'Declined'} color={r.status === 'confirmed' ? t.green : t.muted} bg={r.status === 'confirmed' ? t.greenL : t.bgRow} />}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px 18px', fontSize: '12.5px', color: t.mid, marginBottom: '8px' }}>
+                <div><span style={{ color: t.muted }}>Requested:</span> {r.requestedDate} · {r.preferredTime}</div>
+                <div><span style={{ color: t.muted }}>Type:</span> {r.apptType}</div>
+                <div><span style={{ color: t.muted }}>Doctor requested:</span> {r.requestedDoctor}</div>
+                <div><span style={{ color: t.muted }}>Insurance:</span> {r.insurance}</div>
+              </div>
+              {r.notes && <div style={{ fontSize: '12.5px', color: t.ink2, background: t.bgRow, borderRadius: '8px', padding: '8px 11px', marginBottom: r.status === 'pending' ? '10px' : 0 }}>{r.notes}</div>}
+              {r.status === 'pending' && (
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <Btn small primary onClick={() => openConfirm(r)}><Check size={12} /> Confirm</Btn>
+                  <Btn small onClick={() => setDeclineTarget(r)}>Decline</Btn>
+                  <Btn small onClick={() => setSuggestTarget(r)}><Clock size={12} /> Suggest different time</Btn>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      ))}
+
+      {confirmTarget && (
+        <Modal title={`Confirm — ${confirmTarget.patientName}`} onClose={() => setConfirmTarget(null)}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Date</label>
+            <input value={confirmForm.date} onChange={e => setConfirmForm(f => ({ ...f, date: e.target.value }))} style={inputStyle} />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Time</label>
+            <input value={confirmForm.time} onChange={e => setConfirmForm(f => ({ ...f, time: e.target.value }))} style={inputStyle} />
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Assign to doctor</label>
+            <select value={confirmForm.doctor} onChange={e => setConfirmForm(f => ({ ...f, doctor: e.target.value }))} style={inputStyle}>
+              {DOCTORS_SEED.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={labelStyle}>Internal notes (optional)</label>
+            <textarea value={confirmForm.notes} onChange={e => setConfirmForm(f => ({ ...f, notes: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+          </div>
+          <Btn primary onClick={submitConfirm}><Send size={13} /> Send confirmation</Btn>
+        </Modal>
+      )}
+
+      {declineTarget && (
+        <Modal title={`Decline — ${declineTarget.patientName}`} onClose={() => setDeclineTarget(null)}>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={labelStyle}>Message to patient (optional)</label>
+            <textarea
+              value={declineMessage} onChange={e => setDeclineMessage(e.target.value)} rows={4}
+              placeholder="Explain why, and suggest they call the office to reschedule…"
+              style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+            />
+          </div>
+          <Btn primary onClick={submitDecline}><Send size={13} /> Send decline</Btn>
+        </Modal>
+      )}
+
+      {suggestTarget && (
+        <Modal title={`Suggest a different time — ${suggestTarget.patientName}`} onClose={() => setSuggestTarget(null)}>
+          <div style={{ marginBottom: '18px' }}>
+            <label style={labelStyle}>Suggested date & time</label>
+            <input value={suggestTime} onChange={e => setSuggestTime(e.target.value)} placeholder="e.g. Sep 23, 2:00pm" style={inputStyle} />
+          </div>
+          <Btn primary onClick={submitSuggestion} disabled={!suggestTime.trim()}><Send size={13} /> Send suggestion</Btn>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── TREATMENT PLANS ───────────────────────────────────────
+const TREATMENT_PLANS_SEED = [
+  {
+    id: 'tp1', patientName: 'James Lee', planName: 'Full Mouth Restoration', createdDate: 'Aug 20, 2026',
+    procedures: [
+      { code: 'D2740', name: 'Crown', cost: 1200, status: 'Accepted' },
+      { code: 'D2740', name: 'Crown', cost: 1200, status: 'Accepted' },
+      { code: 'D4341', name: 'Periodontal Scaling', cost: 280, status: 'Pending' },
+    ],
+  },
+  {
+    id: 'tp2', patientName: 'Robert Park', planName: 'Implant Replacement', createdDate: 'Sep 5, 2026',
+    procedures: [
+      { code: 'D6010', name: 'Implant Placement', cost: 3200, status: 'Pending' },
+      { code: 'D1110', name: 'Cleaning', cost: 150, status: 'Accepted' },
+    ],
+  },
+  {
+    id: 'tp3', patientName: 'Sarah Martinez', planName: 'Preventive Care Plan', createdDate: 'Jul 12, 2026',
+    procedures: [
+      { code: 'D1110', name: 'Cleaning', cost: 150, status: 'Accepted' },
+      { code: 'D1110', name: 'Cleaning', cost: 150, status: 'Accepted' },
+    ],
+  },
+  {
+    id: 'tp4', patientName: 'David Wong', planName: 'Crown & Scaling', createdDate: 'Sep 1, 2026',
+    procedures: [
+      { code: 'D2740', name: 'Crown', cost: 1200, status: 'Declined' },
+      { code: 'D4341', name: 'Scaling', cost: 280, status: 'Accepted' },
+    ],
+  },
+];
+
+const PROC_STATUS_COLOR = { Accepted: 'green', Pending: 'amber', Declined: 'red' };
+
+function TreatmentPlans({ contacts }) {
+  const t = useTheme();
+  const [plans, setPlans] = useState(TREATMENT_PLANS_SEED);
+  const [view, setView] = useState('active');
+  const [expandedId, setExpandedId] = useState(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ patient: '', planName: '', procedures: [{ code: '', cost: '' }] });
+  const [sentNotice, setSentNotice] = useState('');
+  const contactList = contacts || [];
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
+
+  const enriched = plans.map(p => {
+    const totalValue = p.procedures.reduce((sum, pr) => sum + pr.cost, 0);
+    const accepted = p.procedures.filter(pr => pr.status === 'Accepted').length;
+    const pending = p.procedures.filter(pr => pr.status === 'Pending').length;
+    const declined = p.procedures.filter(pr => pr.status === 'Declined').length;
+    const isActive = pending > 0;
+    const statusLabel = isActive ? 'In progress' : (declined > 0 && accepted === 0 ? 'Declined' : 'Completed');
+    return { ...p, totalValue, accepted, pending, declined, isActive, statusLabel };
+  });
+
+  const visible = enriched.filter(p => view === 'active' ? p.isActive : !p.isActive);
+
+  const allProcedures = enriched.flatMap(p => p.procedures);
+  const resolvedProcedures = allProcedures.filter(pr => pr.status === 'Accepted' || pr.status === 'Declined');
+  const acceptanceRate = resolvedProcedures.length > 0
+    ? Math.round((resolvedProcedures.filter(pr => pr.status === 'Accepted').length / resolvedProcedures.length) * 100)
+    : 0;
+
+  function addProcedureRow() {
+    setCreateForm(f => ({ ...f, procedures: [...f.procedures, { code: '', cost: '' }] }));
+  }
+
+  function updateProcedureRow(i, field, value) {
+    setCreateForm(f => ({ ...f, procedures: f.procedures.map((p, j) => j === i ? { ...p, [field]: value } : p) }));
+  }
+
+  function createPlan() {
+    if (!createForm.patient.trim() || !createForm.planName.trim()) return;
+    const procedures = createForm.procedures
+      .filter(p => p.code.trim() && p.cost)
+      .map(p => ({ code: p.code.trim(), name: p.code.trim(), cost: Number(p.cost) || 0, status: 'Pending' }));
+    setPlans(list => [{
+      id: `tp-new-${Date.now()}`, patientName: createForm.patient.trim(), planName: createForm.planName.trim(),
+      createdDate: 'Just now', procedures: procedures.length ? procedures : [{ code: '—', name: '—', cost: 0, status: 'Pending' }],
+    }, ...list]);
+    setShowCreate(false);
+    setCreateForm({ patient: '', planName: '', procedures: [{ code: '', cost: '' }] });
+  }
+
+  function sendToPatient(plan) {
+    setSentNotice(`Payment and approval link sent to ${plan.patientName} via SMS.`);
+    setTimeout(() => setSentNotice(''), 4000);
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+        <StatCard label="Treatment acceptance rate" value={`${acceptanceRate}%`} color={acceptanceRate >= 70 ? t.green : t.amber} accent={acceptanceRate >= 70 ? t.accentGreen : t.accentAmber} sub={`Industry average: 70%`} />
+        <StatCard label="Active plan value" value={`$${enriched.filter(p => p.isActive).reduce((s, p) => s + p.totalValue, 0).toLocaleString()}`} color={t.brand} accent={t.accentBlue} sub="Across in-progress plans" />
+        <StatCard label="Plans this month" value={String(plans.length)} color={t.purple} accent={t.accentPurple} sub="Created across all patients" />
+      </div>
+
+      {sentNotice && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '10px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sentNotice}</div>
+      )}
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          {[['active', 'Active Plans'], ['history', 'History']].map(([key, label]) => (
+            <button
+              key={key} type="button" onClick={() => setView(key)}
+              style={{ padding: '8px 18px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: view === key ? 'none' : `1px solid ${t.border}`, background: view === key ? t.brand : t.bgCard, color: view === key ? 'white' : t.mid, fontFamily: 'inherit' }}
+            >{label}</button>
+          ))}
+        </div>
+        <Btn primary onClick={() => setShowCreate(true)}><Plus size={14} /> Create treatment plan</Btn>
+      </div>
+
+      {visible.length === 0 && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No {view === 'active' ? 'active' : 'completed'} plans.</Card>}
+
+      {visible.map(p => {
+        const isExpanded = expandedId === p.id;
+        const total = p.procedures.length;
+        return (
+          <Card key={p.id} className="px-card" style={{ marginBottom: '12px' }}>
+            <div onClick={() => setExpandedId(isExpanded ? null : p.id)} style={{ display: 'flex', alignItems: 'center', gap: '13px', cursor: 'pointer' }}>
+              <Ava initials={initialsOf(p.patientName)} bg={t.brandL} color={t.brand} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{p.patientName}</span>
+                  <span style={{ fontSize: '12.5px', color: t.muted }}>· {p.planName}</span>
+                </div>
+                <div style={{ fontSize: '11.5px', color: t.muted }}>${p.totalValue.toLocaleString()} · {total} procedure{total === 1 ? '' : 's'} · Created {p.createdDate}</div>
+                <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden', marginTop: '8px', background: t.bgRow }}>
+                  {p.accepted > 0 && <div style={{ width: `${(p.accepted / total) * 100}%`, background: t.green }} />}
+                  {p.pending > 0 && <div style={{ width: `${(p.pending / total) * 100}%`, background: t.amber }} />}
+                  {p.declined > 0 && <div style={{ width: `${(p.declined / total) * 100}%`, background: t.red }} />}
+                </div>
+              </div>
+              <Pill label={p.statusLabel} color={p.isActive ? t.amber : (p.statusLabel === 'Declined' ? t.red : t.green)} bg={p.isActive ? t.amberL : (p.statusLabel === 'Declined' ? t.redL : t.greenL)} />
+              <ChevronDown size={16} color={t.muted} style={{ transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease', flexShrink: 0 }} />
+            </div>
+            {isExpanded && (
+              <div className="px-expand" style={{ marginTop: '12px', paddingTop: '12px', borderTop: `1px solid ${t.border2}` }}>
+                {p.procedures.map((pr, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0', borderBottom: i < p.procedures.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: '600', color: t.muted, width: '54px', flexShrink: 0 }}>{pr.code}</span>
+                    <span style={{ flex: 1, fontSize: '13px', color: t.ink2 }}>{pr.name}</span>
+                    <span style={{ fontSize: '13px', color: t.mid, width: '70px', textAlign: 'right' }}>${pr.cost.toLocaleString()}</span>
+                    <Pill label={pr.status} color={t[PROC_STATUS_COLOR[pr.status]]} bg={t[`${PROC_STATUS_COLOR[pr.status]}L`]} />
+                  </div>
+                ))}
+                {p.isActive && (
+                  <Btn small primary style={{ marginTop: '10px' }} onClick={() => sendToPatient(p)}><Send size={12} /> Send to patient</Btn>
+                )}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+
+      {showCreate && (
+        <Modal title="Create treatment plan" onClose={() => setShowCreate(false)}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Patient</label>
+            <input value={createForm.patient} onChange={e => setCreateForm(f => ({ ...f, patient: e.target.value }))} placeholder="Search patients…" list="tp-patient-list" style={inputStyle} />
+            <datalist id="tp-patient-list">
+              {contactList.map(c => <option key={c.id} value={c.name} />)}
+            </datalist>
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Plan name</label>
+            <input value={createForm.planName} onChange={e => setCreateForm(f => ({ ...f, planName: e.target.value }))} placeholder="e.g. Crown & Root Canal" style={inputStyle} />
+          </div>
+          <label style={labelStyle}>Procedures</label>
+          {createForm.procedures.map((pr, i) => (
+            <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <input value={pr.code} onChange={e => updateProcedureRow(i, 'code', e.target.value)} placeholder="Code / name (e.g. D2740 Crown)" style={{ ...inputStyle, flex: 2 }} />
+              <input value={pr.cost} onChange={e => updateProcedureRow(i, 'cost', e.target.value)} placeholder="Cost" type="number" style={{ ...inputStyle, flex: 1 }} />
+            </div>
+          ))}
+          <Btn small onClick={addProcedureRow} style={{ marginBottom: '18px' }}><Plus size={12} /> Add procedure</Btn>
+          <Btn primary onClick={createPlan}>Create plan</Btn>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── MEMBERSHIP PLANS ──────────────────────────────────────
+const MEMBERSHIP_PLANS_SEED = [
+  { id: 'mp1', name: 'Basic', monthlyPrice: 29, annualPrice: 299, benefits: ['2 cleanings per year', '1 X-ray set per year', '10% off all other procedures'] },
+  { id: 'mp2', name: 'Premium', monthlyPrice: 49, annualPrice: 499, benefits: ['Everything in Basic', 'Free teeth whitening once a year', 'Priority scheduling'] },
+];
+
+const MEMBERSHIP_MEMBERS_SEED = [
+  { id: 'mm1', patientName: 'Maria Chen', planId: 'mp2', joinDate: 'Jan 15, 2026', nextBilling: 'Oct 15, 2026', status: 'Active' },
+  { id: 'mm2', patientName: 'David Wong', planId: 'mp1', joinDate: 'Mar 3, 2026', nextBilling: 'Oct 3, 2026', status: 'Active' },
+  { id: 'mm3', patientName: 'Sarah Martinez', planId: 'mp2', joinDate: 'May 20, 2026', nextBilling: 'Oct 20, 2026', status: 'Active' },
+  { id: 'mm4', patientName: 'James Lee', planId: 'mp1', joinDate: 'Jul 8, 2026', nextBilling: 'Sep 8, 2026', status: 'Failed' },
+  { id: 'mm5', patientName: 'Priya Patel', planId: 'mp1', joinDate: 'Aug 1, 2026', nextBilling: 'Oct 1, 2026', status: 'Active' },
+];
+
+function MembershipPlans() {
+  const t = useTheme();
+  const [plans, setPlans] = useState(MEMBERSHIP_PLANS_SEED);
+  const [members] = useState(MEMBERSHIP_MEMBERS_SEED);
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: '', monthlyPrice: '', annualPrice: '', benefits: [''] });
+  const [linkNotice, setLinkNotice] = useState('');
+
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
+
+  const planById = Object.fromEntries(plans.map(p => [p.id, p]));
+  const activeMembers = members.filter(m => m.status === 'Active');
+  const mrr = activeMembers.reduce((sum, m) => sum + (planById[m.planId]?.monthlyPrice || 0), 0);
+
+  function planStats(plan) {
+    const planMembers = activeMembers.filter(m => m.planId === plan.id);
+    return { count: planMembers.length, revenue: planMembers.length * plan.monthlyPrice };
+  }
+
+  function updateBenefit(i, value) {
+    setCreateForm(f => ({ ...f, benefits: f.benefits.map((b, j) => j === i ? value : b) }));
+  }
+
+  function addBenefitRow() {
+    setCreateForm(f => ({ ...f, benefits: [...f.benefits, ''] }));
+  }
+
+  function createPlan() {
+    if (!createForm.name.trim() || !createForm.monthlyPrice) return;
+    setPlans(list => [...list, {
+      id: `mp-new-${Date.now()}`, name: createForm.name.trim(),
+      monthlyPrice: Number(createForm.monthlyPrice) || 0, annualPrice: Number(createForm.annualPrice) || 0,
+      benefits: createForm.benefits.filter(b => b.trim()),
+    }]);
+    setShowCreate(false);
+    setCreateForm({ name: '', monthlyPrice: '', annualPrice: '', benefits: [''] });
+  }
+
+  function generateLink() {
+    setLinkNotice('Stripe payment link generated: pay.stripe.com/praxismd-' + (createForm.name.trim().toLowerCase().replace(/\s+/g, '-') || 'plan') + ' (demo)');
+    setTimeout(() => setLinkNotice(''), 5000);
+  }
+
+  const monthlyNum = Number(createForm.monthlyPrice) || 0;
+  const annualNum = Number(createForm.annualPrice) || 0;
+  const annualSavings = monthlyNum > 0 && annualNum > 0 ? Math.max(0, monthlyNum * 12 - annualNum) : 0;
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '13px', marginBottom: '16px' }}>
+        <StatCard label="Total members" value={String(members.length)} color={t.brand} accent={t.accentBlue} sub={`${activeMembers.length} active`} />
+        <StatCard label="Monthly recurring revenue" value={`$${mrr.toLocaleString()}`} color={t.green} accent={t.accentGreen} sub="From active memberships" />
+        <StatCard label="Members added this month" value="3" color={t.purple} accent={t.accentPurple} sub="↑ growing steadily" />
+      </div>
+
+      <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        Plans
+        <Btn primary onClick={() => setShowCreate(true)}><Plus size={14} /> Create membership plan</Btn>
+      </div>
+
+      {linkNotice && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '10px', fontSize: '12.5px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, wordBreak: 'break-all' }}>{linkNotice}</div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px', marginBottom: '18px' }}>
+        {plans.map(plan => {
+          const stats = planStats(plan);
+          return (
+            <Card key={plan.id}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span style={{ fontSize: '16px', fontWeight: '700', color: t.ink }}>{plan.name}</span>
+                <Pill label={`${stats.count} members`} color={t.brand} bg={t.brandL} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+                <span style={{ fontSize: '24px', fontWeight: '800', color: t.ink }}>${plan.monthlyPrice}</span>
+                <span style={{ fontSize: '12px', color: t.muted }}>/mo · ${plan.annualPrice}/yr</span>
+              </div>
+              <div style={{ fontSize: '12px', color: t.green, fontWeight: '600', marginBottom: '12px' }}>${stats.revenue.toLocaleString()}/mo revenue</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {plan.benefits.map((b, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', color: t.mid }}>
+                    <Check size={13} color={t.green} style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <span>{b}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card>
+        <CardTitle>Active members</CardTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', padding: '0 4px 8px', fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>
+          <div>Patient</div><div>Plan</div><div>Monthly</div><div>Join date</div><div>Next billing</div><div>Status</div>
+        </div>
+        {members.map(m => {
+          const plan = planById[m.planId];
+          return (
+            <div key={m.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', alignItems: 'center', padding: '10px 4px', borderRadius: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
+                <Ava initials={initialsOf(m.patientName)} bg={t.brandL} color={t.brand} />
+                <span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{m.patientName}</span>
+              </div>
+              <div style={{ fontSize: '12.5px', color: t.mid }}>{plan?.name}</div>
+              <div style={{ fontSize: '12.5px', color: t.ink2 }}>${plan?.monthlyPrice}</div>
+              <div style={{ fontSize: '12.5px', color: t.muted }}>{m.joinDate}</div>
+              <div style={{ fontSize: '12.5px', color: t.muted }}>{m.nextBilling}</div>
+              <Pill label={m.status} color={m.status === 'Active' ? t.green : t.red} bg={m.status === 'Active' ? t.greenL : t.redL} />
+            </div>
+          );
+        })}
+      </Card>
+
+      {showCreate && (
+        <Modal title="Create membership plan" onClose={() => setShowCreate(false)}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Plan name</label>
+            <input value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Family Plan" style={inputStyle} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '6px' }}>
+            <div>
+              <label style={labelStyle}>Monthly price</label>
+              <input value={createForm.monthlyPrice} onChange={e => setCreateForm(f => ({ ...f, monthlyPrice: e.target.value }))} type="number" placeholder="39" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Annual price</label>
+              <input value={createForm.annualPrice} onChange={e => setCreateForm(f => ({ ...f, annualPrice: e.target.value }))} type="number" placeholder="399" style={inputStyle} />
+            </div>
+          </div>
+          {annualSavings > 0 && <div style={{ fontSize: '11.5px', color: t.green, marginBottom: '12px' }}>Patients save ${annualSavings}/year paying annually.</div>}
+          <label style={labelStyle}>Benefits</label>
+          {createForm.benefits.map((b, i) => (
+            <input key={i} value={b} onChange={e => updateBenefit(i, e.target.value)} placeholder="e.g. 2 cleanings per year" style={{ ...inputStyle, marginBottom: '8px' }} />
+          ))}
+          <Btn small onClick={addBenefitRow} style={{ marginBottom: '14px' }}><Plus size={12} /> Add benefit</Btn>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn onClick={generateLink}><CreditCard size={13} /> Generate Stripe payment link</Btn>
+            <Btn primary onClick={createPlan}>Create plan</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 // ─── REPORTS ───────────────────────────────────────────────
 const REPORTS_PERIODS = ['September 2026', 'August', 'July', 'Q3 2026'];
 
@@ -3183,6 +3709,17 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
   const [editRoleValue, setEditRoleValue] = useState('');
   const [permEditorRole, setPermEditorRole] = useState(null);
   const [draftPerms, setDraftPerms] = useState({});
+  const [requestDoctors, setRequestDoctors] = useState(DOCTORS_SEED.filter(d => d !== 'Any available doctor'));
+  const [newDoctor, setNewDoctor] = useState('');
+  const [requestApptTypes, setRequestApptTypes] = useState(REQUEST_APPT_TYPES_SEED);
+  const [newApptType, setNewApptType] = useState('');
+  const [businessHours, setBusinessHours] = useState({
+    Mon: { open: true, from: '08:00', to: '17:00' }, Tue: { open: true, from: '08:00', to: '17:00' },
+    Wed: { open: true, from: '08:00', to: '17:00' }, Thu: { open: true, from: '08:00', to: '17:00' },
+    Fri: { open: true, from: '08:00', to: '15:00' }, Sat: { open: false, from: '09:00', to: '13:00' },
+    Sun: { open: false, from: '09:00', to: '13:00' },
+  });
+  const [depositRequired, setDepositRequired] = useState(true);
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
@@ -3363,6 +3900,72 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
             </div>
           );
         })}
+      </Card>
+
+      <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, margin: '18px 0 10px' }}>Appointment Request Settings</div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
+        <Card>
+          <CardTitle>Doctors available for requests</CardTitle>
+          {requestDoctors.map(d => (
+            <RowItem key={d} style={{ justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: t.ink2 }}>{d}</span>
+              <button onClick={() => setRequestDoctors(list => list.filter(x => x !== d))} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+                <X size={14} />
+              </button>
+            </RowItem>
+          ))}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <input value={newDoctor} onChange={e => setNewDoctor(e.target.value)} placeholder="Add a doctor…" style={{ ...inputStyle, flex: 1 }} />
+            <Btn small onClick={() => { if (newDoctor.trim()) { setRequestDoctors(list => [...list, newDoctor.trim()]); setNewDoctor(''); } }}><Plus size={13} /> Add</Btn>
+          </div>
+        </Card>
+
+        <Card>
+          <CardTitle>Appointment types available</CardTitle>
+          {requestApptTypes.map(a => (
+            <RowItem key={a} style={{ justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '13px', color: t.ink2 }}>{a}</span>
+              <button onClick={() => setRequestApptTypes(list => list.filter(x => x !== a))} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+                <X size={14} />
+              </button>
+            </RowItem>
+          ))}
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <input value={newApptType} onChange={e => setNewApptType(e.target.value)} placeholder="Add an appointment type…" style={{ ...inputStyle, flex: 1 }} />
+            <Btn small onClick={() => { if (newApptType.trim()) { setRequestApptTypes(list => [...list, newApptType.trim()]); setNewApptType(''); } }}><Plus size={13} /> Add</Btn>
+          </div>
+        </Card>
+      </div>
+
+      <Card style={{ marginBottom: '14px' }}>
+        <CardTitle>Business hours for requests</CardTitle>
+        {Object.entries(businessHours).map(([day, hrs]) => (
+          <div key={day} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '9px 2px', borderBottom: `1px solid ${t.border2}` }}>
+            <div style={{ width: '42px', fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{day}</div>
+            <ToggleSwitch checked={hrs.open} onChange={() => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], open: !bh[day].open } }))} />
+            {hrs.open ? (
+              <>
+                <input type="time" value={hrs.from} onChange={e => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], from: e.target.value } }))} style={{ ...inputStyle, width: '120px' }} />
+                <span style={{ fontSize: '12px', color: t.muted }}>to</span>
+                <input type="time" value={hrs.to} onChange={e => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], to: e.target.value } }))} style={{ ...inputStyle, width: '120px' }} />
+              </>
+            ) : (
+              <span style={{ fontSize: '12.5px', color: t.muted }}>Closed</span>
+            )}
+          </div>
+        ))}
+      </Card>
+
+      <Card style={{ marginBottom: '18px' }}>
+        <CardTitle>Deposits</CardTitle>
+        <RowItem style={{ justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>Require deposit for high-value appointments</div>
+            <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>Applies to: {DEPOSIT_TYPES.join(', ')}</div>
+          </div>
+          <ToggleSwitch checked={depositRequired} onChange={() => setDepositRequired(v => !v)} />
+        </RowItem>
       </Card>
 
       <Card>
