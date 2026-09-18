@@ -4,7 +4,7 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
-import { getContacts, getConversations, getAppointments, getCampaigns, sendMessage, isGhlConfigured } from './api/ghl';
+import { getContacts, getConversations, getAppointments, getCalendars, getCampaigns, sendMessage, isGhlConfigured } from './api/ghl';
 import { createPaymentLink, isStripeConfigured } from './api/stripe';
 import {
   LayoutDashboard, InboxIcon, Megaphone, RotateCcw, CalendarIcon,
@@ -3445,8 +3445,14 @@ function Calendar() {
   const monthStart = new Date(year, month, 1).getTime();
   const monthEnd = new Date(year, month + 1, 0, 23, 59, 59).getTime();
 
+  // GHL's events endpoint requires a specific calendarId — fetch the
+  // account's calendars once and use the first one.
+  const { data: calendarsData, loading: calendarsLoading, error: calendarsError, refetch: refetchCalendars } = useGhlFetch(getCalendars);
+  const calendarId = (calendarsData && calendarsData[0] && calendarsData[0].id) || null;
+  const noCalendarsFound = isGhlConfigured && !calendarsLoading && !calendarsError && calendarsData && calendarsData.length === 0;
+
   const { data: apptData, loading: apptLoading, error: apptError, refetch: refetchAppts } =
-    useGhlFetch(() => getAppointments({ startTime: monthStart, endTime: monthEnd }), [year, month]);
+    useGhlFetch(() => getAppointments({ startTime: monthStart, endTime: monthEnd, calendarId }), [year, month, calendarId]);
   const appointments = isGhlConfigured ? mapAppointmentsByDate(apptData) : localAppointments;
 
   const days = [];
@@ -3510,10 +3516,15 @@ function Calendar() {
         </div>
       </Card>
 
-      {isGhlConfigured && apptLoading ? (
+      {isGhlConfigured && (calendarsLoading || apptLoading) ? (
         <LoadingState label="Loading appointments…" />
-      ) : isGhlConfigured && apptError ? (
-        <ErrorState message={apptError} onRetry={refetchAppts} />
+      ) : isGhlConfigured && (calendarsError || apptError) ? (
+        <ErrorState message={calendarsError || apptError} onRetry={calendarsError ? refetchCalendars : refetchAppts} />
+      ) : noCalendarsFound ? (
+        <Card>
+          <CardTitle>{selectedLabel}</CardTitle>
+          <div style={{ padding: '20px', textAlign: 'center', color: t.muted, fontSize: '13px' }}>No calendar found in GoHighLevel yet — create one there to start syncing appointments.</div>
+        </Card>
       ) : (
         <Card>
           <CardTitle>{selectedLabel}</CardTitle>
