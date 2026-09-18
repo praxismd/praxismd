@@ -1,63 +1,33 @@
 // GoHighLevel (LeadConnector v2) API client.
 //
-// ⚠️ PROTOTYPE ONLY — NOT SAFE FOR A REAL API KEY.
-// This calls GHL directly from the browser using REACT_APP_GHL_API_KEY,
-// which Create React App bakes into the public JS bundle at build time.
-// Anyone who opens devtools on the deployed site can read that key and get
-// full read/write access to the connected GHL account (contacts, messages,
-// appointments — real patient data once this is live). That's acceptable
-// only while there's no real key configured, for wiring up the UI shape.
-// Before connecting a real GHL account, move these calls behind a server
-// you control — e.g. a Firebase Cloud Function that holds the key and
-// exposes safe endpoints to the client — and delete the key from
-// REACT_APP_* entirely.
+// This never talks to GHL directly — the API key required for that lives
+// in Firebase Secret Manager and is only ever loaded inside the `ghlProxy`
+// Cloud Function (see functions/index.js). This file just sends a relative
+// path + method + body through Firebase's httpsCallable, which attaches the
+// signed-in user's ID token automatically so the function can require auth.
+//
+// Location ID isn't a secret (it's just an account identifier, not a
+// credential), so it's fine to keep it in REACT_APP_GHL_LOCATION_ID.
 //
 // Endpoint paths below target GHL's v2 API (services.leadconnectorhq.com)
 // as of this writing. GHL's API surface changes across versions/plans —
 // verify each path and payload shape against your account's API docs
 // before relying on it.
 
-const API_KEY = process.env.REACT_APP_GHL_API_KEY;
+import { httpsCallable } from 'firebase/functions';
+import { functions, isFirebaseConfigured } from '../firebase';
+
 const LOCATION_ID = process.env.REACT_APP_GHL_LOCATION_ID;
-const BASE_URL = 'https://services.leadconnectorhq.com';
-const API_VERSION = '2021-07-28';
 
-export const isGhlConfigured = Boolean(API_KEY && LOCATION_ID);
+export const isGhlConfigured = Boolean(isFirebaseConfigured && LOCATION_ID);
 
-async function ghlRequest(path, options = {}) {
+async function ghlRequest(path, { method, body } = {}) {
   if (!isGhlConfigured) {
-    throw new Error('GoHighLevel is not connected yet — add REACT_APP_GHL_API_KEY and REACT_APP_GHL_LOCATION_ID to your .env.local.');
+    throw new Error('GoHighLevel is not connected yet — add REACT_APP_GHL_LOCATION_ID to your .env.local and set the GHL_API_KEY secret (see .env.example).');
   }
-
-  const url = `${BASE_URL}${path}`;
-  let res;
-  try {
-    res = await fetch(url, {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${API_KEY}`,
-        Version: API_VERSION,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
-  } catch (err) {
-    throw new Error('Could not reach GoHighLevel — check your connection and try again.');
-  }
-
-  if (!res.ok) {
-    let detail = '';
-    try {
-      const body = await res.json();
-      detail = body?.message || body?.error || '';
-    } catch {
-      // response wasn't JSON — ignore, we'll fall back to the status text below
-    }
-    throw new Error(detail || `GoHighLevel request failed (${res.status} ${res.statusText}).`);
-  }
-
-  return res.json();
+  const call = httpsCallable(functions, 'ghlProxy');
+  const res = await call({ path, method, body });
+  return res.data;
 }
 
 export async function getContacts({ limit = 100 } = {}) {
@@ -88,6 +58,6 @@ export async function sendMessage(contactId, message) {
   if (!message || !message.trim()) throw new Error('Message cannot be empty.');
   return ghlRequest('/conversations/messages', {
     method: 'POST',
-    body: JSON.stringify({ type: 'SMS', contactId, message }),
+    body: { type: 'SMS', contactId, message },
   });
 }
