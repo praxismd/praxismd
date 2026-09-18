@@ -7,8 +7,8 @@ import { light, withAlpha } from './theme';
 import {
   CalendarClock, MessageSquare, User, LogOut, Loader2, AlertTriangle,
   Stethoscope, Receipt, CreditCard, Download, Info, Home, Shield, FileText, CheckCircle2, PenLine,
-  Pill as PillIcon, Users, Plus, RotateCcw,
-} from 'lucide-react';
+  PillIcon, Users, Plus, RotateCcw,
+} from './icons';
 
 const t = light;
 

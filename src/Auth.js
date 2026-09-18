@@ -9,7 +9,7 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider, isFirebaseConfigured } from './firebase';
 import { light, withAlpha } from './theme';
-import { ArrowLeft, Eye, EyeOff, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, Loader2, AlertTriangle, ShieldCheck } from './icons';
 
 const t = light;
 

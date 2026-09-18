@@ -7,16 +7,16 @@ import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, sendMessage, isGhlConfigured } from './api/ghl';
 import { createPaymentLink, isStripeConfigured } from './api/stripe';
 import {
-  LayoutDashboard, Inbox as InboxIcon, Megaphone, RotateCcw, Calendar as CalendarIcon,
+  LayoutDashboard, InboxIcon, Megaphone, RotateCcw, CalendarIcon,
   ClipboardList, Users, Contact, Shield, Star, Smile, Bot, Receipt, CreditCard,
-  TrendingUp, Settings as SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
+  TrendingUp, SettingsIcon, Bell, Sun, Moon, Search, Menu, ChevronLeft,
   ChevronRight, ChevronDown, Zap, Sparkles, LogOut,
   Download, Upload, Clock, Send, RotateCw, AlertTriangle, Plus, MessageSquare, Loader2,
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
-  Paperclip, Image as ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
+  Paperclip, ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
   CalendarPlus, BadgeCheck, Award, Flag, MessageCircle, Camera, EyeOff, Monitor, Smartphone,
   QrCode, Copy, ShieldCheck, KeyRound,
-} from 'lucide-react';
+} from './icons';
 
 export const ThemeContext = createContext(light);
 export const useTheme = () => useContext(ThemeContext);
@@ -200,7 +200,7 @@ const NOTIF_TYPE_META = {
   message: { color: 'brand' },
   recall: { color: 'amber' },
   claim: { color: 'red' },
-  review: { color: 'orange' },
+  review: { color: 'gold' },
   security: { color: 'purple' },
 };
 const NOTIF_SEED = [
@@ -237,7 +237,7 @@ function GlobalSearchModal({ open, onClose, contacts, query, setQuery, setActive
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,15,20,.5)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh' }}>
-      <div onClick={e => e.stopPropagation()} className="px-glass" style={{ width: '560px', maxWidth: '92vw', maxHeight: '66vh', borderRadius: '8px', boxShadow: '0 24px 60px rgba(0,0,0,.35)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div onClick={e => e.stopPropagation()} className="px-glass" style={{ width: '560px', maxWidth: '92vw', maxHeight: '66vh', borderRadius: '10px', boxShadow: '0 24px 60px rgba(0,0,0,.35)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '15px 16px', borderBottom: `1px solid ${t.border2}`, flexShrink: 0 }}>
           <Search size={16} color={t.muted} />
           <input
@@ -247,7 +247,7 @@ function GlobalSearchModal({ open, onClose, contacts, query, setQuery, setActive
             placeholder="Search patients, campaigns..."
             style={{ flex: 1, border: 'none', outline: 'none', fontSize: '15px', fontFamily: 'inherit', background: 'transparent', color: t.ink2 }}
           />
-          <span style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, border: `1px solid ${t.border}`, borderRadius: '5px', padding: '2px 6px', flexShrink: 0 }}>Esc</span>
+          <span style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, border: `1px solid ${t.border}`, borderRadius: '6px', padding: '2px 6px', flexShrink: 0 }}>Esc</span>
         </div>
         <div style={{ overflowY: 'auto', padding: '6px 12px 14px' }}>
           {!q && <div style={{ padding: '30px 10px', textAlign: 'center', color: t.muted, fontSize: '13px' }}>Start typing to search patients, campaigns, or jump to a tab.</div>}
@@ -432,7 +432,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [mode, setMode] = useState(getInitialMode);
   const [brandColor, setBrandColor] = useState(() => (typeof window !== 'undefined' && window.localStorage.getItem('praxismd-brand-color')) || DEFAULT_BRAND);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.localStorage.getItem('praxismd-sidebar-collapsed') === '1');
   const [sidebarHover, setSidebarHover] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifReadIds, setNotifReadIds] = useState([]);
@@ -462,7 +462,11 @@ function App() {
   const suppressHoverRef = useRef(false);
 
   function toggleCollapsed() {
-    setCollapsed(c => !c);
+    setCollapsed(c => {
+      const next = !c;
+      window.localStorage.setItem('praxismd-sidebar-collapsed', next ? '1' : '0');
+      return next;
+    });
     setSidebarHover(false);
     suppressHoverRef.current = true;
     window.setTimeout(() => { suppressHoverRef.current = false; }, 400);
@@ -597,8 +601,8 @@ function App() {
     setDemoContacts(cs => [{ id: `p-new-${Date.now()}`, tag: null, dateAdded: new Date().toLocaleDateString(), ...patient }, ...cs]);
   }
 
-  const notifColorMap = { brand: t.brand, amber: t.amber, red: t.red, orange: t.orange, purple: t.purple };
-  const notifBgMap = { brand: t.brandL, amber: t.amberL, red: t.redL, orange: t.orangeL, purple: t.purpleL };
+  const notifColorMap = { brand: t.brand, amber: t.amber, red: t.red, orange: t.orange, gold: t.gold, purple: t.purple };
+  const notifBgMap = { brand: t.brandL, amber: t.amberL, red: t.redL, orange: t.orangeL, gold: t.goldL, purple: t.purpleL };
   const notifications = NOTIF_SEED.map(n => ({
     ...n,
     color: notifColorMap[NOTIF_TYPE_META[n.type].color],
@@ -658,7 +662,7 @@ function App() {
     <ThemeContext.Provider value={t}>
     <style>{`
       @keyframes pxFadeSlide { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-      .px-page-transition { animation: pxFadeSlide .15s ease; will-change: opacity, transform; }
+      .px-page-transition { animation: pxFadeSlide .18s ease; will-change: opacity, transform; }
       .px-navitem { transition: background .12s ease, border-color .12s ease, color .12s ease; }
       .px-navitem:hover { background: ${t.navHover}; }
       .px-row { transition: background .12s ease; }
@@ -666,8 +670,8 @@ function App() {
       .px-card { transition: border-color .15s ease; }
       .px-glass {
         background: ${t.glassBg};
-        -webkit-backdrop-filter: blur(12px);
-        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
         border: 1px solid ${t.glassBorder};
         box-shadow: ${t.glassShadow};
       }
@@ -680,7 +684,7 @@ function App() {
       }
       .px-btn-ghost:hover { text-decoration: underline; }
       button { transition: transform .08s ease; }
-      button:active { transform: scale(0.96); }
+      button:active { transform: scale(0.97); }
       .px-tooltip-wrap { position: relative; }
       .px-tooltip-bubble {
         position: absolute; left: 100%; top: 50%; transform: translateY(-50%);
@@ -699,6 +703,10 @@ function App() {
       .px-panel { animation: pxSlideIn .2s ease; }
       @keyframes pxExpand { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
       .px-expand { animation: pxExpand .15s ease; }
+      @media (max-width: 767px) {
+        [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+        table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+      }
     `}</style>
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
 
@@ -715,7 +723,7 @@ function App() {
         onMouseLeave={() => setSidebarHover(false)}
         className="px-sidebar-glass"
         style={{
-          width: isMobileView ? '240px' : (showFull ? '240px' : '72px'),
+          width: isMobileView ? '232px' : (showFull ? '232px' : '64px'),
           backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
           borderRight: `1px solid ${t.sidebarGlassBorder}`,
           display: 'flex', flexDirection: 'column', position: 'fixed', height: '100vh', overflow: 'hidden',
@@ -775,7 +783,7 @@ function App() {
 
         <div style={{ padding: showFull ? '12px 16px' : '12px 0', borderTop: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', justifyContent: showFull ? 'space-between' : 'center', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-            <div style={{ width: '34px', height: '34px', borderRadius: '5px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>{initialsOf(ownerDisplayName)}</div>
+            <div style={{ width: '34px', height: '34px', borderRadius: '6px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>{initialsOf(ownerDisplayName)}</div>
             {showFull && (
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{ownerDisplayName}</div>
@@ -792,12 +800,12 @@ function App() {
       </div>
 
       {/* MAIN */}
-      <div style={{ marginLeft: isMobileView ? 0 : (collapsed ? '72px' : '240px'), flex: 1, display: 'flex', flexDirection: 'column', background: t.pageGradient, minHeight: '100vh', transition: 'margin-left .18s ease' }}>
+      <div style={{ marginLeft: isMobileView ? 0 : (collapsed ? '64px' : '232px'), flex: 1, display: 'flex', flexDirection: 'column', background: t.pageGradient, minHeight: '100vh', transition: 'margin-left .2s ease' }}>
 
         {!appBannerDismissed && isMobileView && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: t.brand, color: 'white' }}>
             <Smartphone size={16} style={{ flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '12.5px', fontWeight: '500' }}>Get the PraxisMD app for a faster, native experience.</span>
+            <span style={{ flex: 1, fontSize: '12.5px', fontWeight: '500' }}>PraxisMD works best on desktop. Mobile app coming soon.</span>
             <button
               type="button"
               onClick={dismissAppBanner}
@@ -816,7 +824,7 @@ function App() {
               type="button"
               onClick={() => setMobileDrawerOpen(true)}
               aria-label="Open menu"
-              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid, flexShrink: 0 }}
+              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid, flexShrink: 0 }}
             >
               <Menu size={17} />
             </button>
@@ -830,11 +838,11 @@ function App() {
             <button
               type="button"
               onClick={() => setSearchOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '260px', padding: '8px 10px 8px 12px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '240px', padding: '8px 10px 8px 12px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', fontFamily: 'inherit' }}
             >
               <Search size={15} color={t.muted} style={{ flexShrink: 0 }} />
               <span style={{ flex: 1, textAlign: 'left', fontSize: '13px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Search patients, campaigns...</span>
-              <span style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, border: `1px solid ${t.border}`, borderRadius: '5px', padding: '1px 5px', flexShrink: 0 }}>Ctrl K</span>
+              <span style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, border: `1px solid ${t.border}`, borderRadius: '6px', padding: '1px 5px', flexShrink: 0 }}>Ctrl K</span>
             </button>
           )}
 
@@ -843,7 +851,7 @@ function App() {
               onClick={() => setPrivacyMode(p => !p)}
               aria-label="Toggle privacy mode"
               title={privacyMode ? 'Privacy mode on — click to show patient info' : 'Blur patient names, emails, and phone numbers'}
-              style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 13px', borderRadius: '5px', border: `1px solid ${privacyMode ? t.red : t.border}`, background: privacyMode ? t.redL : t.bgCard, cursor: 'pointer', color: privacyMode ? t.red : t.mid, fontSize: '12.5px', fontWeight: '500', fontFamily: 'inherit' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 13px', borderRadius: '6px', border: `1px solid ${privacyMode ? t.red : t.border}`, background: privacyMode ? t.redL : t.bgCard, cursor: 'pointer', color: privacyMode ? t.red : t.mid, fontSize: '12.5px', fontWeight: '500', fontFamily: 'inherit' }}
             >
               <EyeOff size={15} /> {privacyMode && 'Privacy on'}
             </button>
@@ -851,13 +859,13 @@ function App() {
               onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
               aria-label="Toggle dark mode"
               title={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid }}
+              style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid }}
             >
               {mode === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
             </button>
 
             <div ref={notifRef} style={{ position: 'relative' }}>
-              <button onClick={() => setNotifOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 15px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '13px', cursor: 'pointer', color: t.mid, position: 'relative' }}>
+              <button onClick={() => setNotifOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 15px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgCard, fontSize: '13px', cursor: 'pointer', color: t.mid, position: 'relative' }}>
                 <Bell size={15} />
                 Notifications
                 {unreadNotifCount > 0 && (
@@ -889,19 +897,19 @@ function App() {
               )}
             </div>
 
-            <button onClick={() => setActiveTab('campaigns')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', borderRadius: '5px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+            <button onClick={() => setActiveTab('campaigns')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', borderRadius: '6px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
               <Plus size={14} /> New campaign
             </button>
 
             <div ref={userMenuRef} style={{ position: 'relative' }}>
               <button
                 onClick={() => { setUserMenuOpen(o => !o); setSwitchOpen(false); }}
-                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px 5px 5px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 10px 5px 5px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer' }}
               >
                 <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: '600', color: t.brand, flexShrink: 0 }}>{initialsOf(currentUser.name)}</div>
                 <div style={{ textAlign: 'left' }}>
                   <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, lineHeight: 1.25 }}>{currentUser.name}</div>
-                  <span style={{ fontSize: '9.5px', fontWeight: '600', padding: '1px 7px', borderRadius: '3px', display: 'inline-block', marginTop: '2px', background: roleColor(currentUser.role, t).bg, color: roleColor(currentUser.role, t).color }}>{currentUser.role}</span>
+                  <span style={{ fontSize: '9.5px', fontWeight: '600', padding: '1px 7px', borderRadius: '4px', display: 'inline-block', marginTop: '2px', background: roleColor(currentUser.role, t).bg, color: roleColor(currentUser.role, t).color }}>{currentUser.role}</span>
                 </div>
                 <ChevronDown size={14} color={t.muted} />
               </button>
@@ -1037,7 +1045,7 @@ function NavItem({ label, Icon, tab, active, onClick, badge, badgeColor, collaps
     >
       <Icon size={16} style={{ flexShrink: 0 }} />
       {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
-      {!collapsed && badge && <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '3px', background: badgeColor + '22', color: badgeColor }}>{badge}</span>}
+      {!collapsed && badge && <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '4px', background: badgeColor + '22', color: badgeColor }}>{badge}</span>}
       {collapsed && <span className="px-tooltip-bubble">{label}{badge ? ` · ${badge}` : ''}</span>}
     </div>
   );
@@ -1047,7 +1055,7 @@ function StatCard({ label, value, color, accent, sub, icon: ValueIcon, decorIcon
   const t = useTheme();
   const display = useCountUp(value);
   return (
-    <div className="px-card px-glass" style={{ borderRadius: '6px', padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
+    <div className="px-card px-glass" style={{ borderRadius: '8px', padding: '14px 16px', position: 'relative', overflow: 'hidden' }}>
       {DecorIcon && <DecorIcon size={20} color={accent || color} style={{ position: 'absolute', top: '12px', right: '12px', opacity: 0.15 }} />}
       <div style={{ fontSize: '10px', color: t.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '8px' }}>{label}</div>
       <div style={{ fontSize: '28px', fontWeight: '700', color, letterSpacing: '-0.5px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1059,7 +1067,7 @@ function StatCard({ label, value, color, accent, sub, icon: ValueIcon, decorIcon
 }
 
 function Card({ children, style, onClick, className }) {
-  return <div className={className ? `px-card px-glass ${className}` : 'px-card px-glass'} onClick={onClick} style={{ borderRadius: '6px', padding: '16px', ...style }}>{children}</div>;
+  return <div className={className ? `px-card px-glass ${className}` : 'px-card px-glass'} onClick={onClick} style={{ borderRadius: '8px', padding: '16px', ...style }}>{children}</div>;
 }
 
 function CardTitle({ children }) {
@@ -1068,12 +1076,12 @@ function CardTitle({ children }) {
 }
 
 function Pill({ label, color, bg }) {
-  return <span style={{ fontSize: '11px', fontWeight: '600', padding: '3px 9px', borderRadius: '3px', background: bg, color, whiteSpace: 'nowrap' }}>{label}</span>;
+  return <span style={{ fontSize: '11px', fontWeight: '600', padding: '3px 9px', borderRadius: '4px', background: bg, color, whiteSpace: 'nowrap' }}>{label}</span>;
 }
 
 function RowItem({ children, style, onClick }) {
   const t = useTheme();
-  return <div className="px-row" onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 0', borderRadius: 0, background: 'transparent', borderBottom: `1px solid ${t.rowBorder}`, ...style }}>{children}</div>;
+  return <div className="px-row" onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 0', borderRadius: 0, background: 'transparent', borderBottom: `1px solid ${t.rowBorder}`, ...style }}>{children}</div>;
 }
 
 function Ava({ initials, bg, color }) {
@@ -1095,7 +1103,7 @@ function Btn({ children, onClick, primary, small, ghost, danger, style, disabled
       style={{
         display: 'inline-flex', alignItems: 'center', gap: '6px',
         padding: ghost ? 0 : (small ? '5px 10px' : '7px 14px'),
-        borderRadius: '5px', fontSize: small ? '12px' : '13px', fontWeight: '500',
+        borderRadius: '6px', fontSize: small ? '12px' : '13px', fontWeight: '500',
         cursor: disabled ? 'default' : 'pointer', opacity: disabled ? .65 : 1,
         ...variant, ...style,
       }}
@@ -1150,7 +1158,7 @@ function SlidePanel({ title, subtitle, onClose, children }) {
             <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
             {subtitle && <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '5px', flexShrink: 0 }}>
+          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '6px', flexShrink: 0 }}>
             <X size={16} />
           </button>
         </div>
@@ -1189,10 +1197,10 @@ function Modal({ title, onClose, children }) {
   return (
     <>
       <div onClick={onClose} className="px-panel-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 300 }} />
-      <div className="px-expand px-glass" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '420px', maxWidth: '92vw', maxHeight: '86vh', overflowY: 'auto', borderRadius: '8px', border: `1px solid ${t.glassBorder}`, boxShadow: '0 20px 60px rgba(0,0,0,.25)', zIndex: 301 }}>
+      <div className="px-expand px-glass" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '420px', maxWidth: '92vw', maxHeight: '86vh', overflowY: 'auto', borderRadius: '10px', border: `1px solid ${t.glassBorder}`, boxShadow: '0 20px 60px rgba(0,0,0,.25)', zIndex: 301 }}>
         <div className="px-glass" style={{ padding: '16px 20px', borderBottom: `1px solid ${t.rowBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0 }}>
           <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
-          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '5px' }}>
+          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '6px' }}>
             <X size={16} />
           </button>
         </div>
@@ -1220,8 +1228,8 @@ function BigStatCard({ label, value, color, accent, sub, icon: ValueIcon, decorI
   const t = useTheme();
   const display = useCountUp(value);
   return (
-    <div className="px-card px-glass" style={{ borderRadius: '6px', padding: '16px', position: 'relative', overflow: 'hidden' }}>
-      {DecorIcon && <DecorIcon size={20} color={accent || color} style={{ position: 'absolute', top: '14px', right: '14px', opacity: 0.15 }} />}
+    <div className="px-card px-glass" style={{ borderRadius: '8px', padding: '24px', position: 'relative', overflow: 'hidden' }}>
+      {DecorIcon && <DecorIcon size={20} color={accent || color} style={{ position: 'absolute', top: '18px', right: '18px', opacity: 0.15 }} />}
       <div style={{ fontSize: '10px', color: t.muted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px' }}>{label}</div>
       <div style={{ fontSize: '30px', fontWeight: '700', color, letterSpacing: '-0.8px', display: 'flex', alignItems: 'center', gap: '9px' }}>
         {display}{ValueIcon && <ValueIcon size={22} color={color} fill={color} />}
@@ -1270,7 +1278,7 @@ function Overview({ setActiveTab }) {
         <BigStatCard label="Unread alerts" value="3" color={t.amber} accent={t.accentAmber} sub="Across billing & recall" decorIcon={Bell} />
       </div>
 
-      <div className="px-glass" style={{ background: `linear-gradient(120deg, ${withAlpha(t.brand, .08)}, ${withAlpha(t.teal, .05)}), ${t.glassBg}`, borderRadius: '6px', padding: '16px', marginBottom: '16px' }}>
+      <div className="px-glass" style={{ background: `linear-gradient(120deg, ${withAlpha(t.brand, .08)}, ${withAlpha(t.teal, .05)}), ${t.glassBg}`, borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
         <div style={{ fontSize: '10px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}><Sparkles size={13} color={t.teal} /> Today at a glance</div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {GLANCE_CHIPS.map((chip, i) => (
@@ -1278,7 +1286,7 @@ function Overview({ setActiveTab }) {
               key={i}
               onClick={() => setActiveTab(chip.tab)}
               className="px-btn"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '9px 15px', borderRadius: '3px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '9px 15px', borderRadius: '4px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '12.5px', fontWeight: '500', cursor: 'pointer', fontFamily: 'inherit' }}
             >
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: colorMap[chip.color], flexShrink: 0 }} />
               {chip.text}
@@ -1546,7 +1554,7 @@ function Inbox({ contacts }) {
   const displayMessages = selected ? [...selected.messages, ...(attachmentOverlay[selected.id] || [])] : [];
 
   return (
-    <div className="px-glass" style={{ display: 'flex', height: 'calc(100vh - 108px)', minHeight: '520px', borderRadius: '6px', overflow: 'hidden' }}>
+    <div className="px-glass" style={{ display: 'flex', height: 'calc(100vh - 108px)', minHeight: '520px', borderRadius: '8px', overflow: 'hidden' }}>
       {showList && (
         <div style={{ width: isMobileView ? '100%' : '320px', flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: isMobileView ? 'none' : `1px solid ${t.rowBorder}` }}>
           <div style={{ padding: '14px', borderBottom: `1px solid ${t.border2}` }}>
@@ -1555,7 +1563,7 @@ function Inbox({ contacts }) {
               <input
                 value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search conversations…"
-                style={{ width: '100%', padding: '9px 12px 9px 32px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '9px 12px 9px 32px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
               />
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -1564,7 +1572,7 @@ function Inbox({ contacts }) {
                   key={label}
                   type="button"
                   onClick={() => setFilter(label)}
-                  style={{ padding: '5px 12px', borderRadius: '3px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: filter === label ? 'none' : `1px solid ${t.border}`, background: filter === label ? t.brand : 'transparent', color: filter === label ? 'white' : t.mid, fontFamily: 'inherit' }}
+                  style={{ padding: '5px 12px', borderRadius: '4px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: filter === label ? 'none' : `1px solid ${t.border}`, background: filter === label ? t.brand : 'transparent', color: filter === label ? 'white' : t.mid, fontFamily: 'inherit' }}
                 >{label}</button>
               ))}
             </div>
@@ -1632,7 +1640,7 @@ function Inbox({ contacts }) {
         >
           {isDragOver && (
             <div style={{ position: 'absolute', inset: 0, background: withAlpha(t.brand, .06), zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
-              <div style={{ padding: '10px 18px', borderRadius: '5px', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600' }}>Drop to attach</div>
+              <div style={{ padding: '10px 18px', borderRadius: '6px', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600' }}>Drop to attach</div>
             </div>
           )}
           {unconnectedChannel ? (
@@ -1697,10 +1705,10 @@ function Inbox({ contacts }) {
               </div>
 
               {sendError && (
-                <div style={{ margin: '0 18px', background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '5px', padding: '9px 12px', fontSize: '12px' }}>{sendError}</div>
+                <div style={{ margin: '0 18px', background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '6px', padding: '9px 12px', fontSize: '12px' }}>{sendError}</div>
               )}
               {attachError && (
-                <div style={{ margin: '10px 18px 0', background: t.redL, color: t.red, borderRadius: '5px', padding: '8px 12px', fontSize: '11.5px' }}>{attachError}</div>
+                <div style={{ margin: '10px 18px 0', background: t.redL, color: t.red, borderRadius: '6px', padding: '8px 12px', fontSize: '11.5px' }}>{attachError}</div>
               )}
 
               <div style={{ padding: '14px 18px', borderTop: `1px solid ${t.border2}` }}>
@@ -1708,7 +1716,7 @@ function Inbox({ contacts }) {
                 <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: 'none' }} onChange={e => { handleFilePicked(e.target.files?.[0], 'image'); e.target.value = ''; }} />
 
                 {pendingAttachment && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '9px', padding: '7px 10px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgRow, maxWidth: '320px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '9px', padding: '7px 10px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgRow, maxWidth: '320px' }}>
                     {pendingAttachment.kind === 'image' ? (
                       <img src={pendingAttachment.dataUrl} alt="" style={{ width: '30px', height: '30px', borderRadius: '6px', objectFit: 'cover', flexShrink: 0 }} />
                     ) : (
@@ -1730,7 +1738,7 @@ function Inbox({ contacts }) {
                   <button
                     type="button"
                     onClick={() => setDraft(suggestion)}
-                    style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '9px', padding: '6px 12px', borderRadius: '3px', border: `1px solid ${withAlpha(t.brand, .25)}`, background: t.brandL, color: t.brand, fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit', maxWidth: '100%' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '9px', padding: '6px 12px', borderRadius: '4px', border: `1px solid ${withAlpha(t.brand, .25)}`, background: t.brandL, color: t.brand, fontSize: '11.5px', cursor: 'pointer', fontFamily: 'inherit', maxWidth: '100%' }}
                   >
                     <Bot size={12} style={{ flexShrink: 0 }} />
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>AI: {suggestion}</span>
@@ -1750,7 +1758,7 @@ function Inbox({ contacts }) {
                     value={draft} onChange={e => setDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
                     placeholder="Type a reply…"
-                    style={{ flex: 1, padding: '10px 13px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, minWidth: 0 }}
+                    style={{ flex: 1, padding: '10px 13px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, minWidth: 0 }}
                   />
                   <Btn small primary onClick={handleSend} disabled={sending || (!draft.trim() && !pendingAttachment)}>
                     {sending ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} Send
@@ -1764,8 +1772,8 @@ function Inbox({ contacts }) {
 
       {lightboxSrc && (
         <div onClick={() => setLightboxSrc(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', cursor: 'zoom-out' }}>
-          <img src={lightboxSrc} alt="" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '5px', boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} />
-          <button type="button" onClick={() => setLightboxSrc(null)} style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,.15)', borderRadius: '5px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <img src={lightboxSrc} alt="" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '6px', boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} />
+          <button type="button" onClick={() => setLightboxSrc(null)} style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,.15)', borderRadius: '6px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <X size={18} color="white" />
           </button>
         </div>
@@ -1865,37 +1873,37 @@ function Campaigns() {
           <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>New campaign</div>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Campaign name</label>
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Spring cleaning push" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Spring cleaning push" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
             <div>
               <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_TYPES.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Audience</label>
-              <select value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <select value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_AUDIENCES.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Touches</label>
-              <select value={form.touches} onChange={e => setForm(f => ({ ...f, touches: Number(e.target.value) }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <select value={form.touches} onChange={e => setForm(f => ({ ...f, touches: Number(e.target.value) }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_TOUCHES.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Channel</label>
-              <select value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <select value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_CHANNELS.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
           </div>
           <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>First message ({form.message.length}/160)</label>
-            <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value.slice(0, 160) }))} rows={3} placeholder="Hi {'{'}first_name{'}'}, ..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box' }} />
+            <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value.slice(0, 160) }))} rows={3} placeholder="Hi {'{'}first_name{'}'}, ..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Btn primary onClick={createCampaign}>Create campaign</Btn>
@@ -1918,15 +1926,15 @@ function Campaigns() {
           {c.stats.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${c.stats.length},1fr)`, gap: '10px', marginBottom: c.prog ? '10px' : '0' }}>
               {c.stats.map(([label, val], j) => (
-                <div key={j} className="px-row" style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '5px', border: `1px solid ${t.border2}` }}>
+                <div key={j} className="px-row" style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '6px', border: `1px solid ${t.border2}` }}>
                   <div style={{ fontSize: '11px', color: t.muted }}>{label}</div>
                   <div style={{ fontSize: '16px', fontWeight: '600', color: colorMap[c.statColors[j]] }}>{val}</div>
                 </div>
               ))}
             </div>
           )}
-          {c.prog && <div><div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden', marginTop: '8px' }}><div style={{ height: '100%', borderRadius: '3px', background: t.accentGreen, width: `${c.prog}%` }} /></div><div style={{ fontSize: '11px', color: t.muted, marginTop: '5px' }}>Touch 3 of 7 · {c.prog}% through sequence</div></div>}
-          {c.pill === 'Queued' && <div style={{ padding: '10px 12px', background: t.amberL, borderRadius: '5px', fontSize: '12px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, marginTop: '8px', display: 'flex', alignItems: 'center', gap: '7px' }}><Clock size={13} /> Scheduled in 7 days · 89 patients receive first touch September 20</div>}
+          {c.prog && <div><div style={{ height: '3px', borderRadius: '3px', background: t.border, overflow: 'hidden', marginTop: '8px' }}><div style={{ height: '100%', borderRadius: '3px', background: t.accentGreen, width: `${c.prog}%` }} /></div><div style={{ fontSize: '11px', color: t.muted, marginTop: '5px' }}>Touch 3 of 7 · {c.prog}% through sequence</div></div>}
+          {c.pill === 'Queued' && <div style={{ padding: '10px 12px', background: t.amberL, borderRadius: '6px', fontSize: '12px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, marginTop: '8px', display: 'flex', alignItems: 'center', gap: '7px' }}><Clock size={13} /> Scheduled in 7 days · 89 patients receive first touch September 20</div>}
         </Card>
       ))}
 
@@ -1935,7 +1943,7 @@ function Campaigns() {
           {selected.stats.length > 0 && (
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(selected.stats.length, 3)},1fr)`, gap: '8px', marginBottom: '20px' }}>
               {selected.stats.map(([label, val], j) => (
-                <div key={j} style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '5px', border: `1px solid ${t.border2}` }}>
+                <div key={j} style={{ textAlign: 'center', padding: '10px', background: t.bgRow, borderRadius: '6px', border: `1px solid ${t.border2}` }}>
                   <div style={{ fontSize: '10px', color: t.muted }}>{label}</div>
                   <div style={{ fontSize: '15px', fontWeight: '600', color: colorMap[selected.statColors[j]] }}>{val}</div>
                 </div>
@@ -2189,7 +2197,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
             placeholder="Search patients by name, email, or phone..."
             value={query}
             onChange={e => onQueryChange(e.target.value)}
-            style={{ width: '100%', padding: '9px 14px 9px 36px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '9px 14px 9px 36px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
           />
         </div>
         <Btn primary onClick={handleAddClick}><Plus size={14} /> Add patient</Btn>
@@ -2197,16 +2205,16 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
       </div>
 
       {notice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{notice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '6px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{notice}</div>
       )}
 
       {showAddForm && (
         <Card className="px-expand" style={{ marginBottom: '14px' }}>
           <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>Add a patient</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full name" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
-            <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
-            <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Phone" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full name" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Phone" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Btn primary onClick={submitNewPatient}>Add patient</Btn>
@@ -2222,7 +2230,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
       ) : (
         <>
           {!isGhlConfigured && (
-            <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '6px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}>
               <Sparkles size={13} /> Showing demo data — connect GoHighLevel to load your real patients.
             </div>
           )}
@@ -2290,7 +2298,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
           <DetailRow label="Patient since" value={selected.dateAdded} />
           <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>APPOINTMENT HISTORY</div>
-            <div style={{ padding: '16px', background: t.bgRow, borderRadius: '5px', fontSize: '12.5px', color: t.muted, textAlign: 'center' }}>
+            <div style={{ padding: '16px', background: t.bgRow, borderRadius: '6px', fontSize: '12.5px', color: t.muted, textAlign: 'center' }}>
               Connect the calendar sync to see this patient's visit history here.
             </div>
           </div>
@@ -2323,7 +2331,7 @@ function Billing() {
 
   return (
     <div>
-      <div style={{ padding: '11px 15px', background: t.purpleL, borderRadius: '5px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${withAlpha(t.purple, .15)}` }}>
+      <div style={{ padding: '11px 15px', background: t.purpleL, borderRadius: '6px', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '10px', border: `1px solid ${withAlpha(t.purple, .15)}` }}>
         <Zap size={14} color={t.purple} /><span style={{ fontSize: '13px', color: t.purple, fontWeight: '500' }}>Pro — Billing automation active · Connected to Office Ally clearinghouse</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '10px', marginBottom: '18px' }}>
@@ -2398,15 +2406,15 @@ function Payments() {
           <CardTitle>Send payment request</CardTitle>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Patient name</label>
-            <input value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="Search patient..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="Search patient..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Amount</label>
-            <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="$0.00" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="$0.00" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
-            <select value={reqType} onChange={e => setReqType(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+            <select value={reqType} onChange={e => setReqType(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
               <option>Co-pay collection</option><option>Balance due</option><option>Deposit for procedure</option><option>Payment plan setup</option>
             </select>
           </div>
@@ -2414,16 +2422,16 @@ function Payments() {
             {sending ? <Loader2 size={14} className="px-spin" /> : <Send size={14} />} Send payment link via SMS
           </Btn>
           {!isStripeConfigured && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.amberL, borderRadius: '5px', fontSize: '11.5px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.amberL, borderRadius: '6px', fontSize: '11.5px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
               <AlertTriangle size={13} style={{ marginTop: '1px', flexShrink: 0 }} />
               <span>Stripe isn't connected yet. Add <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_STRIPE_PUBLISHABLE_KEY</code> to your <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>.env.local</code> — this is a bare-bones scaffold for now.</span>
             </div>
           )}
           {error && isStripeConfigured && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.redL, borderRadius: '5px', fontSize: '11.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{error}</div>
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.redL, borderRadius: '6px', fontSize: '11.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{error}</div>
           )}
           {sent && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '5px', fontSize: '11.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>Payment link sent.</div>
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '6px', fontSize: '11.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>Payment link sent.</div>
           )}
         </Card>
       </div>
@@ -2522,7 +2530,7 @@ function AIFrontDesk() {
         <Card>
           <CardTitle>Recent call log</CardTitle>
           {CALL_LOG.map(c => (
-            <div key={c.id} className="px-row" onClick={() => setSelectedCall(c)} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '5px', marginBottom: '7px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}>
+            <div key={c.id} className="px-row" onClick={() => setSelectedCall(c)} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '6px', marginBottom: '7px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: colorMap[c.color], marginTop: '5px', flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{c.caller}</PII> · {c.duration} · {c.topic}</div>
@@ -2682,7 +2690,7 @@ function ReputationCenter() {
         <CardTitle>Review request automation</CardTitle>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
           {REVIEW_AUTOMATION_SEED.map(r => (
-            <div key={r.platform} style={{ padding: '12px', background: t.bgRow, borderRadius: '5px' }}>
+            <div key={r.platform} style={{ padding: '12px', background: t.bgRow, borderRadius: '6px' }}>
               <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2, marginBottom: '6px' }}>{r.platform}</div>
               <div style={{ fontSize: '11.5px', color: t.mid }}>{r.sent} sent this month</div>
               <div style={{ fontSize: '11.5px', color: t.green, fontWeight: '600' }}>{Math.round((r.converted / r.sent) * 100)}% conversion</div>
@@ -2700,7 +2708,7 @@ function ReputationCenter() {
         </div>
         {filtered.length === 0 && <div style={{ fontSize: '13px', color: t.muted, textAlign: 'center', padding: '20px 0' }}>No reviews match these filters.</div>}
         {filtered.map(r => (
-          <div key={r.id} className="px-row" style={{ padding: '14px', borderRadius: '5px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.rating < 4 ? t.accentRed : t.accentAmber}` }}>
+          <div key={r.id} className="px-row" style={{ padding: '14px', borderRadius: '6px', background: t.bgRow, marginBottom: '10px', border: `1px solid ${t.border2}`, borderLeft: `3px solid ${r.rating < 4 ? t.accentRed : t.accentAmber}` }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '5px' }}>
               <StarRating rating={r.rating} />
               <Pill label={r.platform} color={t.brand} bg={t.brandL} />
@@ -2726,7 +2734,7 @@ function ReputationCenter() {
                     <textarea
                       value={drafts[r.id] || ''} onChange={e => setDrafts(d => ({ ...d, [r.id]: e.target.value }))}
                       placeholder="Write a reply…" rows={3}
-                      style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '8px' }}
+                      style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '8px' }}
                     />
                     <Btn small primary onClick={() => send(r)}><Send size={12} /> Send reply</Btn>
                   </div>
@@ -2820,7 +2828,7 @@ function Surveys() {
           {[['Promoters (9-10)', '68%', t.accentGreen], ['Passives (7-8)', '20%', t.accentAmber], ['Detractors (0-6)', '12%', t.accentRed]].map(([label, pct, color], i) => (
             <div key={i} style={{ marginBottom: '14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.muted, marginBottom: '5px' }}><span>{label}</span><span style={{ color, fontWeight: '600' }}>{pct}</span></div>
-              <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: color, width: pct }} /></div>
+              <div style={{ height: '3px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: color, width: pct }} /></div>
             </div>
           ))}
         </Card>
@@ -2837,7 +2845,7 @@ function Surveys() {
           <div style={{ marginTop: '20px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>REPLY TO PATIENT</div>
             {sentReply ? (
-              <div style={{ padding: '12px 14px', background: t.greenL, color: t.green, borderRadius: '5px', fontSize: '12.5px' }}>Reply sent.</div>
+              <div style={{ padding: '12px 14px', background: t.greenL, color: t.green, borderRadius: '6px', fontSize: '12.5px' }}>Reply sent.</div>
             ) : (
               <>
                 {selected.status === 'Detractor' && (
@@ -2847,7 +2855,7 @@ function Surveys() {
                 )}
                 <textarea
                   value={reply} onChange={e => setReply(e.target.value)} placeholder="Write a reply…" rows={4}
-                  style={{ width: '100%', padding: '10px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '10px' }}
+                  style={{ width: '100%', padding: '10px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box', marginBottom: '10px' }}
                 />
                 <Btn primary style={{ width: '100%', justifyContent: 'center' }} onClick={() => reply.trim() && setSentReply(true)}>
                   <Send size={13} /> Send reply
@@ -2938,7 +2946,7 @@ function Eligibility() {
               {selected.coverage.map(([label, pct], i) => (
                 <div key={i} style={{ marginBottom: '12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>{label}</span><span style={{ fontWeight: '600', color: t.ink2 }}>{pct}</span></div>
-                  <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.brand, width: pct }} /></div>
+                  <div style={{ height: '3px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.brand, width: pct }} /></div>
                 </div>
               ))}
             </div>
@@ -3043,7 +3051,7 @@ function Documents({ contacts }) {
   const [shareNotice, setShareNotice] = useState('');
   const contactList = contacts || [];
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   const filtered = documents
@@ -3085,7 +3093,7 @@ function Documents({ contacts }) {
           {[['received', 'Received'], ['sent', 'Sent']].map(([key, label]) => (
             <button
               key={key} type="button" onClick={() => setTab(key)}
-              style={{ padding: '8px 18px', borderRadius: '5px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: tab === key ? 'none' : `1px solid ${t.border}`, background: tab === key ? t.brand : t.bgCard, color: tab === key ? 'white' : t.mid, fontFamily: 'inherit' }}
+              style={{ padding: '8px 18px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: tab === key ? 'none' : `1px solid ${t.border}`, background: tab === key ? t.brand : t.bgCard, color: tab === key ? 'white' : t.mid, fontFamily: 'inherit' }}
             >{label}</button>
           ))}
         </div>
@@ -3101,20 +3109,20 @@ function Documents({ contacts }) {
         {DOCUMENT_CATEGORIES.map(cat => (
           <button
             key={cat} type="button" onClick={() => setCategory(cat)}
-            style={{ padding: '6px 13px', borderRadius: '3px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: category === cat ? 'none' : `1px solid ${t.border}`, background: category === cat ? t.brand : t.bgCard, color: category === cat ? 'white' : t.mid, fontFamily: 'inherit' }}
+            style={{ padding: '6px 13px', borderRadius: '4px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: category === cat ? 'none' : `1px solid ${t.border}`, background: category === cat ? t.brand : t.bgCard, color: category === cat ? 'white' : t.mid, fontFamily: 'inherit' }}
           >{cat}</button>
         ))}
       </div>
 
       {shareNotice && (
-        <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{shareNotice}</div>
+        <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.tealL, borderRadius: '6px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{shareNotice}</div>
       )}
 
       <Card>
         {filtered.length === 0 && <div style={{ fontSize: '13px', color: t.muted, textAlign: 'center', padding: '28px 0' }}>No documents match these filters.</div>}
         {filtered.map(doc => (
           <RowItem key={doc.id}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '5px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '6px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <FileText size={17} color={t.brand} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -3164,7 +3172,7 @@ function Documents({ contacts }) {
           ) : (
             <div style={{ padding: '10px 0' }}>
               <div style={{ fontSize: '13px', color: t.ink2, marginBottom: '10px' }}>Uploading "{uploadForm.name}"…</div>
-              <div style={{ height: '8px', borderRadius: '5px', background: t.bgRow, overflow: 'hidden' }}>
+              <div style={{ height: '8px', borderRadius: '6px', background: t.bgRow, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${uploadProgress}%`, background: t.brand, transition: 'width .15s ease' }} />
               </div>
             </div>
@@ -3252,7 +3260,7 @@ function Waitlist() {
               </div>
             );
           })}
-          <div style={{ marginTop: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> When a slot opens PraxisMD auto-texts the next patient. First to reply gets the spot.</div>
+          <div style={{ marginTop: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '6px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> When a slot opens PraxisMD auto-texts the next patient. First to reply gets the spot.</div>
         </Card>
         <Card>
           <CardTitle>Recent auto-fills</CardTitle>
@@ -3358,7 +3366,7 @@ function Calendar() {
                 onClick={() => { setSelectedKey(dayKey); setShowAddForm(false); }}
                 className="px-btn"
                 style={{
-                  borderRadius: '5px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', minHeight: '54px',
+                  borderRadius: '6px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', minHeight: '54px',
                   border: `${isSelected ? '2px' : '1px'} solid ${isToday ? t.brand : isSelected ? t.teal : has ? withAlpha(t.accentBlue, .2) : t.border2}`,
                   background: isToday ? t.brand : has ? t.brandL : t.bgRow, transition: 'all .12s',
                 }}
@@ -3401,7 +3409,7 @@ function Calendar() {
         })}
 
         {showAddForm ? (
-          <div style={{ background: t.bgRow, border: `1px solid ${t.border2}`, borderRadius: '5px', padding: '12px', marginTop: '8px' }}>
+          <div style={{ background: t.bgRow, border: `1px solid ${t.border2}`, borderRadius: '6px', padding: '12px', marginTop: '8px' }}>
             <input value={newPatient} onChange={e => setNewPatient(e.target.value)} placeholder="Patient name" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, marginBottom: '8px', boxSizing: 'border-box' }} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
               <select value={newTime} onChange={e => setNewTime(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
@@ -3473,7 +3481,7 @@ function AppointmentRequests() {
   const [suggestTime, setSuggestTime] = useState('');
   const [notice, setNotice] = useState('');
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   const confirmedCount = requests.filter(r => r.status === 'confirmed').length;
@@ -3524,7 +3532,7 @@ function AppointmentRequests() {
       </div>
 
       {notice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '5px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{notice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '6px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{notice}</div>
       )}
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
@@ -3659,7 +3667,7 @@ function TreatmentPlans({ contacts }) {
   const [sentNotice, setSentNotice] = useState('');
   const contactList = contacts || [];
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   const enriched = plans.map(p => {
@@ -3715,7 +3723,7 @@ function TreatmentPlans({ contacts }) {
       </div>
 
       {sentNotice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '5px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sentNotice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '6px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sentNotice}</div>
       )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
@@ -3723,7 +3731,7 @@ function TreatmentPlans({ contacts }) {
           {[['active', 'Active Plans'], ['history', 'History']].map(([key, label]) => (
             <button
               key={key} type="button" onClick={() => setView(key)}
-              style={{ padding: '8px 18px', borderRadius: '5px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: view === key ? 'none' : `1px solid ${t.border}`, background: view === key ? t.brand : t.bgCard, color: view === key ? 'white' : t.mid, fontFamily: 'inherit' }}
+              style={{ padding: '8px 18px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', border: view === key ? 'none' : `1px solid ${t.border}`, background: view === key ? t.brand : t.bgCard, color: view === key ? 'white' : t.mid, fontFamily: 'inherit' }}
             >{label}</button>
           ))}
         </div>
@@ -3745,7 +3753,7 @@ function TreatmentPlans({ contacts }) {
                   <span style={{ fontSize: '12.5px', color: t.muted }}>· {p.planName}</span>
                 </div>
                 <div style={{ fontSize: '11.5px', color: t.muted }}>${p.totalValue.toLocaleString()} · {total} procedure{total === 1 ? '' : 's'} · Created {p.createdDate}</div>
-                <div style={{ display: 'flex', height: '6px', borderRadius: '3px', overflow: 'hidden', marginTop: '8px', background: t.bgRow }}>
+                <div style={{ display: 'flex', height: '3px', borderRadius: '3px', overflow: 'hidden', marginTop: '8px', background: t.bgRow }}>
                   {p.accepted > 0 && <div style={{ width: `${(p.accepted / total) * 100}%`, background: t.green }} />}
                   {p.pending > 0 && <div style={{ width: `${(p.pending / total) * 100}%`, background: t.amber }} />}
                   {p.declined > 0 && <div style={{ width: `${(p.declined / total) * 100}%`, background: t.red }} />}
@@ -3823,7 +3831,7 @@ function MembershipPlans() {
   const [createForm, setCreateForm] = useState({ name: '', monthlyPrice: '', annualPrice: '', benefits: [''] });
   const [linkNotice, setLinkNotice] = useState('');
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   const planById = Object.fromEntries(plans.map(p => [p.id, p]));
@@ -3877,7 +3885,7 @@ function MembershipPlans() {
       </div>
 
       {linkNotice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '5px', fontSize: '12.5px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, wordBreak: 'break-all' }}>{linkNotice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '6px', fontSize: '12.5px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, wordBreak: 'break-all' }}>{linkNotice}</div>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginBottom: '18px' }}>
@@ -3915,7 +3923,7 @@ function MembershipPlans() {
         {members.map(m => {
           const plan = planById[m.planId];
           return (
-            <div key={m.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', alignItems: 'center', padding: '10px 4px', borderRadius: '5px' }}>
+            <div key={m.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', alignItems: 'center', padding: '10px 4px', borderRadius: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
                 <Ava initials={initialsOf(m.patientName)} bg={t.brandL} color={t.brand} />
                 <span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{m.patientName}</PII></span>
@@ -4108,12 +4116,12 @@ function AdPerformance() {
             <span
               key={p}
               onClick={() => setPlatform(p)}
-              style={{ padding: '5px 12px', borderRadius: '3px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: platform === p ? 'none' : `1px solid ${t.border}`, background: platform === p ? t.brand : 'transparent', color: platform === p ? 'white' : t.mid }}
+              style={{ padding: '5px 12px', borderRadius: '4px', fontSize: '11.5px', fontWeight: '500', cursor: 'pointer', border: platform === p ? 'none' : `1px solid ${t.border}`, background: platform === p ? t.brand : 'transparent', color: platform === p ? 'white' : t.mid }}
             >{p}</span>
           ))}
         </div>
       </CardTitle>
-      <div style={{ padding: '9px 12px', background: t.tealL, borderRadius: '5px', fontSize: '11.5px', color: t.teal, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
+      <div style={{ padding: '9px 12px', background: t.tealL, borderRadius: '6px', fontSize: '11.5px', color: t.teal, display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '14px' }}>
         <Sparkles size={12} /> Demo campaign data shown — connect {platform} for real numbers.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '18px' }}>
@@ -4127,7 +4135,7 @@ function AdPerformance() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '10px', height: '10px', borderRadius: '3px', background: t.brand, display: 'inline-block' }} /> Spend</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '10px', height: '10px', borderRadius: '3px', background: t.green, display: 'inline-block' }} /> Revenue</div>
       </div>
-      <div style={{ marginTop: '16px', padding: '10px 14px', background: t.brandL, borderRadius: '5px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+      <div style={{ marginTop: '16px', padding: '10px 14px', background: t.brandL, borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
         <div style={{ fontSize: '12.5px', color: t.brand, display: 'flex', alignItems: 'center', gap: '7px' }}>
           <Sparkles size={13} /> {data.insight}
         </div>
@@ -4158,7 +4166,7 @@ function Reports() {
       <AdPerformance />
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
         {REPORTS_PERIODS.map((label, i) => (
-          <span key={i} onClick={() => setPeriod(label)} style={{ padding: '6px 14px', borderRadius: '3px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: period === label ? 'none' : `1px solid ${t.border}`, background: period === label ? t.brand : t.bgCard, color: period === label ? 'white' : t.mid }}>{label}</span>
+          <span key={i} onClick={() => setPeriod(label)} style={{ padding: '6px 14px', borderRadius: '4px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', border: period === label ? 'none' : `1px solid ${t.border}`, background: period === label ? t.brand : t.bgCard, color: period === label ? 'white' : t.mid }}>{label}</span>
         ))}
         <Btn small onClick={() => setNotice(`Exported ${period} report as PDF.`)}><Download size={13} /> Export PDF</Btn>
         {notice && <span style={{ fontSize: '12px', color: t.green, marginLeft: '4px' }}>{notice}</span>}
@@ -4171,7 +4179,7 @@ function Reports() {
       <Card>
         <CardTitle>Monthly performance breakdown</CardTitle>
         {data.metrics.map(([label, val, color], i) => (
-          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', background: t.bgRow, borderRadius: '5px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
+          <div key={i} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', background: t.bgRow, borderRadius: '6px', marginBottom: '6px', border: `1px solid ${t.border2}` }}>
             <span style={{ fontSize: '12.5px', color: t.mid }}>{label}</span>
             <span style={{ fontSize: '14px', fontWeight: '600', color: colorMap[color] }}>{val}</span>
           </div>
@@ -4305,7 +4313,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
     setTimeout(() => setSessionNotice(''), 3000);
   }
 
-  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   function saveChanges() {
@@ -4371,13 +4379,13 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
         <Card>
           <CardTitle>Integrations</CardTitle>
           {INTEGRATIONS.map(item => (
-            <div key={item.id} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '5px', marginBottom: '8px', borderWidth: '1px', borderStyle: 'solid', background: item.connected ? t.greenL : t.bgRow, borderColor: item.connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
+            <div key={item.id} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '6px', marginBottom: '8px', borderWidth: '1px', borderStyle: 'solid', background: item.connected ? t.greenL : t.bgRow, borderColor: item.connected ? withAlpha(t.accentGreen, .15) : t.border2 }}>
               <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{item.name}</div><div style={{ fontSize: '11.5px', color: t.muted }}>{item.sub}</div></div>
               {item.connected ? <Pill label="Connected" color={t.green} bg={t.greenL} /> : <Btn small onClick={() => connect(item)}>Connect</Btn>}
             </div>
           ))}
           {connectNotice && (
-            <div style={{ marginTop: '8px', padding: '10px 12px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{connectNotice}</div>
+            <div style={{ marginTop: '8px', padding: '10px 12px', background: t.tealL, borderRadius: '6px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{connectNotice}</div>
           )}
         </Card>
       </div>
@@ -4394,7 +4402,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                 type="button"
                 onClick={() => onBrandColorChange && onBrandColorChange(preset.hex)}
                 className="px-row"
-                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 13px', borderRadius: '5px', border: active ? `2px solid ${preset.hex}` : `1px solid ${t.border}`, background: t.bgRow, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 13px', borderRadius: '6px', border: active ? `2px solid ${preset.hex}` : `1px solid ${t.border}`, background: t.bgRow, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}
               >
                 <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: preset.hex, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {active && <Check size={13} color="white" />}
@@ -4431,7 +4439,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           <Btn small primary onClick={() => setShowInviteModal(true)}><UserPlus size={13} /> Invite staff member</Btn>
         </CardTitle>
         {inviteNotice && (
-          <div style={{ marginBottom: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '5px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{inviteNotice}</div>
+          <div style={{ marginBottom: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '6px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}` }}>{inviteNotice}</div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.9fr 1.1fr 0.9fr 0.9fr 1.4fr', gap: '8px', padding: '0 13px 8px', fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>
           <div>Name</div><div>Email</div><div>Role</div><div>Last login</div><div>Status</div><div>Actions</div>
@@ -4440,7 +4448,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           const rc = roleColor(s.role, t);
           const isOwner = s.role === 'Owner';
           return (
-            <div key={s.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.9fr 1.1fr 0.9fr 0.9fr 1.4fr', gap: '8px', alignItems: 'center', padding: '10px 13px', borderRadius: '5px', marginBottom: '6px', background: t.bgRow }}>
+            <div key={s.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.7fr 1.9fr 1.1fr 0.9fr 0.9fr 1.4fr', gap: '8px', alignItems: 'center', padding: '10px 13px', borderRadius: '6px', marginBottom: '6px', background: t.bgRow }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                 <Ava initials={initialsOf(s.name)} bg={t.brandL} color={t.brand} />
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</div>
@@ -4470,7 +4478,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           const onCount = ALL_TABS.filter(tab => perms[tab]).length;
           const rc = roleColor(role, t);
           return (
-            <div key={role} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '5px', marginBottom: '8px', background: t.bgRow }}>
+            <div key={role} className="px-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '6px', marginBottom: '8px', background: t.bgRow }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <Pill label={role} color={rc.color} bg={rc.bg} />
                 <span style={{ fontSize: '12px', color: t.muted }}>{onCount} of {ALL_TABS.length} tabs visible</span>
@@ -4576,7 +4584,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                   {['SMS', 'Email', 'Both'].map(method => (
                     <button
                       key={method} type="button" onClick={() => setBriefingDelivery(method)}
-                      style={{ flex: 1, padding: '8px', borderRadius: '5px', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', border: briefingDelivery === method ? 'none' : `1px solid ${t.border}`, background: briefingDelivery === method ? t.brand : t.bgCard, color: briefingDelivery === method ? 'white' : t.mid, fontFamily: 'inherit' }}
+                      style={{ flex: 1, padding: '8px', borderRadius: '6px', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', border: briefingDelivery === method ? 'none' : `1px solid ${t.border}`, background: briefingDelivery === method ? t.brand : t.bgCard, color: briefingDelivery === method ? 'white' : t.mid, fontFamily: 'inherit' }}
                     >{method}</button>
                   ))}
                 </div>
@@ -4635,14 +4643,14 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
       <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, margin: '18px 0 10px' }}>Security</div>
 
       {twoFANotice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '5px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{twoFANotice}</div>
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '6px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{twoFANotice}</div>
       )}
 
       <Card style={{ marginBottom: '18px' }}>
         <CardTitle>Two-factor authentication</CardTitle>
         <RowItem style={{ justifyContent: 'space-between', borderLeft: twoFAEnabled ? `2px solid ${t.green}` : 'none', paddingLeft: twoFAEnabled ? '10px' : 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '5px', background: twoFAEnabled ? t.greenL : t.bgCard, border: twoFAEnabled ? 'none' : `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '6px', background: twoFAEnabled ? t.greenL : t.bgCard, border: twoFAEnabled ? 'none' : `1px solid ${t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {twoFAEnabled ? <ShieldCheck size={17} color={t.green} /> : <Shield size={17} color={t.muted} />}
             </div>
             <div>
@@ -4661,12 +4669,12 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
       <Card style={{ marginBottom: '18px' }}>
         <CardTitle>Active sessions</CardTitle>
         {sessionNotice && (
-          <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '5px', fontSize: '12px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sessionNotice}</div>
+          <div style={{ marginBottom: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '6px', fontSize: '12px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sessionNotice}</div>
         )}
         {sessions.map(s => (
           <RowItem key={s.id} style={{ justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '5px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '6px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 {s.device === 'mobile' ? <Smartphone size={16} color={t.brand} /> : <Monitor size={16} color={t.brand} />}
               </div>
               <div>
@@ -4764,9 +4772,9 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                   key={key}
                   onClick={() => setWizardMethod(key)}
                   className="px-row"
-                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px', borderRadius: '5px', marginBottom: '10px', cursor: 'pointer', border: `2px solid ${wizardMethod === key ? t.brand : t.border2}`, background: wizardMethod === key ? t.brandL : t.bgRow }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px', borderRadius: '6px', marginBottom: '10px', cursor: 'pointer', border: `2px solid ${wizardMethod === key ? t.brand : t.border2}`, background: wizardMethod === key ? t.brandL : t.bgRow }}
                 >
-                  <div style={{ width: '38px', height: '38px', borderRadius: '5px', background: t.bgCard, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '6px', background: t.bgCard, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Icon size={18} color={wizardMethod === key ? t.brand : t.muted} />
                   </div>
                   <div>
@@ -4789,7 +4797,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                   ))}
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '5px', marginBottom: '18px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '6px', marginBottom: '18px' }}>
                 <span style={{ fontSize: '12.5px', color: t.ink2, fontFamily: 'monospace', letterSpacing: '.5px' }}>JBSW Y3DP EHPK 3PXP</span>
                 <KeyRound size={14} color={t.muted} />
               </div>
@@ -4862,7 +4870,7 @@ function FilterPillGroup({ options, value, onChange }) {
           <button
             key={key}
             onClick={() => onChange(key)}
-            style={{ padding: '6px 13px', borderRadius: '3px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', borderWidth: '1px', borderStyle: 'solid', borderColor: active ? 'transparent' : t.border, background: active ? t.brand : t.bgCard, color: active ? 'white' : t.mid }}
+            style={{ padding: '6px 13px', borderRadius: '4px', fontSize: '12px', fontWeight: '500', cursor: 'pointer', borderWidth: '1px', borderStyle: 'solid', borderColor: active ? 'transparent' : t.border, background: active ? t.brand : t.bgCard, color: active ? 'white' : t.mid }}
           >
             {label}
           </button>
@@ -4933,13 +4941,13 @@ function ActivityLog() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search by user or action…"
-                style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12.5px', color: t.ink2, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12.5px', color: t.ink2, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '7px 9px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '7px 9px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
               <span style={{ fontSize: '12px', color: t.muted }}>to</span>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '7px 9px', borderRadius: '5px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '7px 9px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
             </div>
             <Btn small onClick={exportCsv}><Download size={13} /> Export CSV</Btn>
           </div>

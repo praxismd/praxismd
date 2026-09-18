@@ -4,7 +4,7 @@ import {
   Check, X, ArrowRight, RotateCcw, Bot, ClipboardList, Receipt, Shield,
   Smile, CreditCard, Contact, Sparkles, Star, Menu, TrendingDown, PhoneOff,
   FileWarning, Megaphone, Activity, Quote,
-} from 'lucide-react';
+} from './icons';
 
 // Self-contained palette — the landing page is always light mode and never
 // imports the dashboard's theme (the dashboard's brand color is orange;
