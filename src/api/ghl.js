@@ -40,11 +40,20 @@ export async function getConversations({ limit = 50 } = {}) {
   return data.conversations || [];
 }
 
-export async function getAppointments({ startTime, endTime } = {}) {
+export async function getCalendars() {
+  const data = await ghlRequest(`/calendars/?locationId=${LOCATION_ID}`);
+  return data.calendars || [];
+}
+
+// GHL's events endpoint requires one of userId/calendarId/groupId in
+// addition to a date range — it won't just return "everything for this
+// location." Callers must pass a calendarId (see getCalendars()).
+export async function getAppointments({ startTime, endTime, calendarId } = {}) {
+  if (!calendarId) return [];
   const now = Date.now();
   const start = startTime || now;
   const end = endTime || now + 30 * 24 * 60 * 60 * 1000; // default: next 30 days
-  const data = await ghlRequest(`/calendars/events?locationId=${LOCATION_ID}&startTime=${start}&endTime=${end}`);
+  const data = await ghlRequest(`/calendars/events?locationId=${LOCATION_ID}&calendarId=${calendarId}&startTime=${start}&endTime=${end}`);
   return data.events || [];
 }
 
