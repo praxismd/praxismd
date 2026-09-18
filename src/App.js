@@ -4,7 +4,7 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
-import { getContacts, getConversations, sendMessage, isGhlConfigured } from './api/ghl';
+import { getContacts, getConversations, getAppointments, getCampaigns, sendMessage, isGhlConfigured } from './api/ghl';
 import { createPaymentLink, isStripeConfigured } from './api/stripe';
 import {
   LayoutDashboard, InboxIcon, Megaphone, RotateCcw, CalendarIcon,
@@ -102,6 +102,24 @@ function mapContact(c) {
     phone: c.phone || '—',
     tag: Array.isArray(c.tags) && c.tags.length ? c.tags[0] : null,
     dateAdded: c.dateAdded ? new Date(c.dateAdded).toLocaleDateString() : '—',
+  };
+}
+
+// GHL's legacy Campaigns API returns basic metadata only (id, name,
+// status) — nowhere near the per-touch sequence timelines, open/reply
+// rates, or revenue attribution CAMPAIGNS_DATA fabricates below for the
+// demo. Real campaigns render with an empty stats/sequence section rather
+// than pretending to have engagement data GHL doesn't provide.
+function mapCampaign(c) {
+  const status = (c.status || '').toLowerCase();
+  let pill = 'Live', pillColor = 'green';
+  if (status.includes('pause')) { pill = 'Paused'; pillColor = 'muted'; }
+  else if (status.includes('draft')) { pill = 'Draft'; pillColor = 'amber'; }
+  return {
+    id: c.id,
+    name: c.name || 'Untitled campaign',
+    sub: 'Synced from GoHighLevel',
+    stats: [], statColors: [], pill, pillColor, prog: null, sequence: [],
   };
 }
 
@@ -212,7 +230,7 @@ const NOTIF_SEED = [
 ];
 
 // ─── GLOBAL SEARCH MODAL ───────────────────────────────────
-function GlobalSearchModal({ open, onClose, contacts, query, setQuery, setActiveTab }) {
+function GlobalSearchModal({ open, onClose, contacts, campaigns, query, setQuery, setActiveTab }) {
   const t = useTheme();
 
   useEffect(() => {
@@ -226,7 +244,7 @@ function GlobalSearchModal({ open, onClose, contacts, query, setQuery, setActive
 
   const q = query.trim().toLowerCase();
   const patientResults = q ? (contacts || []).filter(p => p.name.toLowerCase().includes(q)).slice(0, 5) : [];
-  const campaignResults = q ? CAMPAIGNS_DATA.filter(c => c.name.toLowerCase().includes(q)).slice(0, 5) : [];
+  const campaignResults = q ? (campaigns || []).filter(c => c.name.toLowerCase().includes(q)).slice(0, 5) : [];
   const quickActions = q ? ALL_TABS.filter(tab => TAB_LABELS[tab].toLowerCase().includes(q)).slice(0, 6) : [];
   const noResults = q && patientResults.length === 0 && campaignResults.length === 0 && quickActions.length === 0;
 
@@ -309,7 +327,7 @@ function GlobalSearchModal({ open, onClose, contacts, query, setQuery, setActive
 // Fetches once on mount (and whenever refetch() is called). Skips the call
 // entirely — no spinner, no error — when GHL isn't configured, since that's
 // an expected, common state here, not a failure.
-function useGhlFetch(fetchFn) {
+function useGhlFetch(fetchFn, deps = []) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(isGhlConfigured);
   const [error, setError] = useState('');
@@ -326,7 +344,7 @@ function useGhlFetch(fetchFn) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reloadKey]);
+  }, [reloadKey, ...deps]);
 
   return { data, loading, error, refetch: () => setReloadKey(k => k + 1) };
 }
@@ -596,6 +614,9 @@ function App() {
   const { data: contactsData, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useGhlFetch(getContacts);
   const [demoContacts, setDemoContacts] = useState(DEMO_CONTACTS);
   const contacts = isGhlConfigured ? (contactsData || []).map(mapContact) : demoContacts;
+
+  const { data: campaignsData, loading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useGhlFetch(getCampaigns);
+  const ghlCampaigns = isGhlConfigured ? (campaignsData || []).map(mapCampaign) : null;
 
   function addDemoPatient(patient) {
     setDemoContacts(cs => [{ id: `p-new-${Date.now()}`, tag: null, dateAdded: new Date().toLocaleDateString(), ...patient }, ...cs]);
@@ -943,12 +964,12 @@ function App() {
         <div key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
           {gate('overview', <Overview setActiveTab={setActiveTab} userRole={userRole} />)}
           {gate('inbox', <Inbox contacts={contacts} userRole={userRole} />)}
-          {gate('campaigns', <Campaigns userRole={userRole} />)}
+          {gate('campaigns', <Campaigns userRole={userRole} ghlCampaigns={ghlCampaigns} loading={campaignsLoading} error={campaignsError} onRetry={refetchCampaigns} />)}
           {gate('recall', <Recall userRole={userRole} />)}
           {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />)}
           {gate('billing', <Billing userRole={userRole} />)}
           {gate('membershipplans', <MembershipPlans userRole={userRole} />)}
-          {gate('payments', <Payments userRole={userRole} />)}
+          {gate('payments', <Payments userRole={userRole} contacts={contacts} />)}
           {gate('reports', <Reports userRole={userRole} />)}
           {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} brandColor={brandColor} onBrandColorChange={setBrandColor} />)}
           {gate('activitylog', <ActivityLog userRole={userRole} />)}
@@ -969,6 +990,7 @@ function App() {
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
         contacts={contacts}
+        campaigns={isGhlConfigured ? (ghlCampaigns || []) : CAMPAIGNS_DATA}
         query={patientQuery}
         setQuery={setPatientQuery}
         setActiveTab={setActiveTab}
@@ -1826,9 +1848,10 @@ const CAMPAIGN_AUDIENCES = ['Inactive 3mo', 'Inactive 6mo', 'All patients', 'Cus
 const CAMPAIGN_TOUCHES = [3, 5, 7];
 const CAMPAIGN_CHANNELS = ['SMS', 'Email', 'Both'];
 
-function Campaigns() {
+function Campaigns({ ghlCampaigns, loading: campaignsLoading, error: campaignsError, onRetry: refetchCampaigns }) {
   const t = useTheme();
-  const [campaigns, setCampaigns] = useState(CAMPAIGNS_DATA);
+  const [localCampaigns, setLocalCampaigns] = useState(CAMPAIGNS_DATA);
+  const campaigns = isGhlConfigured ? (ghlCampaigns || []) : localCampaigns;
   const [selected, setSelected] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [exported, setExported] = useState(false);
@@ -1836,18 +1859,18 @@ function Campaigns() {
   const colorMap = { brand: t.brand, green: t.green, amber: t.amber, purple: t.purple, muted: t.muted };
 
   function toggleStatus(name) {
-    setCampaigns(cs => cs.map(c => c.name === name
+    setLocalCampaigns(cs => cs.map(c => c.name === name
       ? (c.pill === 'Live' ? { ...c, pill: 'Paused', pillColor: 'muted' } : { ...c, pill: 'Live', pillColor: 'green' })
       : c));
   }
 
   function launchNow(name) {
-    setCampaigns(cs => cs.map(c => c.name === name ? { ...c, pill: 'Live', pillColor: 'green', prog: 0 } : c));
+    setLocalCampaigns(cs => cs.map(c => c.name === name ? { ...c, pill: 'Live', pillColor: 'green', prog: 0 } : c));
   }
 
   function createCampaign() {
     if (!form.name.trim()) return;
-    setCampaigns(cs => [{
+    setLocalCampaigns(cs => [{
       name: form.name.trim(), sub: `${form.audience} · ${form.touches}-touch ${form.channel.toLowerCase()} · ${form.type}`,
       stats: [], statColors: [], pill: 'Live', pillColor: 'green', prog: 0,
       sequence: [{ day: 'Day 0', channel: form.channel === 'Both' ? 'SMS' : form.channel, label: form.message.trim() || 'First touch message', status: 'upcoming' }],
@@ -1855,6 +1878,9 @@ function Campaigns() {
     setForm({ name: '', type: CAMPAIGN_TYPES[0], audience: CAMPAIGN_AUDIENCES[0], touches: CAMPAIGN_TOUCHES[1], channel: CAMPAIGN_CHANNELS[0], message: '' });
     setShowForm(false);
   }
+
+  if (isGhlConfigured && campaignsLoading) return <LoadingState label="Loading campaigns…" />;
+  if (isGhlConfigured && campaignsError) return <ErrorState message={campaignsError} onRetry={refetchCampaigns} />;
 
   return (
     <div>
@@ -1864,11 +1890,17 @@ function Campaigns() {
         <StatCard label="Booked from campaigns" value="14" color={t.green} accent={t.accentGreen} sub="$8,400 revenue recovered" />
       </div>
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', alignItems: 'center' }}>
-        <Btn primary onClick={() => setShowForm(s => !s)}><Plus size={14} /> New campaign</Btn>
+        {!isGhlConfigured && <Btn primary onClick={() => setShowForm(s => !s)}><Plus size={14} /> New campaign</Btn>}
         <Btn onClick={() => { setExported(true); setTimeout(() => setExported(false), 2200); }}>{exported ? <Check size={14} /> : <Download size={14} />} {exported ? 'Exported' : 'Export'}</Btn>
       </div>
 
-      {showForm && (
+      {isGhlConfigured && (
+        <div style={{ marginBottom: '16px', padding: '10px 12px', background: t.bgRow, borderRadius: '6px', fontSize: '12px', color: t.muted, textAlign: 'center' }}>
+          Manage campaigns in GoHighLevel — create, pause, or resume them there. This list mirrors your real campaigns.
+        </div>
+      )}
+
+      {!isGhlConfigured && showForm && (
         <Card className="px-expand" style={{ marginBottom: '14px' }}>
           <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>New campaign</div>
           <div style={{ marginBottom: '12px' }}>
@@ -1918,9 +1950,9 @@ function Campaigns() {
             <div><div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{c.name}</div><div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{c.sub}</div></div>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
               <Pill label={c.pill} color={colorMap[c.pillColor] || t.muted} bg={c.pillColor ? withAlpha(colorMap[c.pillColor], .12) : t.bgRow} />
-              {c.pill === 'Live' && <Btn small onClick={e => { e.stopPropagation(); toggleStatus(c.name); }}>Pause</Btn>}
-              {c.pill === 'Paused' && <Btn small onClick={e => { e.stopPropagation(); toggleStatus(c.name); }}>Resume</Btn>}
-              {c.pill === 'Queued' && <Btn small onClick={e => { e.stopPropagation(); launchNow(c.name); }}>Launch now</Btn>}
+              {!isGhlConfigured && c.pill === 'Live' && <Btn small onClick={e => { e.stopPropagation(); toggleStatus(c.name); }}>Pause</Btn>}
+              {!isGhlConfigured && c.pill === 'Paused' && <Btn small onClick={e => { e.stopPropagation(); toggleStatus(c.name); }}>Resume</Btn>}
+              {!isGhlConfigured && c.pill === 'Queued' && <Btn small onClick={e => { e.stopPropagation(); launchNow(c.name); }}>Launch now</Btn>}
             </div>
           </div>
           {c.stats.length > 0 && (
@@ -1951,6 +1983,9 @@ function Campaigns() {
             </div>
           )}
           <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '12px' }}>TOUCH-BY-TOUCH SEQUENCE</div>
+          {selected.sequence.length === 0 && (
+            <div style={{ padding: '16px', textAlign: 'center', color: t.muted, fontSize: '12.5px' }}>No sequence detail available from GoHighLevel for this campaign.</div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {selected.sequence.map((touch, i) => (
               <div key={i} style={{ display: 'flex', gap: '12px' }}>
@@ -2357,23 +2392,32 @@ function Billing() {
 }
 
 // ─── PAYMENTS ──────────────────────────────────────────────
-function Payments() {
+function Payments({ contacts }) {
   const t = useTheme();
-  const [patientName, setPatientName] = useState('');
+  const contactList = contacts || [];
+  const [selectedContactId, setSelectedContactId] = useState('');
   const [amount, setAmount] = useState('');
   const [reqType, setReqType] = useState('Co-pay collection');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [copied, setCopied] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsSent, setSmsSent] = useState(false);
+  const [smsError, setSmsError] = useState('');
+
+  const selectedContact = contactList.find(c => c.id === selectedContactId) || null;
 
   async function handleSend() {
+    if (!selectedContact) { setError('Select a patient first.'); return; }
     setError('');
     setLinkUrl('');
     setCopied(false);
+    setSmsSent(false);
+    setSmsError('');
     setSending(true);
     try {
-      const res = await createPaymentLink(patientName, amount, reqType);
+      const res = await createPaymentLink(selectedContact.name, amount, reqType);
       setLinkUrl(res?.url || '');
     } catch (err) {
       setError(err.message || 'Something went wrong.');
@@ -2388,6 +2432,20 @@ function Payments() {
       setCopied(true);
     } catch {
       // clipboard API unavailable — link is still shown for manual copy
+    }
+  }
+
+  async function handleSendSms() {
+    if (!selectedContact) return;
+    setSmsError('');
+    setSmsSending(true);
+    try {
+      await sendMessage(selectedContact.id, `Here's your secure payment link: ${linkUrl}`);
+      setSmsSent(true);
+    } catch (err) {
+      setSmsError(err.message || 'Could not send the text.');
+    } finally {
+      setSmsSending(false);
     }
   }
 
@@ -2416,8 +2474,11 @@ function Payments() {
         <Card>
           <CardTitle>Send payment request</CardTitle>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Patient name</label>
-            <input value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="Search patient..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Patient</label>
+            <select value={selectedContactId} onChange={e => setSelectedContactId(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <option value="">Select a patient…</option>
+              {contactList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Amount</label>
@@ -2443,11 +2504,19 @@ function Payments() {
           )}
           {linkUrl && (
             <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '6px', border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>
-              <div style={{ fontSize: '11.5px', color: t.green, fontWeight: '600', marginBottom: '6px' }}>Payment link created — copy and send it to the patient.</div>
+              <div style={{ fontSize: '11.5px', color: t.green, fontWeight: '600', marginBottom: '6px' }}>Payment link created.</div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <input readOnly value={linkUrl} onFocus={e => e.target.select()} style={{ flex: 1, padding: '7px 10px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12px', fontFamily: 'inherit', background: t.bgCard, color: t.ink2, minWidth: 0 }} />
                 <Btn small onClick={handleCopy}>{copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy'}</Btn>
               </div>
+              {isGhlConfigured && (
+                <div style={{ marginTop: '8px' }}>
+                  <Btn small primary onClick={handleSendSms} disabled={smsSending || smsSent} style={{ width: '100%', justifyContent: 'center' }}>
+                    {smsSending ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} {smsSent ? 'Sent via SMS' : 'Send via SMS'}
+                  </Btn>
+                  {smsError && <div style={{ marginTop: '6px', fontSize: '11px', color: t.red }}>{smsError}</div>}
+                </div>
+              )}
             </div>
           )}
         </Card>
@@ -3312,6 +3381,38 @@ function timeToMinutes(time) {
   return hours * 60 + parseInt(m, 10);
 }
 
+function formatApptTime12h(date) {
+  let h = date.getHours();
+  const m = date.getMinutes();
+  const period = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return `${h}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+// Buckets GHL calendar events by local day, matching the same
+// `${year}-${month}-${day}` key shape seedSeptemberAppointments() produces
+// so the rest of Calendar() doesn't need to know which source it's reading.
+function mapAppointmentsByDate(events) {
+  const seed = {};
+  (events || []).forEach(e => {
+    if (!e.startTime) return;
+    const start = new Date(e.startTime);
+    if (Number.isNaN(start.getTime())) return;
+    const end = e.endTime ? new Date(e.endTime) : null;
+    const key = `${start.getFullYear()}-${start.getMonth()}-${start.getDate()}`;
+    const duration = end && !Number.isNaN(end.getTime()) ? Math.round((end - start) / 60000) : null;
+    const entry = {
+      id: e.id,
+      time: formatApptTime12h(start),
+      patient: e.title || 'Appointment',
+      type: e.appointmentStatus ? e.appointmentStatus.charAt(0).toUpperCase() + e.appointmentStatus.slice(1) : 'Appointment',
+      duration,
+    };
+    (seed[key] || (seed[key] = [])).push(entry);
+  });
+  return seed;
+}
+
 function seedSeptemberAppointments() {
   const counts = { 13: 4, 15: 2, 16: 3, 17: 5, 18: 2, 20: 1, 22: 3, 23: 4, 24: 2, 27: 3, 29: 2, 30: 3 };
   const seed = {};
@@ -3329,7 +3430,7 @@ function Calendar() {
   const t = useTheme();
   const [monthOffset, setMonthOffset] = useState(0);
   const [selectedKey, setSelectedKey] = useState(`${CAL_BASE_YEAR}-${CAL_BASE_MONTH}-${CAL_TODAY.day}`);
-  const [appointments, setAppointments] = useState(seedSeptemberAppointments);
+  const [localAppointments, setLocalAppointments] = useState(seedSeptemberAppointments);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newPatient, setNewPatient] = useState('');
   const [newTime, setNewTime] = useState(CAL_TIME_POOL[0]);
@@ -3341,6 +3442,12 @@ function Calendar() {
   const monthLabel = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const startWeekday = new Date(year, month, 1).getDay();
+  const monthStart = new Date(year, month, 1).getTime();
+  const monthEnd = new Date(year, month + 1, 0, 23, 59, 59).getTime();
+
+  const { data: apptData, loading: apptLoading, error: apptError, refetch: refetchAppts } =
+    useGhlFetch(() => getAppointments({ startTime: monthStart, endTime: monthEnd }), [year, month]);
+  const appointments = isGhlConfigured ? mapAppointmentsByDate(apptData) : localAppointments;
 
   const days = [];
   for (let i = 0; i < startWeekday; i++) days.push(null);
@@ -3354,13 +3461,13 @@ function Calendar() {
   function addAppointment() {
     if (!newPatient.trim()) return;
     const entry = { id: `new-${Date.now()}`, time: newTime, patient: newPatient.trim(), type: newType, duration: (CAL_TYPE_POOL.find(([ty]) => ty === newType) || [null, 30])[1] };
-    setAppointments(a => ({ ...a, [selectedKey]: [...(a[selectedKey] || []), entry] }));
+    setLocalAppointments(a => ({ ...a, [selectedKey]: [...(a[selectedKey] || []), entry] }));
     setNewPatient('');
     setShowAddForm(false);
   }
 
   function removeAppointment(id) {
-    setAppointments(a => ({ ...a, [selectedKey]: (a[selectedKey] || []).filter(e => e.id !== id) }));
+    setLocalAppointments(a => ({ ...a, [selectedKey]: (a[selectedKey] || []).filter(e => e.id !== id) }));
   }
 
   return (
@@ -3403,50 +3510,62 @@ function Calendar() {
         </div>
       </Card>
 
-      <Card>
-        <CardTitle>{selectedLabel}</CardTitle>
-        {selectedList.length === 0 && !showAddForm && (
-          <div style={{ padding: '20px', textAlign: 'center', color: t.muted, fontSize: '13px' }}>No appointments this day.</div>
-        )}
-        {selectedList.map((appt, i) => {
-          const [color, bg] = avatarStyle(t, i);
-          return (
-            <RowItem key={appt.id}>
-              <div style={{ fontSize: '11.5px', color: t.muted, width: '60px', flexShrink: 0, fontWeight: '500' }}>{appt.time}</div>
-              <Ava initials={initialsOf(appt.patient)} bg={bg} color={color} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{appt.patient}</PII></div>
-                <div style={{ fontSize: '11.5px', color: t.muted }}>{appt.type} · {appt.duration} min</div>
-              </div>
-              <button onClick={() => removeAppointment(appt.id)} title="Remove" style={{ background: 'none', border: 'none', color: t.muted, cursor: 'pointer', padding: '4px', display: 'flex' }}>
-                <X size={14} />
-              </button>
-            </RowItem>
-          );
-        })}
+      {isGhlConfigured && apptLoading ? (
+        <LoadingState label="Loading appointments…" />
+      ) : isGhlConfigured && apptError ? (
+        <ErrorState message={apptError} onRetry={refetchAppts} />
+      ) : (
+        <Card>
+          <CardTitle>{selectedLabel}</CardTitle>
+          {selectedList.length === 0 && !showAddForm && (
+            <div style={{ padding: '20px', textAlign: 'center', color: t.muted, fontSize: '13px' }}>No appointments this day.</div>
+          )}
+          {selectedList.map((appt, i) => {
+            const [color, bg] = avatarStyle(t, i);
+            return (
+              <RowItem key={appt.id}>
+                <div style={{ fontSize: '11.5px', color: t.muted, width: '60px', flexShrink: 0, fontWeight: '500' }}>{appt.time}</div>
+                <Ava initials={initialsOf(appt.patient)} bg={bg} color={color} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{appt.patient}</PII></div>
+                  <div style={{ fontSize: '11.5px', color: t.muted }}>{appt.type}{appt.duration ? ` · ${appt.duration} min` : ''}</div>
+                </div>
+                {!isGhlConfigured && (
+                  <button onClick={() => removeAppointment(appt.id)} title="Remove" style={{ background: 'none', border: 'none', color: t.muted, cursor: 'pointer', padding: '4px', display: 'flex' }}>
+                    <X size={14} />
+                  </button>
+                )}
+              </RowItem>
+            );
+          })}
 
-        {showAddForm ? (
-          <div style={{ background: t.bgRow, border: `1px solid ${t.border2}`, borderRadius: '6px', padding: '12px', marginTop: '8px' }}>
-            <input value={newPatient} onChange={e => setNewPatient(e.target.value)} placeholder="Patient name" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, marginBottom: '8px', boxSizing: 'border-box' }} />
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-              <select value={newTime} onChange={e => setNewTime(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
-                {CAL_TIME_POOL.map(time => <option key={time} value={time}>{time}</option>)}
-              </select>
-              <select value={newType} onChange={e => setNewType(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
-                {CAL_TYPE_POOL.map(([type]) => <option key={type} value={type}>{type}</option>)}
-              </select>
+          {isGhlConfigured ? (
+            <div style={{ marginTop: selectedList.length ? '8px' : '0', padding: '10px 12px', background: t.bgRow, borderRadius: '6px', fontSize: '12px', color: t.muted, textAlign: 'center' }}>
+              Appointments sync from GoHighLevel — book or edit them there.
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <Btn small onClick={() => setShowAddForm(false)} style={{ flex: 1, justifyContent: 'center' }}>Cancel</Btn>
-              <Btn small primary onClick={addAppointment} style={{ flex: 1, justifyContent: 'center' }}>Add</Btn>
+          ) : showAddForm ? (
+            <div style={{ background: t.bgRow, border: `1px solid ${t.border2}`, borderRadius: '6px', padding: '12px', marginTop: '8px' }}>
+              <input value={newPatient} onChange={e => setNewPatient(e.target.value)} placeholder="Patient name" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, marginBottom: '8px', boxSizing: 'border-box' }} />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                <select value={newTime} onChange={e => setNewTime(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
+                  {CAL_TIME_POOL.map(time => <option key={time} value={time}>{time}</option>)}
+                </select>
+                <select value={newType} onChange={e => setNewType(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
+                  {CAL_TYPE_POOL.map(([type]) => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Btn small onClick={() => setShowAddForm(false)} style={{ flex: 1, justifyContent: 'center' }}>Cancel</Btn>
+                <Btn small primary onClick={addAppointment} style={{ flex: 1, justifyContent: 'center' }}>Add</Btn>
+              </div>
             </div>
-          </div>
-        ) : (
-          <Btn primary style={{ width: '100%', justifyContent: 'center', marginTop: selectedList.length ? '8px' : '0' }} onClick={() => setShowAddForm(true)}>
-            <Plus size={14} /> Add appointment
-          </Btn>
-        )}
-      </Card>
+          ) : (
+            <Btn primary style={{ width: '100%', justifyContent: 'center', marginTop: selectedList.length ? '8px' : '0' }} onClick={() => setShowAddForm(true)}>
+              <Plus size={14} /> Add appointment
+            </Btn>
+          )}
+        </Card>
+      )}
     </div>
   );
 }
