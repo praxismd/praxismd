@@ -1,34 +1,31 @@
-// Stripe API client — BARE-BONES SCAFFOLD. No key wired up yet.
+// Stripe API client.
 //
-// This mirrors the shape of src/api/ghl.js so the rest of the app has
-// something to call, but there's nothing live behind it: every function
-// below just throws a friendly "not connected" error for now.
-//
-// Important: even once you're ready to connect a real Stripe account, this
-// file should NOT call the Stripe API directly from the browser the way
-// ghl.js does. Creating a payment link or charge requires your Stripe
-// SECRET key, which must never ship in client-side JS. The real version of
-// this file should call your own backend (e.g. a Firebase Cloud Function)
-// that holds the secret key and exposes safe endpoints — this client would
-// then just fetch() those endpoints.
+// This never talks to Stripe directly — the secret key required to create
+// a real payment link can't live in browser JS (Create React App bakes
+// REACT_APP_* values straight into the public bundle). Instead this calls
+// the `createPaymentLink` Firebase Cloud Function (see functions/index.js),
+// which holds the Stripe secret key in Secret Manager and does the actual
+// Stripe API call server-side. The Firebase SDK attaches the signed-in
+// user's ID token automatically, so the function can require auth.
 
-export const isStripeConfigured = Boolean(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+import { httpsCallable } from 'firebase/functions';
+import { functions, isFirebaseConfigured } from '../firebase';
 
-async function stripeRequest(action) {
-  if (!isStripeConfigured) {
-    throw new Error("Stripe isn't connected yet — add REACT_APP_STRIPE_PUBLISHABLE_KEY to your .env.local.");
-  }
-  throw new Error(`${action} isn't wired up yet — this is a bare-bones scaffold. Build a backend endpoint that calls Stripe with your secret key, then call it from src/api/stripe.js.`);
-}
+export const isStripeConfigured = isFirebaseConfigured;
 
 export async function createPaymentLink(patientName, amount, type) {
-  return stripeRequest('createPaymentLink');
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase isn\'t connected yet — add REACT_APP_FIREBASE_* to your .env.local.');
+  }
+  const call = httpsCallable(functions, 'createPaymentLink');
+  const res = await call({ patientName, amount, type });
+  return res.data; // { url }
 }
 
 export async function createPaymentPlan(patientName, amount, months) {
-  return stripeRequest('createPaymentPlan');
+  throw new Error('Recurring payment plans aren\'t wired up yet — only one-time payment links are live so far.');
 }
 
 export async function listPayments() {
-  return stripeRequest('listPayments');
+  throw new Error('Payment history isn\'t wired up yet — that needs a Stripe webhook writing completed payments into Firestore.');
 }

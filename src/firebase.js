@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getFunctions } from 'firebase/functions';
 
 // Fill these in with your own Firebase project's config — see .env.example.
 // Create a .env.local file in the project root (never commit it) with the
@@ -23,12 +24,14 @@ export const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseCon
 let auth = null;
 let db = null;
 let googleProvider = null;
+let functions = null;
 
 if (isFirebaseConfigured) {
   const app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
   googleProvider = new GoogleAuthProvider();
+  functions = getFunctions(app);
 }
 
-export { auth, db, googleProvider };
+export { auth, db, googleProvider, functions };
