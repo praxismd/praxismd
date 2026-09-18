@@ -2364,19 +2364,30 @@ function Payments() {
   const [reqType, setReqType] = useState('Co-pay collection');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
-  const [sent, setSent] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [copied, setCopied] = useState(false);
 
   async function handleSend() {
     setError('');
-    setSent(false);
+    setLinkUrl('');
+    setCopied(false);
     setSending(true);
     try {
-      await createPaymentLink(patientName, amount, reqType);
-      setSent(true);
+      const res = await createPaymentLink(patientName, amount, reqType);
+      setLinkUrl(res?.url || '');
     } catch (err) {
       setError(err.message || 'Something went wrong.');
     } finally {
       setSending(false);
+    }
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(linkUrl);
+      setCopied(true);
+    } catch {
+      // clipboard API unavailable — link is still shown for manual copy
     }
   }
 
@@ -2419,19 +2430,25 @@ function Payments() {
             </select>
           </div>
           <Btn primary onClick={handleSend} disabled={sending} style={{ width: '100%', justifyContent: 'center' }}>
-            {sending ? <Loader2 size={14} className="px-spin" /> : <Send size={14} />} Send payment link via SMS
+            {sending ? <Loader2 size={14} className="px-spin" /> : <Send size={14} />} Create payment link
           </Btn>
           {!isStripeConfigured && (
             <div style={{ marginTop: '12px', padding: '10px 12px', background: t.amberL, borderRadius: '6px', fontSize: '11.5px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}`, display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
               <AlertTriangle size={13} style={{ marginTop: '1px', flexShrink: 0 }} />
-              <span>Stripe isn't connected yet. Add <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_STRIPE_PUBLISHABLE_KEY</code> to your <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>.env.local</code> — this is a bare-bones scaffold for now.</span>
+              <span>Firebase isn't connected yet — add <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_FIREBASE_*</code> to your <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>.env.local</code>.</span>
             </div>
           )}
           {error && isStripeConfigured && (
             <div style={{ marginTop: '12px', padding: '10px 12px', background: t.redL, borderRadius: '6px', fontSize: '11.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{error}</div>
           )}
-          {sent && (
-            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '6px', fontSize: '11.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>Payment link sent.</div>
+          {linkUrl && (
+            <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '6px', border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>
+              <div style={{ fontSize: '11.5px', color: t.green, fontWeight: '600', marginBottom: '6px' }}>Payment link created — copy and send it to the patient.</div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input readOnly value={linkUrl} onFocus={e => e.target.select()} style={{ flex: 1, padding: '7px 10px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12px', fontFamily: 'inherit', background: t.bgCard, color: t.ink2, minWidth: 0 }} />
+                <Btn small onClick={handleCopy}>{copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy'}</Btn>
+              </div>
+            </div>
           )}
         </Card>
       </div>
