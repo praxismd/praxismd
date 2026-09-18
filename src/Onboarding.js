@@ -7,7 +7,7 @@ import { light, withAlpha } from './theme';
 import {
   Building2, Plug, Phone, PartyPopper, Check, ArrowLeft, ArrowRight,
   Loader2, AlertTriangle, CheckCircle2,
-} from 'lucide-react';
+} from './icons';
 
 const t = light;
 
