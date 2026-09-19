@@ -726,6 +726,7 @@ function App() {
       .px-expand { animation: pxExpand .15s ease; }
       @media (max-width: 767px) {
         [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+        [style*="grid-template-columns"] > * { min-width: 0 !important; }
         table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
       }
     `}</style>
@@ -821,7 +822,7 @@ function App() {
       </div>
 
       {/* MAIN */}
-      <div style={{ marginLeft: isMobileView ? 0 : (collapsed ? '64px' : '232px'), flex: 1, display: 'flex', flexDirection: 'column', background: t.pageGradient, minHeight: '100vh', transition: 'margin-left .2s ease' }}>
+      <div style={{ marginLeft: isMobileView ? 0 : (collapsed ? '64px' : '232px'), flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: t.pageGradient, minHeight: '100vh', transition: 'margin-left .2s ease' }}>
 
         {!appBannerDismissed && isMobileView && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 16px', background: t.brand, color: 'white' }}>
@@ -839,7 +840,7 @@ function App() {
         )}
 
         {/* TOPBAR */}
-        <div className="px-topbar-glass" style={{ height: '64px', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: `1px solid ${t.topbarGlassBorder}`, display: 'flex', alignItems: 'center', gap: '24px', padding: '0 26px', position: 'sticky', top: 0, zIndex: 50 }}>
+        <div className="px-topbar-glass" style={{ height: '64px', minWidth: 0, backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', borderBottom: `1px solid ${t.topbarGlassBorder}`, display: 'flex', alignItems: 'center', gap: isMobileView ? '10px' : '24px', padding: isMobileView ? '0 14px' : '0 26px', position: 'sticky', top: 0, zIndex: 50 }}>
           {isMobileView && (
             <button
               type="button"
@@ -850,9 +851,9 @@ function App() {
               <Menu size={17} />
             </button>
           )}
-          <div style={{ flexShrink: 0 }}>
-            <div style={{ fontSize: '16px', fontWeight: '600', color: t.ink }}>{getPageTitle(activeTab, ownerDisplayName)}</div>
-            <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · {practiceDisplayName}</div>
+          <div style={{ flex: isMobileView ? '1 1 auto' : '0 0 auto', minWidth: 0 }}>
+            <div style={{ fontSize: '16px', fontWeight: '600', color: t.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getPageTitle(activeTab, ownerDisplayName)}</div>
+            <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })} · {practiceDisplayName}</div>
           </div>
 
           {!isMobileView && (
