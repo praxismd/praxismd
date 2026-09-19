@@ -90,7 +90,7 @@ const COMPARISON_ROWS = [
   { feature: 'Billing automation', wins: [true, false, false, false, false] },
   { feature: 'Insurance eligibility', wins: [true, false, false, false, true] },
   { feature: 'Payment plans', wins: [true, false, false, false, true] },
-  { feature: 'Patient portal & e-signatures', wins: [true, false, false, false, true] },
+  { feature: 'Patient portal & e-signatures', wins: [true, true, false, true, true] },
   { feature: 'Activity log & audit trail', wins: [true, false, false, false, false] },
 ];
 
