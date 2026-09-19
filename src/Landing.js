@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Check, X, ArrowRight, RotateCcw, Bot, ClipboardList, Receipt, Shield,
   Smile, CreditCard, Contact, Sparkles, Star, Menu, TrendingDown, PhoneOff,
-  FileWarning, Megaphone, Activity, Quote,
+  FileWarning, Megaphone, Activity, Quote, Stethoscope, ShieldCheck,
 } from './icons';
 
 // Self-contained palette — the landing page is always light mode and never
@@ -77,25 +77,16 @@ const FEATURES_9 = [
   { Icon: Activity, title: 'Activity Log', desc: 'A full audit trail of every action taken across your practice, for compliance and accountability.' },
 ];
 
-const COMPETITOR_COLUMNS = [
-  { name: 'PraxisMD', price: null, highlight: true },
-  { name: 'Weave', price: '$399' },
-  { name: 'Podium', price: '$289' },
-  { name: 'RevenueWell', price: '$189' },
-  { name: 'NexHealth', price: null },
+const WHY_PILLARS = [
+  {
+    Icon: Stethoscope, title: 'Built for healthcare, not bolted onto it',
+    desc: 'The general-purpose communications platforms in this space sell the same AI receptionist to plumbers, salons, and auto shops, then relabel it for healthcare. Every workflow here — patient portal, eligibility, billing — is designed around how a practice actually runs, not retrofitted from a horizontal answering service.',
+  },
+  {
+    Icon: ShieldCheck, title: 'A full audit trail, not just an inbox',
+    desc: "Every action taken on a patient's record — who viewed it, what changed, when — is logged automatically. That's the kind of accountability a compliance-minded practice needs, and it's not something a generalist messaging platform is built to prioritize.",
+  },
 ];
-
-const COMPARISON_ROWS = [
-  { feature: 'Patient reactivation', wins: [true, false, false, false, false] },
-  { feature: 'AI front desk calls', wins: [true, false, false, false, false] },
-  { feature: 'Billing automation', wins: [true, false, false, false, false] },
-  { feature: 'Smart waitlist', wins: [true, false, false, false, false] },
-  { feature: 'Insurance eligibility', wins: [true, false, false, false, true] },
-  { feature: 'NPS surveys', wins: [true, true, false, false, false] },
-  { feature: 'Payment plans', wins: [true, false, false, false, true] },
-];
-
-const STARTING_PRICE_ROW = ['$299/mo', '$399/mo', '$289/mo', '$189/mo', 'Custom pricing'];
 
 const PRICING_PLANS = [
   {
@@ -146,7 +137,7 @@ const TESTIMONIALS = [
 ];
 
 const FOOTER_COLUMNS = [
-  { title: 'Product', links: ['Features', 'Pricing', 'Compare', 'Book a demo'] },
+  { title: 'Product', links: ['Features', 'Pricing', 'Why us', 'Book a demo'] },
   { title: 'Company', links: ['About', 'Careers', 'Blog', 'Contact'] },
   { title: 'Resources', links: ['Help center', 'API docs', 'System status', 'Case studies'] },
   { title: 'Legal', links: ['Privacy policy', 'Terms of service', 'BAA', 'Security'] },
@@ -258,7 +249,7 @@ function NavBar({ onOpenDemo }) {
   const links = [
     ['Features', 'features'],
     ['Pricing', 'pricing'],
-    ['Compare', 'compare'],
+    ['Why us', 'why'],
     ['Contact', 'contact'],
   ];
 
@@ -403,6 +394,7 @@ function Landing() {
           .px-problem-grid { grid-template-columns: 1fr !important; }
           .px-solution-grid { grid-template-columns: 1fr !important; }
           .px-testimonial-grid { grid-template-columns: 1fr !important; }
+          .px-why-grid { grid-template-columns: 1fr !important; }
           .px-footer-grid { grid-template-columns: 1fr 1fr !important; }
           .px-hero-headline { font-size: 34px !important; }
           .px-hero-mockup-sidebar { display: none !important; }
@@ -410,7 +402,6 @@ function Landing() {
         }
         @media (max-width: 560px) {
           .px-features-grid { grid-template-columns: 1fr !important; }
-          .px-compare-table { font-size: 11.5px !important; }
           .px-footer-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
@@ -527,54 +518,23 @@ function Landing() {
         </Reveal>
       </div>
 
-      {/* COMPARISON */}
-      <div id="compare" style={{ padding: '80px 26px' }}>
+      {/* WHY */}
+      <div id="why" style={{ padding: '80px 26px' }}>
         <Reveal style={{ maxWidth: '1040px', margin: '0 auto' }}>
-          <SectionLabel>How we compare</SectionLabel>
+          <SectionLabel>Why PraxisMD</SectionLabel>
           <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 44px', letterSpacing: '-.5px' }}>
-            How PraxisMD compares
+            Two things a general-purpose platform can't fake
           </h2>
-          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: '16px', overflow: 'hidden', overflowX: 'auto' }}>
-            <table className="px-compare-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '620px' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '16px 18px', fontSize: '11.5px', fontWeight: '600', color: C.muted, textTransform: 'uppercase', letterSpacing: '.4px', background: C.bgAlt, borderBottom: `1px solid ${C.border}` }}>Feature</th>
-                  {COMPETITOR_COLUMNS.map((c, i) => (
-                    <th key={i} style={{
-                      textAlign: 'center', padding: '14px 12px', fontSize: '12.5px', fontWeight: '700',
-                      color: c.highlight ? 'white' : C.mid,
-                      background: c.highlight ? C.brand : C.bgAlt,
-                      borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap',
-                    }}>
-                      <div>{c.name}</div>
-                      {c.price && <div style={{ fontSize: '10.5px', fontWeight: '500', opacity: .8, marginTop: '2px' }}>{c.price}/mo</div>}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARISON_ROWS.map((row, i) => (
-                  <tr key={i} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <td style={{ padding: '13px 18px', color: C.ink2, fontWeight: '500' }}>{row.feature}</td>
-                    {row.wins.map((win, j) => (
-                      <td key={j} style={{ textAlign: 'center', padding: '13px 12px', background: COMPETITOR_COLUMNS[j].highlight ? withAlpha(C.brand, .06) : 'transparent' }}>
-                        {win
-                          ? <Check size={16} color={C.green} style={{ display: 'inline-block' }} />
-                          : <X size={16} color={C.muted} style={{ display: 'inline-block', opacity: .5 }} />}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                <tr>
-                  <td style={{ padding: '13px 18px', color: C.ink, fontWeight: '700' }}>Starting price</td>
-                  {STARTING_PRICE_ROW.map((price, j) => (
-                    <td key={j} style={{ textAlign: 'center', padding: '13px 12px', fontWeight: '700', color: COMPETITOR_COLUMNS[j].highlight ? C.brand : C.ink2, background: COMPETITOR_COLUMNS[j].highlight ? withAlpha(C.brand, .06) : 'transparent' }}>
-                      {price}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
+          <div className="px-why-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+            {WHY_PILLARS.map(({ Icon, title, desc }, i) => (
+              <div key={i} style={{ background: C.bgAlt, borderRadius: '16px', padding: '30px 26px', border: `1px solid ${C.border}` }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '11px', background: C.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '18px' }}>
+                  <Icon size={21} color={C.brand} />
+                </div>
+                <div style={{ fontSize: '17px', fontWeight: '700', color: C.ink, marginBottom: '10px' }}>{title}</div>
+                <div style={{ fontSize: '13.5px', color: C.mid, lineHeight: '1.65' }}>{desc}</div>
+              </div>
+            ))}
           </div>
         </Reveal>
       </div>
