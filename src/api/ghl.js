@@ -49,7 +49,7 @@ export async function getCalendars() {
 // addition to a date range — it won't just return "everything for this
 // location." Callers must pass a calendarId (see getCalendars()).
 export async function getAppointments({ startTime, endTime, calendarId } = {}) {
-  if (!calendarId) return [];
+  if (!calendarId) return null;
   const now = Date.now();
   const start = startTime || now;
   const end = endTime || now + 30 * 24 * 60 * 60 * 1000; // default: next 30 days
