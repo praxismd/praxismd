@@ -10,6 +10,14 @@
 // The client (src/api/stripe.js, src/api/ghl.js) calls these through the
 // Firebase SDK's httpsCallable(), which automatically attaches the caller's
 // Firebase Auth ID token — that's what request.auth is checked against below.
+//
+// Note: request.auth only proves "some signed-in PraxisMD user called this,"
+// not which role they have — role/tab permissions in src/App.js are UI-only,
+// not enforced server-side yet. So ghlProxy is restricted below to the exact
+// GHL endpoints the app actually calls (see ALLOWED_GHL_ROUTES), rather than
+// accepting an arbitrary path/method, so a compromised or malicious
+// authenticated session can't use it as an open proxy to the clinic's full
+// GHL account.
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
@@ -19,6 +27,21 @@ const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
 const ghlApiKey = defineSecret('GHL_API_KEY');
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
 const GHL_API_VERSION = '2021-07-28';
+// Matches REACT_APP_GHL_LOCATION_ID (see .github/workflows/deploy-pages.yml)
+// — not a secret, just pinned here too so a caller can't point this proxy
+// at a different sub-account by passing a different locationId.
+const GHL_LOCATION_ID = 'MJIYE0wyUSwdoXjflQns';
+
+const MAX_PAYMENT_LINK_AMOUNT = 50000; // dollars — sanity cap, not a real business limit
+
+const ALLOWED_GHL_ROUTES = [
+  { method: 'GET', pathname: '/contacts/' },
+  { method: 'GET', pathname: '/conversations/search' },
+  { method: 'GET', pathname: '/calendars/' },
+  { method: 'GET', pathname: '/calendars/events' },
+  { method: 'GET', pathname: '/campaigns/' },
+  { method: 'POST', pathname: '/conversations/messages' },
+];
 
 exports.createPaymentLink = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) {
@@ -32,6 +55,9 @@ exports.createPaymentLink = onCall({ secrets: [stripeSecretKey] }, async (reques
   }
   if (!parsedAmount || parsedAmount <= 0) {
     throw new HttpsError('invalid-argument', 'A positive amount is required.');
+  }
+  if (parsedAmount > MAX_PAYMENT_LINK_AMOUNT) {
+    throw new HttpsError('invalid-argument', `Amount can't exceed $${MAX_PAYMENT_LINK_AMOUNT.toLocaleString()}.`);
   }
 
   const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2024-06-20' });
@@ -62,7 +88,8 @@ exports.createPaymentLink = onCall({ secrets: [stripeSecretKey] }, async (reques
 
 // Generic proxy for GoHighLevel (LeadConnector v2) API calls. Holds the GHL
 // API key in Secret Manager — the client (src/api/ghl.js) sends a relative
-// path + method + body, this attaches the auth header and forwards it.
+// path + method + body, this attaches the auth header and forwards it, but
+// only for paths/methods in ALLOWED_GHL_ROUTES and only for our own location.
 exports.ghlProxy = onCall({ secrets: [ghlApiKey] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in to use GoHighLevel.');
@@ -73,10 +100,28 @@ exports.ghlProxy = onCall({ secrets: [ghlApiKey] }, async (request) => {
     throw new HttpsError('invalid-argument', 'A valid GoHighLevel API path is required.');
   }
 
+  const reqMethod = method || 'GET';
+  let url;
+  try {
+    url = new URL(path, GHL_BASE_URL);
+  } catch {
+    throw new HttpsError('invalid-argument', 'Malformed path.');
+  }
+
+  const allowed = ALLOWED_GHL_ROUTES.some(r => r.method === reqMethod && r.pathname === url.pathname);
+  if (!allowed) {
+    throw new HttpsError('permission-denied', 'That GoHighLevel endpoint is not permitted from this app.');
+  }
+
+  const locationId = url.searchParams.get('locationId');
+  if (locationId && locationId !== GHL_LOCATION_ID) {
+    throw new HttpsError('permission-denied', 'That location is not permitted from this app.');
+  }
+
   let res;
   try {
     res = await fetch(`${GHL_BASE_URL}${path}`, {
-      method: method || 'GET',
+      method: reqMethod,
       headers: {
         Authorization: `Bearer ${ghlApiKey.value()}`,
         Version: GHL_API_VERSION,

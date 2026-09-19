@@ -2408,6 +2408,17 @@ function Payments({ contacts }) {
 
   const selectedContact = contactList.find(c => c.id === selectedContactId) || null;
 
+  function handleContactChange(id) {
+    setSelectedContactId(id);
+    // A link created for the previous patient must not be sendable to a
+    // newly-selected one — force re-creating the link for the new patient.
+    setLinkUrl('');
+    setCopied(false);
+    setSmsSent(false);
+    setSmsError('');
+    setError('');
+  }
+
   async function handleSend() {
     if (!selectedContact) { setError('Select a patient first.'); return; }
     setError('');
@@ -2475,7 +2486,7 @@ function Payments({ contacts }) {
           <CardTitle>Send payment request</CardTitle>
           <div style={{ marginBottom: '12px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Patient</label>
-            <select value={selectedContactId} onChange={e => setSelectedContactId(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+            <select value={selectedContactId} onChange={e => handleContactChange(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
               <option value="">Select a patient…</option>
               {contactList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -2499,7 +2510,7 @@ function Payments({ contacts }) {
               <span>Firebase isn't connected yet — add <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>REACT_APP_FIREBASE_*</code> to your <code style={{ background: withAlpha(t.amber, .12), padding: '1px 5px', borderRadius: '4px' }}>.env.local</code>.</span>
             </div>
           )}
-          {error && isStripeConfigured && (
+          {error && (
             <div style={{ marginTop: '12px', padding: '10px 12px', background: t.redL, borderRadius: '6px', fontSize: '11.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{error}</div>
           )}
           {linkUrl && (
@@ -3446,13 +3457,21 @@ function Calendar() {
   const monthEnd = new Date(year, month + 1, 0, 23, 59, 59).getTime();
 
   // GHL's events endpoint requires a specific calendarId — fetch the
-  // account's calendars once and use the first one.
+  // account's calendars and default to the first one, but let staff switch
+  // if the practice has more than one (e.g. one per doctor).
+  const [selectedCalendarId, setSelectedCalendarId] = useState('');
   const { data: calendarsData, loading: calendarsLoading, error: calendarsError, refetch: refetchCalendars } = useGhlFetch(getCalendars);
-  const calendarId = (calendarsData && calendarsData[0] && calendarsData[0].id) || null;
+  const calendarId = selectedCalendarId || (calendarsData && calendarsData[0] && calendarsData[0].id) || null;
   const noCalendarsFound = isGhlConfigured && !calendarsLoading && !calendarsError && calendarsData && calendarsData.length === 0;
 
   const { data: apptData, loading: apptLoading, error: apptError, refetch: refetchAppts } =
     useGhlFetch(() => getAppointments({ startTime: monthStart, endTime: monthEnd, calendarId }), [year, month, calendarId]);
+  // apptData stays null (not []) until a fetch for the *current* calendarId
+  // has actually resolved, so this catches the render right after calendarId
+  // first becomes available but before its fetch has started — without it,
+  // that one render would show a stale "no appointments" from the earlier
+  // calendarId-less no-op call.
+  const apptStillResolving = Boolean(calendarId) && apptData === null;
   const appointments = isGhlConfigured ? mapAppointmentsByDate(apptData) : localAppointments;
 
   const days = [];
@@ -3480,6 +3499,15 @@ function Calendar() {
     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '12px', alignItems: 'start' }}>
       <Card>
         <CardTitle>{monthLabel} <div style={{ display: 'flex', gap: '8px' }}><Btn small onClick={() => setMonthOffset(o => o - 1)}><ChevronLeft size={14} /> Prev</Btn><Btn small onClick={() => setMonthOffset(o => o + 1)}>Next <ChevronRight size={14} /></Btn></div></CardTitle>
+        {isGhlConfigured && calendarsData && calendarsData.length > 1 && (
+          <select
+            value={calendarId || ''}
+            onChange={e => setSelectedCalendarId(e.target.value)}
+            style={{ width: '100%', padding: '7px 10px', marginBottom: '10px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}
+          >
+            {calendarsData.map(c => <option key={c.id} value={c.id}>{c.name || c.id}</option>)}
+          </select>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px', marginBottom: '6px' }}>
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: '11px', color: t.muted, fontWeight: '600', textAlign: 'center', padding: '6px 0', textTransform: 'uppercase', letterSpacing: '.5px' }}>{d}</div>)}
         </div>
@@ -3516,7 +3544,7 @@ function Calendar() {
         </div>
       </Card>
 
-      {isGhlConfigured && (calendarsLoading || apptLoading) ? (
+      {isGhlConfigured && (calendarsLoading || apptLoading || apptStillResolving) ? (
         <LoadingState label="Loading appointments…" />
       ) : isGhlConfigured && (calendarsError || apptError) ? (
         <ErrorState message={calendarsError || apptError} onRetry={calendarsError ? refetchCalendars : refetchAppts} />
