@@ -727,7 +727,15 @@ function App() {
       @media (max-width: 767px) {
         [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
         [style*="grid-template-columns"] > * { min-width: 0 !important; }
+        .px-cal-grid { grid-template-columns: repeat(7, 1fr) !important; }
         table { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+      }
+      @media (max-width: 420px) {
+        .px-cal-grid { gap: 2px !important; }
+        .px-cal-day { padding: 5px 2px !important; min-height: 44px !important; }
+        .px-cal-day-num { font-size: 11.5px !important; }
+        .px-cal-day-count { font-size: 0 !important; }
+        .px-cal-day-count::before { content: attr(data-count); font-size: 9px; }
       }
     `}</style>
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
@@ -3509,10 +3517,10 @@ function Calendar() {
             {calendarsData.map(c => <option key={c.id} value={c.id}>{c.name || c.id}</option>)}
           </select>
         )}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px', marginBottom: '6px' }}>
+        <div className="px-cal-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px', marginBottom: '6px' }}>
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <div key={d} style={{ fontSize: '11px', color: t.muted, fontWeight: '600', textAlign: 'center', padding: '6px 0', textTransform: 'uppercase', letterSpacing: '.5px' }}>{d}</div>)}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px' }}>
+        <div className="px-cal-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: '4px' }}>
           {days.map((d, i) => {
             if (!d) return <div key={i} />;
             const isToday = year === CAL_TODAY.year && month === CAL_TODAY.month && d === CAL_TODAY.day;
@@ -3523,15 +3531,15 @@ function Calendar() {
               <div
                 key={i}
                 onClick={() => { setSelectedKey(dayKey); setShowAddForm(false); }}
-                className="px-btn"
+                className="px-btn px-cal-day"
                 style={{
                   borderRadius: '6px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', minHeight: '54px',
                   border: `${isSelected ? '2px' : '1px'} solid ${isToday ? t.brand : isSelected ? t.teal : has ? withAlpha(t.accentBlue, .2) : t.border2}`,
                   background: isToday ? t.brand : has ? t.brandL : t.bgRow, transition: 'all .12s',
                 }}
               >
-                <div style={{ fontSize: '13px', fontWeight: isToday ? '700' : has ? '500' : '400', color: isToday ? 'white' : has ? t.ink2 : t.muted }}>{d}</div>
-                {has > 0 && <div style={{ fontSize: '10px', marginTop: '3px', color: isToday ? 'rgba(255,255,255,.85)' : t.brand, fontWeight: '600' }}>{has} apt{has > 1 ? 's' : ''}</div>}
+                <div className="px-cal-day-num" style={{ fontSize: '13px', fontWeight: isToday ? '700' : has ? '500' : '400', color: isToday ? 'white' : has ? t.ink2 : t.muted }}>{d}</div>
+                {has > 0 && <div className="px-cal-day-count" data-count={has} style={{ fontSize: '10px', marginTop: '3px', color: isToday ? 'rgba(255,255,255,.85)' : t.brand, fontWeight: '600' }}>{has} apt{has > 1 ? 's' : ''}</div>}
               </div>
             );
           })}
