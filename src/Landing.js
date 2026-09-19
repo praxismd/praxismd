@@ -86,13 +86,12 @@ const COMPETITOR_COLUMNS = [
 ];
 
 const COMPARISON_ROWS = [
-  { feature: 'Patient reactivation', wins: [true, false, false, false, false] },
   { feature: 'AI front desk calls', wins: [true, false, false, false, false] },
   { feature: 'Billing automation', wins: [true, false, false, false, false] },
-  { feature: 'Smart waitlist', wins: [true, false, false, false, false] },
   { feature: 'Insurance eligibility', wins: [true, false, false, false, true] },
-  { feature: 'NPS surveys', wins: [true, true, false, false, false] },
   { feature: 'Payment plans', wins: [true, false, false, false, true] },
+  { feature: 'Patient portal & e-signatures', wins: [true, false, false, false, true] },
+  { feature: 'Activity log & audit trail', wins: [true, false, false, false, false] },
 ];
 
 const STARTING_PRICE_ROW = ['$299/mo', '$399/mo', '$289/mo', '$189/mo', 'Custom pricing'];
