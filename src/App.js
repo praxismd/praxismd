@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, getAppointments, getCalendars, getCampaigns, sendMessage, createContact, isGhlConfigured } from './api/ghl';
@@ -2361,6 +2361,101 @@ function PatientInsuranceEditor({ ghlContactId }) {
   );
 }
 
+// Live prescription log for one patient — staff add records here (direct
+// client write, same trust level as PatientInsuranceEditor above), and see
+// a patient's own refill requests (set only via the requestPrescriptionRefill
+// Cloud Function, so a patient can never touch anything but that one flag)
+// show up in this same list in real time.
+function PatientPrescriptionsEditor({ ghlContactId }) {
+  const t = useTheme();
+  const [rxList, setRxList] = useState(null); // null = loading
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [form, setForm] = useState({ name: '', dosage: '', prescriber: '', refillsRemaining: '2' });
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setRxList([]); return; }
+    const q = query(collection(db, 'patientPrescriptions'), where('ghlContactId', '==', ghlContactId), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setRxList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => setRxList([]));
+    return unsub;
+  }, [ghlContactId]);
+
+  async function handleAdd() {
+    if (!form.name.trim()) { setSaveError('A drug name is required.'); return; }
+    setSaving(true);
+    setSaveError('');
+    try {
+      await addDoc(collection(db, 'patientPrescriptions'), {
+        practiceId: auth.currentUser.uid,
+        ghlContactId,
+        name: form.name.trim(),
+        dosage: form.dosage.trim(),
+        prescriber: form.prescriber.trim(),
+        refillsRemaining: Number(form.refillsRemaining) || 0,
+        status: 'active',
+        refillRequested: false,
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser.uid,
+      });
+      setForm({ name: '', dosage: '', prescriber: '', refillsRemaining: '2' });
+      setShowForm(false);
+    } catch (err) {
+      setSaveError(err.message || 'Could not add that prescription.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const fieldStyle = { width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '4px', display: 'block' };
+
+  if (rxList === null) {
+    return <div style={{ fontSize: '12px', color: t.muted, textAlign: 'center', padding: '10px' }}>Loading…</div>;
+  }
+
+  return (
+    <div>
+      {rxList.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '10px' }}>No prescriptions on file yet.</div>}
+      {rxList.map(rx => (
+        <div key={rx.id} style={{ padding: '10px 12px', background: t.bgRow, borderRadius: '6px', marginBottom: '8px', border: `1px solid ${t.border2}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2 }}>{rx.name}</div>
+            {rx.refillRequested && <Pill label="Refill requested" color={t.amber} bg={t.amberL} />}
+          </div>
+          <div style={{ fontSize: '11px', color: t.muted, marginTop: '2px' }}>{rx.dosage}{rx.dosage && ' · '}{rx.refillsRemaining} refill{rx.refillsRemaining === 1 ? '' : 's'} left</div>
+        </div>
+      ))}
+
+      {showForm ? (
+        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${t.border2}` }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+            <div><label style={labelStyle}>Drug name</label><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Amoxicillin 500mg" style={fieldStyle} /></div>
+            <div><label style={labelStyle}>Dosage</label><input value={form.dosage} onChange={e => setForm(f => ({ ...f, dosage: e.target.value }))} placeholder="1 capsule 3x daily" style={fieldStyle} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+            <div><label style={labelStyle}>Prescriber</label><input value={form.prescriber} onChange={e => setForm(f => ({ ...f, prescriber: e.target.value }))} style={fieldStyle} /></div>
+            <div><label style={labelStyle}>Refills</label><input value={form.refillsRemaining} onChange={e => setForm(f => ({ ...f, refillsRemaining: e.target.value }))} style={fieldStyle} /></div>
+          </div>
+          {saveError && (
+            <div style={{ marginBottom: '10px', padding: '8px 10px', background: t.redL, borderRadius: '6px', fontSize: '11.5px', color: t.red }}>{saveError}</div>
+          )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn primary onClick={handleAdd} disabled={saving} style={{ flex: 1, justifyContent: 'center' }}>
+              {saving ? <Loader2 size={13} className="px-spin" /> : null} {saving ? 'Adding…' : 'Add'}
+            </Btn>
+            <Btn onClick={() => setShowForm(false)} disabled={saving} style={{ flex: 1, justifyContent: 'center' }}>Cancel</Btn>
+          </div>
+        </div>
+      ) : (
+        <Btn style={{ marginTop: '4px', width: '100%', justifyContent: 'center' }} onClick={() => setShowForm(true)}>Add prescription</Btn>
+      )}
+    </div>
+  );
+}
+
 function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onAddPatient, onBulkAddPatient }) {
   const t = useTheme();
   const q = query.trim().toLowerCase();
@@ -2673,6 +2768,10 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
           <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>INSURANCE</div>
             <PatientInsuranceEditor ghlContactId={selected.id} />
+          </div>
+          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>PRESCRIPTIONS</div>
+            <PatientPrescriptionsEditor ghlContactId={selected.id} />
           </div>
         </SlidePanel>
       )}

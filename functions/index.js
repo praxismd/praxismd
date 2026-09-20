@@ -382,3 +382,44 @@ exports.signPatientDocument = onCall(async (request) => {
 
   return { signed: true };
 });
+
+// Patient-side: requests a refill on one of their own prescriptions. Routed
+// through a function (not a direct client write) so a patient can only ever
+// flip this one narrow signal — never edit the drug, dosage, or refill
+// count themselves — and the request timestamp is always set server-side.
+exports.requestPrescriptionRefill = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to request a refill.');
+  }
+
+  const { prescriptionId } = request.data || {};
+  if (!prescriptionId || typeof prescriptionId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A prescription is required.');
+  }
+
+  const patientSnap = await db.collection('patients').doc(request.auth.uid).get();
+  const ghlContactId = patientSnap.exists ? patientSnap.data().ghlContactId : null;
+  if (!ghlContactId) {
+    throw new HttpsError('failed-precondition', 'Your account isn\'t linked to a practice yet.');
+  }
+
+  const rxRef = db.collection('patientPrescriptions').doc(prescriptionId);
+  const rxSnap = await rxRef.get();
+  if (!rxSnap.exists || rxSnap.data().ghlContactId !== ghlContactId) {
+    throw new HttpsError('not-found', 'That prescription could not be found.');
+  }
+  const rx = rxSnap.data();
+  if ((rx.refillsRemaining || 0) <= 0) {
+    throw new HttpsError('failed-precondition', 'No refills remaining — your practice will need to prescribe a new one.');
+  }
+  if (rx.refillRequested) {
+    return { requested: true };
+  }
+
+  await rxRef.update({
+    refillRequested: true,
+    refillRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { requested: true };
+});

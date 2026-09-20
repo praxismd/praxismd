@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './firebase';
-import { signPatientDocument } from './api/patients';
+import { signPatientDocument, requestPrescriptionRefill } from './api/patients';
 import { light, withAlpha } from './theme';
 import {
   CalendarClock, MessageSquare, User, LogOut, Loader2, AlertTriangle,
@@ -42,12 +42,6 @@ const TREATMENT_HISTORY = [
   { date: 'Jul 22, 2022', teeth: [30], procedure: 'Crown placed', provider: 'Dr. Rivera', notes: 'Crown placed after prior filling failed.' },
 ];
 
-
-const PRESCRIPTIONS_SEED = [
-  { id: 'rx1', name: 'Chlorhexidine Rinse 0.12%', dosage: 'Rinse 15mL twice daily', prescriber: 'Dr. Rivera', prescribedDate: 'Nov 2, 2023', refillsRemaining: 2, status: 'active' },
-  { id: 'rx2', name: 'Ibuprofen 600mg', dosage: '1 tablet every 6 hours as needed for pain', prescriber: 'Dr. Alvarez', prescribedDate: 'Jun 20, 2023', refillsRemaining: 1, status: 'active' },
-  { id: 'rx3', name: 'Amoxicillin 500mg', dosage: '1 capsule 3x daily for 7 days', prescriber: 'Dr. Rivera', prescribedDate: 'Mar 15, 2024', refillsRemaining: 0, status: 'expired' },
-];
 
 const FAMILY_SEED = [
   { id: 'f1', name: 'Alex Thompson', relation: 'Spouse', dob: 'Apr 12, 1988', lastVisit: 'Feb 3, 2026' },
@@ -147,6 +141,26 @@ function useDocuments(profile) {
   }, [profile?.ghlContactId]);
 
   return { docs, loading };
+}
+
+// Live prescription log for the signed-in patient — staff add these from
+// the Patient detail panel (see App.js's PatientPrescriptionsEditor),
+// matched by the same ghlContactId link as everything else.
+function usePrescriptions(profile) {
+  const [prescriptions, setPrescriptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !profile?.ghlContactId) { setLoading(false); return; }
+    const q = query(collection(db, 'patientPrescriptions'), where('ghlContactId', '==', profile.ghlContactId), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setPrescriptions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, [profile?.ghlContactId]);
+
+  return { prescriptions, loading };
 }
 
 // Live insurance profile for the signed-in patient — a single doc, staff-
@@ -627,17 +641,44 @@ function DocumentsTab({ setNotice, profile }) {
   );
 }
 
-function PrescriptionsTab() {
-  const [prescriptions, setPrescriptions] = useState(PRESCRIPTIONS_SEED);
-  const [requested, setRequested] = useState({});
+function formatRxDate(ts) {
+  return ts?.toDate ? ts.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+}
 
-  function requestRefill(id) {
-    setRequested(r => ({ ...r, [id]: true }));
-    setPrescriptions(ps => ps.map(p => p.id === id ? { ...p, refillsRemaining: Math.max(0, p.refillsRemaining - 1) } : p));
+function PrescriptionsTab({ profile }) {
+  const { prescriptions, loading } = usePrescriptions(profile);
+  const [requestState, setRequestState] = useState({}); // rx id -> 'requesting' | error string
+
+  async function requestRefill(id) {
+    setRequestState(s => ({ ...s, [id]: 'requesting' }));
+    try {
+      await requestPrescriptionRefill(id);
+      setRequestState(s => { const next = { ...s }; delete next[id]; return next; });
+    } catch (err) {
+      setRequestState(s => ({ ...s, [id]: err.message || 'Could not request a refill.' }));
+    }
   }
 
   const active = prescriptions.filter(p => p.status === 'active');
   const expired = prescriptions.filter(p => p.status === 'expired');
+
+  if (loading) {
+    return <div style={{ ...cardStyle, textAlign: 'center', color: t.muted, fontSize: '12.5px' }}>Loading…</div>;
+  }
+
+  if (prescriptions.length === 0) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <PillIcon size={17} color={t.teal} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Active prescriptions</div>
+        </div>
+        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>
+          {profile?.ghlContactId ? 'No prescriptions on file yet.' : "No prescriptions yet — once your practice links your account, anything they've prescribed will show up here."}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -653,10 +694,12 @@ function PrescriptionsTab() {
               <div>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink2 }}>{rx.name}</div>
                 <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{rx.dosage}</div>
-                <div style={{ fontSize: '11px', color: t.muted, marginTop: '4px' }}>Prescribed by {rx.prescriber} · {rx.prescribedDate}</div>
+                <div style={{ fontSize: '11px', color: t.muted, marginTop: '4px' }}>Prescribed by {rx.prescriber} · {formatRxDate(rx.createdAt)}</div>
               </div>
-              {requested[rx.id] ? (
+              {rx.refillRequested ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11.5px', color: t.teal, whiteSpace: 'nowrap', flexShrink: 0 }}><CheckCircle2 size={13} /> Requested</div>
+              ) : requestState[rx.id] === 'requesting' ? (
+                <PortalBtn><Loader2 size={13} className="px-spin" /> Requesting…</PortalBtn>
               ) : rx.refillsRemaining > 0 ? (
                 <PortalBtn onClick={() => requestRefill(rx.id)}><RotateCcw size={13} /> Request refill</PortalBtn>
               ) : (
@@ -664,6 +707,9 @@ function PrescriptionsTab() {
               )}
             </div>
             <div style={{ fontSize: '11px', color: t.muted, marginTop: '8px' }}>{rx.refillsRemaining} refill{rx.refillsRemaining === 1 ? '' : 's'} remaining</div>
+            {requestState[rx.id] && requestState[rx.id] !== 'requesting' && (
+              <div style={{ marginTop: '6px', fontSize: '11px', color: t.red }}>{requestState[rx.id]}</div>
+            )}
           </div>
         ))}
         {active.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No active prescriptions on file.</div>}
@@ -681,7 +727,7 @@ function PrescriptionsTab() {
                 <div style={{ fontSize: '13px', color: t.ink2 }}>{rx.name}</div>
                 <div style={{ fontSize: '11px', color: t.muted, marginTop: '2px' }}>{rx.dosage}</div>
               </div>
-              <div style={{ fontSize: '11.5px', color: t.muted }}>{rx.prescribedDate}</div>
+              <div style={{ fontSize: '11.5px', color: t.muted }}>{formatRxDate(rx.createdAt)}</div>
             </div>
           ))}
         </div>
@@ -1011,7 +1057,7 @@ function PatientPortal() {
 
         {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} onOpenMessages={() => setTab('messages')} />}
         {tab === 'chart' && <ChartTab />}
-        {tab === 'prescriptions' && <PrescriptionsTab />}
+        {tab === 'prescriptions' && <PrescriptionsTab profile={profile} />}
         {tab === 'insurance' && <InsuranceTab setNotice={setNotice} profile={profile} />}
         {tab === 'documents' && <DocumentsTab setNotice={setNotice} profile={profile} />}
         {tab === 'billing' && <BillingTab setNotice={setNotice} profile={profile} />}

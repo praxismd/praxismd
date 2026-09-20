@@ -44,3 +44,13 @@ export async function signPatientDocument(docId) {
   const res = await call({ docId });
   return res.data; // { signed: true }
 }
+
+// Patient-side: requests a refill on one of their own prescriptions.
+export async function requestPrescriptionRefill(prescriptionId) {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase isn\'t connected yet — add REACT_APP_FIREBASE_* to your .env.local.');
+  }
+  const call = httpsCallable(functions, 'requestPrescriptionRefill');
+  const res = await call({ prescriptionId });
+  return res.data; // { requested: true }
+}
