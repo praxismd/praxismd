@@ -13,12 +13,16 @@ import { functions, isFirebaseConfigured } from '../firebase';
 
 export const isStripeConfigured = isFirebaseConfigured;
 
-export async function createPaymentLink(patientName, amount, type) {
+// Deliberately does not take a patient name or any other identifying detail
+// — Stripe won't sign a HIPAA BAA, so nothing that could identify a patient
+// or their treatment is sent to it. See the matching note in
+// functions/index.js's createPaymentLink for the full rationale.
+export async function createPaymentLink(amount, type) {
   if (!isFirebaseConfigured) {
     throw new Error('Firebase isn\'t connected yet — add REACT_APP_FIREBASE_* to your .env.local.');
   }
   const call = httpsCallable(functions, 'createPaymentLink');
-  const res = await call({ patientName, amount, type });
+  const res = await call({ amount, type });
   return res.data; // { url }
 }
 
