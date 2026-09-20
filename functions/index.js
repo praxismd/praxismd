@@ -19,7 +19,7 @@
 // authenticated session can't use it as an open proxy to the clinic's full
 // GHL account.
 
-const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const { randomBytes } = require('crypto');
 const admin = require('firebase-admin');
@@ -29,6 +29,7 @@ admin.initializeApp();
 const db = admin.firestore();
 
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
+const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
 const ghlApiKey = defineSecret('GHL_API_KEY');
 const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
 const GHL_API_VERSION = '2021-07-28';
@@ -60,19 +61,24 @@ const ALLOWED_GHL_ROUTES = [
 // not in the product name, not in metadata, not anywhere. The link amount
 // and a generic billing category (e.g. "Co-pay collection") are the only
 // details Stripe ever sees; the practice's own systems (GHL/Firestore) are
-// what map a sent link back to a specific patient.
+// what map a sent link back to a specific patient. ghlContactId travels only
+// as far as our own Firestore record below — never to Stripe — so the
+// patient's portal can find it again once it's paid.
 exports.createPaymentLink = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in to send a payment link.');
   }
 
-  const { amount, type } = request.data || {};
+  const { amount, type, ghlContactId } = request.data || {};
   const parsedAmount = Number(String(amount).replace(/[^0-9.]/g, ''));
   if (!parsedAmount || parsedAmount <= 0) {
     throw new HttpsError('invalid-argument', 'A positive amount is required.');
   }
   if (parsedAmount > MAX_PAYMENT_LINK_AMOUNT) {
     throw new HttpsError('invalid-argument', `Amount can't exceed $${MAX_PAYMENT_LINK_AMOUNT.toLocaleString()}.`);
+  }
+  if (!ghlContactId || typeof ghlContactId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A patient is required.');
   }
   const billingCategory = typeof type === 'string' && type.trim() ? type.trim() : 'Payment';
 
@@ -94,10 +100,60 @@ exports.createPaymentLink = onCall({ secrets: [stripeSecretKey] }, async (reques
       },
     });
 
+    // A lightweight record the practice's own systems use to track this
+    // charge — this is what lets the patient portal show it live and flip
+    // to "paid" once stripeWebhook hears back from Stripe.
+    await db.collection('billingCharges').add({
+      practiceId: request.auth.uid,
+      ghlContactId,
+      amount: parsedAmount,
+      type: billingCategory,
+      status: 'pending',
+      stripePaymentLinkId: link.id,
+      url: link.url,
+      createdBy: request.auth.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
     return { url: link.url };
   } catch (err) {
     throw new HttpsError('internal', err.message || 'Stripe request failed.');
   }
+});
+
+// Stripe calls this directly (not through the Firebase SDK, so no
+// request.auth) whenever a payment link is paid. Verifies the request is
+// genuinely from Stripe via the webhook signing secret, then flips the
+// matching billingCharges record(s) to "paid" so the patient portal's
+// onSnapshot listener picks it up immediately.
+exports.stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecret] }, async (req, res) => {
+  const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2024-06-20' });
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.rawBody, req.headers['stripe-signature'], stripeWebhookSecret.value());
+  } catch (err) {
+    res.status(400).send(`Webhook signature verification failed: ${err.message}`);
+    return;
+  }
+
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    const paymentLinkId = session.payment_link;
+    if (paymentLinkId) {
+      const snap = await db.collection('billingCharges')
+        .where('stripePaymentLinkId', '==', paymentLinkId)
+        .where('status', '==', 'pending')
+        .get();
+      const batch = db.batch();
+      snap.forEach(doc => {
+        batch.update(doc.ref, { status: 'paid', paidAt: admin.firestore.FieldValue.serverTimestamp() });
+      });
+      if (!snap.empty) await batch.commit();
+    }
+  }
+
+  res.status(200).send('ok');
 });
 
 // Generic proxy for GoHighLevel (LeadConnector v2) API calls. Holds the GHL
