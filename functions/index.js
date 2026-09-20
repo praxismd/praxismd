@@ -46,6 +46,7 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // patient invite links expire af
 
 const ALLOWED_GHL_ROUTES = [
   { method: 'GET', pathname: '/contacts/' },
+  { method: 'POST', pathname: '/contacts/' },
   { method: 'GET', pathname: '/conversations/search' },
   { method: 'GET', pathname: '/calendars/' },
   { method: 'GET', pathname: '/calendars/events' },
@@ -185,6 +186,11 @@ exports.ghlProxy = onCall({ secrets: [ghlApiKey] }, async (request) => {
 
   const locationId = url.searchParams.get('locationId');
   if (locationId && locationId !== GHL_LOCATION_ID) {
+    throw new HttpsError('permission-denied', 'That location is not permitted from this app.');
+  }
+  // POST bodies (e.g. contact creation) carry locationId in the JSON body
+  // instead of the query string — same check, same reason.
+  if (body && typeof body === 'object' && body.locationId && body.locationId !== GHL_LOCATION_ID) {
     throw new HttpsError('permission-denied', 'That location is not permitted from this app.');
   }
 

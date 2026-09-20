@@ -62,6 +62,31 @@ export async function getCampaigns() {
   return data.campaigns || [];
 }
 
+// Splits a single "Full Name" input into GHL's separate firstName/lastName
+// fields — a single trailing token becomes lastName, everything before it
+// firstName, matching how most contact forms behave.
+function splitName(name) {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+  return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length - 1] };
+}
+
+export async function createContact({ name, email, phone }) {
+  if (!name || !name.trim()) throw new Error('A name is required.');
+  const { firstName, lastName } = splitName(name);
+  const data = await ghlRequest('/contacts/', {
+    method: 'POST',
+    body: {
+      locationId: LOCATION_ID,
+      firstName,
+      lastName,
+      email: email && email !== '—' ? email : undefined,
+      phone: phone && phone !== '—' ? phone : undefined,
+    },
+  });
+  return data.contact;
+}
+
 export async function sendMessage(contactId, message) {
   if (!contactId) throw new Error('sendMessage requires a contactId.');
   if (!message || !message.trim()) throw new Error('Message cannot be empty.');
