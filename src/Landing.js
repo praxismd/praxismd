@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Check, X, ArrowRight, RotateCcw, Bot, ClipboardList, Receipt, Shield,
-  Smile, CreditCard, Contact, Sparkles, Star, Menu, TrendingDown, PhoneOff,
-  FileWarning, Megaphone, Activity, Stethoscope, ShieldCheck,
+  Smile, CreditCard, Contact, Sparkles, Star, Menu, TrendingDown, TrendingUp,
+  PhoneOff, FileWarning, Megaphone, Activity, Stethoscope, ShieldCheck,
+  LayoutDashboard, InboxIcon, Users,
 } from './icons';
 
 // Self-contained palette — the landing page is always light mode and never
@@ -26,6 +27,12 @@ const C = {
   redL: '#FEF2F2',
   amber: '#D97706',
   amberL: '#FFFBEB',
+  purple: '#7C3AED',
+  purpleL: '#F5F3FF',
+  teal: '#0D9488',
+  tealL: '#F0FDFA',
+  rose: '#E11D48',
+  roseL: '#FFF1F2',
   trim: '#0B1220',
 };
 
@@ -66,15 +73,15 @@ const SOLUTION_LAYERS = [
 ];
 
 const FEATURES_9 = [
-  { Icon: ClipboardList, title: 'Smart Waitlist', desc: 'Cancelled slots automatically text the next patient in line and fill themselves in minutes.' },
-  { Icon: Shield, title: 'Insurance Eligibility', desc: 'Every appointment is auto-checked against insurance before the patient walks in the door.' },
-  { Icon: Contact, title: 'Patient Portal', desc: 'Patients complete forms, sign documents, and message your team from their phone.' },
-  { Icon: Star, title: 'Review Automation', desc: 'Automated review requests turn happy visits into 5-star ratings, on autopilot.' },
-  { Icon: Smile, title: 'NPS Surveys', desc: 'Catch unhappy patients early with automated satisfaction surveys and recovery workflows.' },
-  { Icon: RotateCcw, title: 'Recall System', desc: 'Multi-touch recall sequences bring overdue patients back without manual follow-up.' },
-  { Icon: Megaphone, title: 'Custom Campaigns', desc: 'Build targeted email and SMS campaigns for any segment of your patient list.' },
-  { Icon: CreditCard, title: 'Payment Plans', desc: 'Stripe-powered payment plans with automatic retry on failed charges.' },
-  { Icon: Activity, title: 'Activity Log', desc: 'A full audit trail of every action taken across your practice, for compliance and accountability.' },
+  { Icon: ClipboardList, title: 'Smart Waitlist', desc: 'Cancelled slots automatically text the next patient in line and fill themselves in minutes.', c: 'brand' },
+  { Icon: Shield, title: 'Insurance Eligibility', desc: 'Every appointment is auto-checked against insurance before the patient walks in the door.', c: 'purple' },
+  { Icon: Contact, title: 'Patient Portal', desc: 'Patients complete forms, sign documents, and message your team from their phone.', c: 'teal' },
+  { Icon: Star, title: 'Review Automation', desc: 'Automated review requests turn happy visits into 5-star ratings, on autopilot.', c: 'amber' },
+  { Icon: Smile, title: 'NPS Surveys', desc: 'Catch unhappy patients early with automated satisfaction surveys and recovery workflows.', c: 'rose' },
+  { Icon: RotateCcw, title: 'Recall System', desc: 'Multi-touch recall sequences bring overdue patients back without manual follow-up.', c: 'brand' },
+  { Icon: Megaphone, title: 'Custom Campaigns', desc: 'Build targeted email and SMS campaigns for any segment of your patient list.', c: 'rose' },
+  { Icon: CreditCard, title: 'Payment Plans', desc: 'Stripe-powered payment plans with automatic retry on failed charges.', c: 'teal' },
+  { Icon: Activity, title: 'Activity Log', desc: 'A full audit trail of every action taken across your practice, for compliance and accountability.', c: 'purple' },
 ];
 
 const WHY_PILLARS = [
@@ -305,15 +312,26 @@ function SectionLabel({ children }) {
 // ─── HERO DASHBOARD MOCKUP ─────────────────────────────────
 function HeroMockup() {
   const stats = [
-    ['Revenue', '$8,400', C.green],
-    ['Appts', '4', C.brand],
-    ['Messages', '4', C.red],
-    ['Alerts', '3', C.amber],
+    ['Revenue', '$8,400', C.green, '+18%'],
+    ['Appts today', '4', C.brand, null],
+    ['Open messages', '4', C.rose, null],
+    ['Unread alerts', '3', C.amber, null],
   ];
-  const navItems = [['Overview', true], ['Inbox', false], ['Campaigns', false], ['Recall', false], ['Patients', false]];
+  const navItems = [
+    ['Overview', LayoutDashboard, true],
+    ['Inbox', InboxIcon, false],
+    ['Campaigns', Megaphone, false],
+    ['Recall', RotateCcw, false],
+    ['Patients', Users, false],
+  ];
+  const chartBars = [38, 52, 44, 61, 58, 72, 90];
+  const inbox = [
+    { initials: 'MC', bg: '#E5ECFD', color: '#2563EB', name: 'Maria Chen', msg: "Yes I'd like to book the cleaning…" },
+    { initials: 'DW', bg: '#DCFCE7', color: '#16A34A', name: 'David Wong', msg: 'Can I reschedule my 3pm appointment?' },
+  ];
 
   return (
-    <div style={{ marginTop: '56px', maxWidth: '900px', marginLeft: 'auto', marginRight: 'auto' }}>
+    <div style={{ marginTop: '56px', maxWidth: '920px', marginLeft: 'auto', marginRight: 'auto' }}>
       <div style={{ background: '#1E293B', borderRadius: '14px 14px 0 0', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
         <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
           <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
@@ -324,25 +342,45 @@ function HeroMockup() {
           praxismd.health
         </div>
       </div>
-      <div className="px-hero-mockup" style={{ background: '#fff', borderRadius: '0 0 14px 14px', border: `1px solid ${C.border}`, borderTop: 'none', padding: '20px', boxShadow: '0 40px 80px -20px rgba(15,23,42,.35)', transform: 'perspective(1400px) rotateX(4deg) scale(0.99)', transformOrigin: 'top center' }}>
-        <div style={{ display: 'flex', gap: '14px' }}>
-          <div className="px-hero-mockup-sidebar" style={{ width: '110px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {navItems.map(([label, active], i) => (
-              <div key={i} style={{ padding: '7px 10px', borderRadius: '7px', fontSize: '10.5px', fontWeight: '600', color: active ? '#F2734A' : '#94A3B8', background: active ? '#FFE8DA' : 'transparent' }}>{label}</div>
+      <div className="px-hero-mockup" style={{ background: '#fff', borderRadius: '0 0 14px 14px', border: `1px solid ${C.border}`, borderTop: 'none', padding: '22px', boxShadow: '0 40px 80px -20px rgba(15,23,42,.35)', transform: 'perspective(1400px) rotateX(4deg) scale(0.99)', transformOrigin: 'top center' }}>
+        <div style={{ display: 'flex', gap: '16px' }}>
+          <div className="px-hero-mockup-sidebar" style={{ width: '128px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {navItems.map(([label, Icon, active], i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '7px', padding: '7px 10px', borderRadius: '7px', fontSize: '10.5px', fontWeight: '600', color: active ? '#F2734A' : '#94A3B8', background: active ? '#FFE8DA' : 'transparent' }}>
+                <Icon size={12} color={active ? '#F2734A' : '#94A3B8'} />{label}
+              </div>
             ))}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '12px' }}>
-              {stats.map(([label, val, color], i) => (
+              {stats.map(([label, val, color, trend], i) => (
                 <div key={i} style={{ background: '#F8FAFC', borderRadius: '8px', padding: '10px' }}>
                   <div style={{ fontSize: '9px', color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>{label}</div>
-                  <div style={{ fontSize: '15px', fontWeight: '800', color }}>{val}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <div style={{ fontSize: '15px', fontWeight: '800', color }}>{val}</div>
+                    {trend && <span style={{ display: 'flex', alignItems: 'center', gap: '1px', fontSize: '9px', fontWeight: '700', color: C.green }}><TrendingUp size={9} />{trend}</span>}
+                  </div>
                 </div>
               ))}
             </div>
-            <div style={{ background: '#F8FAFC', borderRadius: '8px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '7px' }}>
-              {[0, 1, 2].map(i => (
-                <div key={i} style={{ height: '9px', borderRadius: '4px', background: '#E2E8F0', width: `${88 - i * 14}%` }} />
+            <div style={{ background: '#F8FAFC', borderRadius: '8px', padding: '14px', marginBottom: '10px' }}>
+              <div style={{ fontSize: '9.5px', color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase', marginBottom: '10px' }}>Revenue, last 7 days</div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '54px' }}>
+                {chartBars.map((h, i) => (
+                  <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: '3px 3px 0 0', background: i === chartBars.length - 1 ? C.brand : withAlpha(C.brand, .28) }} />
+                ))}
+              </div>
+            </div>
+            <div style={{ background: '#F8FAFC', borderRadius: '8px', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '9px' }}>
+              <div style={{ fontSize: '9.5px', color: '#94A3B8', fontWeight: '700', textTransform: 'uppercase' }}>Priority inbox</div>
+              {inbox.map((m, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ width: '20px', height: '20px', borderRadius: '6px', background: m.bg, color: m.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontWeight: '700', flexShrink: 0 }}>{m.initials}</div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ fontSize: '10px', fontWeight: '700', color: '#1E293B' }}>{m.name}</span>
+                    <span style={{ fontSize: '10px', color: '#94A3B8' }}> — {m.msg}</span>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -383,6 +421,7 @@ function Landing() {
           .px-features-grid { grid-template-columns: 1fr 1fr !important; }
           .px-problem-grid { grid-template-columns: 1fr !important; }
           .px-solution-grid { grid-template-columns: 1fr !important; }
+          .px-solution-connector { display: none !important; }
           .px-why-grid { grid-template-columns: 1fr !important; }
           .px-footer-grid { grid-template-columns: 1fr 1fr !important; }
           .px-hero-headline { font-size: 34px !important; }
@@ -399,7 +438,14 @@ function Landing() {
       <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
 
       {/* HERO */}
-      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '150px 26px 80px', textAlign: 'center' }}>
+      <div style={{ position: 'relative', overflow: 'hidden' }}>
+        <div style={{
+          position: 'absolute', top: '-260px', left: '50%', transform: 'translateX(-50%)',
+          width: '1100px', height: '640px', borderRadius: '50%',
+          background: `radial-gradient(ellipse at center, ${withAlpha(C.brand, .16)} 0%, ${withAlpha(C.brand, .05)} 45%, transparent 72%)`,
+          pointerEvents: 'none',
+        }} />
+        <div style={{ position: 'relative', maxWidth: '900px', margin: '0 auto', padding: '150px 26px 80px', textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '20px', background: C.brandL, color: C.brand, fontSize: '12px', fontWeight: '600', marginBottom: '22px' }}>
           <Sparkles size={13} /> Built for dental &amp; medical practices
         </div>
@@ -433,10 +479,11 @@ function Landing() {
         </div>
 
         <HeroMockup />
+        </div>
       </div>
 
       {/* PROBLEM */}
-      <div id="problem" style={{ background: C.bgAlt, padding: '80px 26px' }}>
+      <div id="problem" style={{ background: `linear-gradient(180deg, ${C.bgAlt} 0%, ${withAlpha(C.red, .04)} 100%)`, padding: '80px 26px' }}>
         <Reveal style={{ maxWidth: '1080px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 44px', letterSpacing: '-.5px', lineHeight: 1.3 }}>
             Your practice is leaving money on the table. Every. Single. Month.
@@ -463,22 +510,31 @@ function Landing() {
           <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 44px', letterSpacing: '-.5px' }}>
             PraxisMD fixes all three. Automatically.
           </h2>
-          <div className="px-solution-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-            {SOLUTION_LAYERS.map(({ n, Icon, title, desc, label }, i) => (
-              <div key={i} style={{ background: C.bgAlt, borderRadius: '16px', padding: '26px 22px', border: `1px solid ${C.border}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-                  <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: C.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Icon size={19} color={C.brand} />
+          <div style={{ position: 'relative' }}>
+            <div className="px-solution-connector" style={{ position: 'absolute', top: '23px', left: '16.6%', right: '16.6%', height: '2px', background: C.border, zIndex: 0 }} />
+            <div className="px-solution-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', position: 'relative', zIndex: 1 }}>
+              {SOLUTION_LAYERS.map(({ n, Icon, title, desc, label }, i) => (
+                <div key={i}>
+                  <div style={{
+                    width: '46px', height: '46px', borderRadius: '50%', background: C.brand, color: 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: '800',
+                    margin: '0 auto 18px', boxShadow: `0 0 0 6px ${C.bg}`,
+                  }}>
+                    {n}
                   </div>
-                  <div style={{ fontSize: '11px', fontWeight: '700', color: C.muted, letterSpacing: '.5px' }}>LAYER {n}</div>
+                  <div style={{ background: C.bgAlt, borderRadius: '16px', padding: '24px 22px', border: `1px solid ${C.border}`, height: '100%' }}>
+                    <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: C.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                      <Icon size={18} color={C.brand} />
+                    </div>
+                    <div style={{ fontSize: '16px', fontWeight: '700', color: C.ink, marginBottom: '8px' }}>{title}</div>
+                    <div style={{ fontSize: '13px', color: C.mid, lineHeight: '1.6', marginBottom: '16px' }}>{desc}</div>
+                    <div style={{ display: 'inline-flex', padding: '4px 11px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', background: label === 'Pro plan' ? C.amberL : C.greenL, color: label === 'Pro plan' ? C.amber : C.green }}>
+                      {label}
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontSize: '16px', fontWeight: '700', color: C.ink, marginBottom: '8px' }}>{title}</div>
-                <div style={{ fontSize: '13px', color: C.mid, lineHeight: '1.6', marginBottom: '16px' }}>{desc}</div>
-                <div style={{ display: 'inline-flex', padding: '4px 11px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', background: label === 'Pro plan' ? C.amberL : C.greenL, color: label === 'Pro plan' ? C.amber : C.green }}>
-                  {label}
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </Reveal>
       </div>
@@ -494,10 +550,10 @@ function Landing() {
             One platform instead of five different tools that don’t talk to each other.
           </p>
           <div className="px-features-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-            {FEATURES_9.map(({ Icon, title, desc }, i) => (
-              <div key={i} className="px-fcard" style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: '14px', padding: '22px 20px' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: C.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
-                  <Icon size={18} color={C.brand} />
+            {FEATURES_9.map(({ Icon, title, desc, c }, i) => (
+              <div key={i} className="px-fcard" style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: '14px', padding: '22px 20px 20px', borderTop: `3px solid ${C[c]}` }}>
+                <div style={{ width: '42px', height: '42px', borderRadius: '11px', background: C[`${c}L`], display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
+                  <Icon size={20} color={C[c]} />
                 </div>
                 <div style={{ fontSize: '14.5px', fontWeight: '600', color: C.ink2, marginBottom: '6px' }}>{title}</div>
                 <div style={{ fontSize: '12.5px', color: C.mid, lineHeight: '1.55' }}>{desc}</div>
