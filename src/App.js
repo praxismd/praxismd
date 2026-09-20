@@ -4,7 +4,7 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
-import { getContacts, getConversations, getAppointments, getCalendars, getCampaigns, sendMessage, isGhlConfigured } from './api/ghl';
+import { getContacts, getConversations, getAppointments, getCalendars, getCampaigns, sendMessage, createContact, isGhlConfigured } from './api/ghl';
 import { createPaymentLink, isStripeConfigured } from './api/stripe';
 import { createPatientInvite } from './api/patients';
 import {
@@ -623,6 +623,17 @@ function App() {
     setDemoContacts(cs => [{ id: `p-new-${Date.now()}`, tag: null, dateAdded: new Date().toLocaleDateString(), ...patient }, ...cs]);
   }
 
+  async function addGhlPatient(patient) {
+    await createContact(patient);
+    await refetchContacts();
+  }
+
+  // Used for bulk CSV import — skips the refetch-per-row cost of
+  // addGhlPatient; the caller refetches once after the whole batch finishes.
+  async function addGhlPatientOnly(patient) {
+    await createContact(patient);
+  }
+
   const notifColorMap = { brand: t.brand, amber: t.amber, red: t.red, orange: t.orange, gold: t.gold, purple: t.purple };
   const notifBgMap = { brand: t.brandL, amber: t.amberL, red: t.redL, orange: t.orangeL, gold: t.goldL, purple: t.purpleL };
   const notifications = NOTIF_SEED.map(n => ({
@@ -976,7 +987,7 @@ function App() {
           {gate('inbox', <Inbox contacts={contacts} userRole={userRole} />)}
           {gate('campaigns', <Campaigns userRole={userRole} ghlCampaigns={ghlCampaigns} loading={campaignsLoading} error={campaignsError} onRetry={refetchCampaigns} />)}
           {gate('recall', <Recall userRole={userRole} />)}
-          {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? null : addDemoPatient} userRole={userRole} />)}
+          {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? addGhlPatient : addDemoPatient} onBulkAddPatient={isGhlConfigured ? addGhlPatientOnly : addDemoPatient} userRole={userRole} />)}
           {gate('billing', <Billing userRole={userRole} />)}
           {gate('membershipplans', <MembershipPlans userRole={userRole} />)}
           {gate('payments', <Payments userRole={userRole} contacts={contacts} />)}
@@ -2166,7 +2177,39 @@ function ltvColor(value, t) {
   return t.red;
 }
 
-function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onAddPatient }) {
+// Minimal CSV parser — handles quoted fields (so a quoted name or address
+// containing a comma doesn't split into extra columns) but not every CSV
+// edge case (embedded newlines inside a quoted field, escaped quotes). Good
+// enough for a patient-list export from a spreadsheet or another PM system.
+function parseCsv(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const rows = lines.map(line => {
+    const cells = [];
+    let cur = '', inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQuotes = !inQuotes; continue; }
+      if (c === ',' && !inQuotes) { cells.push(cur.trim()); cur = ''; continue; }
+      cur += c;
+    }
+    cells.push(cur.trim());
+    return cells;
+  });
+  if (rows.length < 2) return [];
+  const header = rows[0].map(h => h.toLowerCase());
+  const nameIdx = header.findIndex(h => h.includes('name'));
+  const emailIdx = header.findIndex(h => h.includes('email'));
+  const phoneIdx = header.findIndex(h => h.includes('phone'));
+  return rows.slice(1)
+    .filter(r => r.some(c => c))
+    .map(r => ({
+      name: nameIdx >= 0 ? r[nameIdx] || '' : '',
+      email: emailIdx >= 0 ? r[emailIdx] || '' : '',
+      phone: phoneIdx >= 0 ? r[phoneIdx] || '' : '',
+    }));
+}
+
+function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onAddPatient, onBulkAddPatient }) {
   const t = useTheme();
   const q = query.trim().toLowerCase();
   const list = (contacts || []).map(p => ({ ...p, ltv: patientLtv(p.id) }));
@@ -2179,13 +2222,16 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');
   const [notice, setNotice] = useState('');
+  const [csvRows, setCsvRows] = useState(null); // parsed rows awaiting confirmation
+  const [csvResults, setCsvResults] = useState(null); // per-row outcome after import
+  const [csvImporting, setCsvImporting] = useState(false);
+  const fileInputRef = useRef(null);
 
   function handleAddClick() {
-    if (!onAddPatient) {
-      setNotice("Adding patients writes to GoHighLevel — that's not wired up in this scaffold yet.");
-      return;
-    }
+    setAddError('');
     setShowAddForm(s => !s);
   }
 
@@ -2199,10 +2245,58 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
     }
   }
 
-  function submitNewPatient() {
+  async function submitNewPatient() {
     if (!newName.trim()) return;
-    onAddPatient({ name: newName.trim(), email: newEmail.trim() || '—', phone: newPhone.trim() || '—' });
-    setNewName(''); setNewEmail(''); setNewPhone(''); setShowAddForm(false);
+    setAdding(true);
+    setAddError('');
+    try {
+      await onAddPatient({ name: newName.trim(), email: newEmail.trim() || '—', phone: newPhone.trim() || '—' });
+      setNewName(''); setNewEmail(''); setNewPhone(''); setShowAddForm(false);
+    } catch (err) {
+      setAddError(err.message || 'Could not add that patient.');
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  function handleImportClick() {
+    setNotice('');
+    fileInputRef.current?.click();
+  }
+
+  function handleCsvFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // lets the same file be re-selected after a fix
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rows = parseCsv(String(reader.result || '')).filter(r => r.name);
+      if (rows.length === 0) {
+        setNotice('No valid rows found — the CSV needs a "name" column and at least one data row.');
+        return;
+      }
+      setCsvRows(rows);
+      setCsvResults(null);
+    };
+    reader.onerror = () => setNotice('Could not read that file.');
+    reader.readAsText(file);
+  }
+
+  async function runCsvImport() {
+    if (!csvRows) return;
+    setCsvImporting(true);
+    const results = [];
+    for (const row of csvRows) {
+      try {
+        await onBulkAddPatient({ name: row.name, email: row.email || '—', phone: row.phone || '—' });
+        results.push({ ...row, status: 'ok' });
+      } catch (err) {
+        results.push({ ...row, status: 'error', message: err.message || 'Failed' });
+      }
+    }
+    setCsvResults(results);
+    setCsvImporting(false);
+    if (results.some(r => r.status === 'ok')) onRetry();
   }
 
   function toggleSort(key) {
@@ -2257,7 +2351,8 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
           />
         </div>
         <Btn primary onClick={handleAddClick}><Plus size={14} /> Add patient</Btn>
-        <Btn onClick={() => setNotice("Bulk import isn't wired up in this scaffold yet.")}><Upload size={14} /> Import</Btn>
+        <Btn onClick={handleImportClick}><Upload size={14} /> Import</Btn>
+        <input ref={fileInputRef} type="file" accept=".csv,text/csv" onChange={handleCsvFile} style={{ display: 'none' }} />
       </div>
 
       {notice && (
@@ -2272,9 +2367,52 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
             <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
             <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Phone" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
+          {addError && (
+            <div style={{ marginBottom: '12px', padding: '8px 12px', background: t.redL, borderRadius: '6px', fontSize: '12px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{addError}</div>
+          )}
           <div style={{ display: 'flex', gap: '8px' }}>
-            <Btn primary onClick={submitNewPatient}>Add patient</Btn>
+            <Btn primary onClick={submitNewPatient} disabled={adding}>{adding ? <Loader2 size={13} className="px-spin" /> : null} {adding ? 'Adding…' : 'Add patient'}</Btn>
             <Btn onClick={() => setShowAddForm(false)}>Cancel</Btn>
+          </div>
+        </Card>
+      )}
+
+      {csvRows && (
+        <Card className="px-expand" style={{ marginBottom: '14px' }}>
+          <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '4px' }}>
+            {csvResults ? 'Import finished' : `Import ${csvRows.length} patient${csvRows.length === 1 ? '' : 's'}?`}
+          </div>
+          <div style={{ fontSize: '12px', color: t.muted, marginBottom: '12px' }}>
+            {csvResults
+              ? `${csvResults.filter(r => r.status === 'ok').length} added, ${csvResults.filter(r => r.status === 'error').length} failed.`
+              : 'Review the rows below, then confirm to add them all.'}
+          </div>
+          <div style={{ maxHeight: '220px', overflowY: 'auto', border: `1px solid ${t.border2}`, borderRadius: '6px', marginBottom: '12px' }}>
+            {(csvResults || csvRows).map((row, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: i < csvRows.length - 1 ? `1px solid ${t.border2}` : 'none', fontSize: '12.5px' }}>
+                <div>
+                  <span style={{ color: t.ink2, fontWeight: '500' }}>{row.name}</span>
+                  <span style={{ color: t.muted }}> · {row.email || '—'} · {row.phone || '—'}</span>
+                </div>
+                {csvResults && (
+                  row.status === 'ok'
+                    ? <Pill label="Added" color={t.green} bg={t.greenL} />
+                    : <span title={row.message} style={{ color: t.red, fontSize: '11px', fontWeight: '600' }}>Failed</span>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {csvResults ? (
+              <Btn onClick={() => { setCsvRows(null); setCsvResults(null); }}>Done</Btn>
+            ) : (
+              <>
+                <Btn primary onClick={runCsvImport} disabled={csvImporting}>
+                  {csvImporting ? <Loader2 size={13} className="px-spin" /> : <Upload size={13} />} {csvImporting ? 'Importing…' : `Import ${csvRows.length}`}
+                </Btn>
+                <Btn onClick={() => setCsvRows(null)} disabled={csvImporting}>Cancel</Btn>
+              </>
+            )}
           </div>
         </Card>
       )}
