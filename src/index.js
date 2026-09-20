@@ -7,6 +7,8 @@ import Landing from './Landing';
 import Auth from './Auth';
 import Onboarding from './Onboarding';
 import PatientPortal from './PatientPortal';
+import Terms from './Terms';
+import Privacy from './Privacy';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -19,6 +21,8 @@ root.render(
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/patient" element={<PatientPortal />} />
         <Route path="/dashboard" element={<App />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/privacy" element={<Privacy />} />
       </Routes>
     </HashRouter>
   </React.StrictMode>

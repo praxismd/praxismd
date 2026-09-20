@@ -10,7 +10,7 @@ import {
 // Self-contained palette — the landing page is always light mode and never
 // imports the dashboard's theme (the dashboard's brand color is orange;
 // the marketing site's brand color is blue, by design).
-const C = {
+export const C = {
   bg: '#FFFFFF',
   bgAlt: '#F8FAFC',
   ink: '#0F172A',
@@ -139,7 +139,7 @@ const FOOTER_COLUMNS = [
   { title: 'Product', links: ['Features', 'Pricing', 'Why us', 'Book a demo'] },
   { title: 'Company', links: ['About', 'Careers', 'Blog', 'Contact'] },
   { title: 'Resources', links: ['Help center', 'API docs', 'System status', 'Case studies'] },
-  { title: 'Legal', links: ['Privacy policy', 'Terms of service', 'BAA', 'Security'] },
+  { title: 'Legal', links: [{ label: 'Privacy policy', to: '/privacy' }, { label: 'Terms of service', to: '/terms' }, 'BAA', 'Security'] },
 ];
 
 // ─── SCROLL-REVEAL WRAPPER ─────────────────────────────────
@@ -666,7 +666,9 @@ function Landing() {
                 <div style={{ fontSize: '12px', fontWeight: '700', color: C.ink, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '14px' }}>{col.title}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {col.links.map((link, j) => (
-                    <span key={j} className="px-footer-link" style={{ fontSize: '13px', color: C.mid, cursor: 'pointer' }}>{link}</span>
+                    typeof link === 'object'
+                      ? <Link key={j} to={link.to} className="px-footer-link" style={{ fontSize: '13px', color: C.mid, textDecoration: 'none' }}>{link.label}</Link>
+                      : <span key={j} className="px-footer-link" style={{ fontSize: '13px', color: C.mid, cursor: 'pointer' }}>{link}</span>
                   ))}
                 </div>
               </div>
