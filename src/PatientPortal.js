@@ -41,17 +41,6 @@ const TREATMENT_HISTORY = [
   { date: 'Jul 22, 2022', teeth: [30], procedure: 'Crown placed', provider: 'Dr. Rivera', notes: 'Crown placed after prior filling failed.' },
 ];
 
-const BILLING = {
-  balance: 140,
-  items: [
-    { date: 'Mar 15, 2024', desc: 'Crown — tooth #3', amount: 420, status: 'Paid' },
-    { date: 'Mar 15, 2024', desc: 'Insurance adjustment', amount: -280, status: 'Applied' },
-    { date: 'Nov 2, 2023', desc: 'Root canal — tooth #19', amount: 640, status: 'Paid' },
-    { date: 'Jun 20, 2023', desc: 'Composite fillings (x2)', amount: 140, status: 'Balance due' },
-    { date: 'Jan 10, 2023', desc: 'Cleaning + exam', amount: 0, status: 'Covered by insurance' },
-  ],
-};
-
 const INSURANCE = {
   payer: 'Delta Dental', plan: 'PPO Plus Premier', memberId: 'DD-2284910', group: 'GRP-4471', effective: 'Jan 1, 2026',
   coverage: [['Preventive (cleanings, exams)', '100%'], ['Basic (fillings)', '80%'], ['Major (crowns, root canals)', '50%']],
@@ -125,7 +114,33 @@ function StatTile({ label, value, sub, color, icon: Icon }) {
   );
 }
 
+// Live billing records for the signed-in patient, matched by the
+// ghlContactId their account picked up from an invite redemption (see
+// Auth.js / functions/index.js's redeemPatientInvite) — the same link that
+// lets a staff-created charge (Payments tab -> createPaymentLink) find its
+// way back to this patient in real time. A patient who signed up without an
+// invite has no ghlContactId yet and simply sees no billing records, same
+// as they'd see no synced data anywhere else.
+function useBillingRecords(profile) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !profile?.ghlContactId) { setLoading(false); return; }
+    const q = query(collection(db, 'billingCharges'), where('ghlContactId', '==', profile.ghlContactId), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setRecords(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, [profile?.ghlContactId]);
+
+  const balance = records.filter(r => r.status === 'pending').reduce((sum, r) => sum + (r.amount || 0), 0);
+  return { records, balance, loading };
+}
+
 function OverviewTab({ setNotice, profile, onOpenMessages }) {
+  const { balance: billingBalance } = useBillingRecords(profile);
   const lastVisit = TREATMENT_HISTORY[0];
   const [showForm, setShowForm] = useState(false);
   const [reqWhen, setReqWhen] = useState('');
@@ -166,7 +181,7 @@ function OverviewTab({ setNotice, profile, onOpenMessages }) {
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px', marginBottom: '16px' }}>
         <StatTile label="Next appointment" value={justRequested ? 'Request pending' : 'None scheduled'} sub={justRequested ? 'Awaiting confirmation' : 'Request one below'} icon={CalendarClock} />
-        <StatTile label="Balance due" value={`$${BILLING.balance}`} color={BILLING.balance > 0 ? t.amber : t.green} sub="See Billing tab" icon={Receipt} />
+        <StatTile label="Balance due" value={`$${billingBalance}`} color={billingBalance > 0 ? t.amber : t.green} sub="See Billing tab" icon={Receipt} />
         <StatTile label="Last visit" value={lastVisit.date} sub={lastVisit.procedure} icon={Stethoscope} />
       </div>
 
@@ -335,11 +350,22 @@ function ChartTab() {
   );
 }
 
-function BillingTab({ setNotice }) {
+function BillingTab({ setNotice, profile }) {
+  const { records, balance, loading } = useBillingRecords(profile);
+  const nextPending = records.find(r => r.status === 'pending');
+
+  function handlePay() {
+    if (nextPending?.url) {
+      window.open(nextPending.url, '_blank', 'noopener,noreferrer');
+    } else {
+      setNotice("You're all paid up — nothing due right now.");
+    }
+  }
+
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: '12px', marginBottom: '16px' }}>
-        <StatTile label="Balance due" value={`$${BILLING.balance}`} color={BILLING.balance > 0 ? t.amber : t.green} icon={CreditCard} />
+        <StatTile label="Balance due" value={`$${balance}`} color={balance > 0 ? t.amber : t.green} icon={CreditCard} />
         <StatTile label="On payment plan" value="No" sub="Ask your practice to set one up" icon={Receipt} />
       </div>
 
@@ -354,11 +380,12 @@ function BillingTab({ setNotice }) {
           Pay online with a card, or set up a payment plan with your practice.
         </div>
         <button
-          onClick={() => setNotice("Online payments aren't set up yet — your practice will need to enable this.")}
+          onClick={handlePay}
+          disabled={!nextPending}
           className="px-btn"
-          style={{ padding: '10px 16px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit' }}
+          style={{ padding: '10px 16px', borderRadius: '10px', border: 'none', background: nextPending ? t.brand : t.border, color: nextPending ? 'white' : t.muted, fontSize: '13px', fontWeight: '600', cursor: nextPending ? 'pointer' : 'default', fontFamily: 'inherit' }}
         >
-          Pay ${BILLING.balance} online
+          {nextPending ? `Pay $${nextPending.amount} online` : "You're all paid up"}
         </button>
       </div>
 
@@ -367,15 +394,21 @@ function BillingTab({ setNotice }) {
           <Receipt size={17} color={t.purple} />
           <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Billing history</div>
         </div>
-        {BILLING.items.map((it, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < BILLING.items.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
+        {loading ? (
+          <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '16px 0' }}>Loading…</div>
+        ) : records.length === 0 ? (
+          <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '16px 0' }}>
+            {profile?.ghlContactId ? 'No billing activity yet.' : "No billing activity yet — once your practice links your account, charges they send you will show up here."}
+          </div>
+        ) : records.map((it, i) => (
+          <div key={it.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < records.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
             <div>
-              <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{it.desc}</div>
-              <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{it.date} · {it.status}</div>
+              <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{it.type}</div>
+              <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>
+                {it.createdAt?.toDate ? it.createdAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Just now'} · {it.status === 'paid' ? 'Paid' : 'Balance due'}
+              </div>
             </div>
-            <div style={{ fontSize: '13px', fontWeight: '600', color: it.amount > 0 ? t.ink2 : t.green }}>
-              {it.amount === 0 ? '$0' : it.amount > 0 ? `$${it.amount}` : `-$${Math.abs(it.amount)}`}
-            </div>
+            <div style={{ fontSize: '13px', fontWeight: '600', color: it.status === 'paid' ? t.green : t.ink2 }}>${it.amount}</div>
           </div>
         ))}
         <button
@@ -907,7 +940,7 @@ function PatientPortal() {
         {tab === 'prescriptions' && <PrescriptionsTab />}
         {tab === 'insurance' && <InsuranceTab setNotice={setNotice} />}
         {tab === 'documents' && <DocumentsTab setNotice={setNotice} />}
-        {tab === 'billing' && <BillingTab setNotice={setNotice} />}
+        {tab === 'billing' && <BillingTab setNotice={setNotice} profile={profile} />}
         {tab === 'family' && <FamilyTab setNotice={setNotice} />}
         {tab === 'messages' && <MessagesTab profile={profile} />}
 
