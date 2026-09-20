@@ -18,14 +18,8 @@ const cardStyle = {
   boxShadow: '0 2px 12px rgba(0,0,0,.04)',
 };
 
-// Demo clinical data for the patient-facing chart/billing views. Keyed by
-// tooth number (universal numbering, 1-32) so the chart grid and the
-// treatment log below it reference the same records. All fabricated —
-// there's no PM-software sync wired up yet, so a real account starts empty.
-const TOOTH_STATUS = {
-  1: 'watch', 3: 'crown', 8: 'filling', 14: 'filling', 16: 'watch', 19: 'rootcanal', 30: 'crown',
-};
-
+// Fixed legend for tooth status colors — shared by the patient-facing chart
+// (ChartTab, below) and the staff editor (App.js's PatientChartEditor).
 const STATUS_META = {
   healthy: { label: 'Healthy', colorKey: 'border' },
   watch: { label: 'Watching', colorKey: 'teal' },
@@ -33,16 +27,6 @@ const STATUS_META = {
   crown: { label: 'Crown', colorKey: 'purple' },
   rootcanal: { label: 'Root canal', colorKey: 'red' },
 };
-
-const TREATMENT_HISTORY = [
-  { date: 'Mar 15, 2024', teeth: [3], procedure: 'Crown placed', provider: 'Dr. Rivera', notes: 'Porcelain crown, no complications. Follow-up in 6 months.' },
-  { date: 'Nov 2, 2023', teeth: [19], procedure: 'Root canal', provider: 'Dr. Rivera', notes: '3-canal RCT completed. Crown recommended within 3 months.' },
-  { date: 'Jun 20, 2023', teeth: [8, 14], procedure: 'Composite fillings', provider: 'Dr. Alvarez', notes: 'Two-surface fillings placed. Cavities caught at routine exam.' },
-  { date: 'Jan 10, 2023', teeth: [1, 16], procedure: 'Cleaning + exam', provider: 'Dr. Rivera', notes: 'Routine cleaning, X-rays taken. Teeth #1 and #16 flagged for monitoring.' },
-  { date: 'Jul 22, 2022', teeth: [30], procedure: 'Crown placed', provider: 'Dr. Rivera', notes: 'Crown placed after prior filling failed.' },
-];
-
-
 
 const TABS = [
   { key: 'overview', label: 'Overview', Icon: Home },
@@ -183,6 +167,31 @@ function useFamily(profile) {
   return { family, loading };
 }
 
+// Live dental chart for the signed-in patient — tooth status (a single doc,
+// staff-edited via App.js's PatientChartEditor) plus treatment history (its
+// own growing collection), both matched by ghlContactId like everything
+// else staff-authored tonight.
+function useChart(profile) {
+  const [toothStatus, setToothStatus] = useState({});
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !profile?.ghlContactId) { setLoading(false); return; }
+    const unsubDoc = onSnapshot(doc(db, 'patientChart', profile.ghlContactId), snap => {
+      setToothStatus(snap.exists() ? (snap.data().toothStatus || {}) : {});
+    }, () => {});
+    const q = query(collection(db, 'patientTreatmentHistory'), where('ghlContactId', '==', profile.ghlContactId), orderBy('createdAt', 'desc'));
+    const unsubHistory = onSnapshot(q, snap => {
+      setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return () => { unsubDoc(); unsubHistory(); };
+  }, [profile?.ghlContactId]);
+
+  return { toothStatus, history, loading };
+}
+
 // Live insurance profile for the signed-in patient — a single doc, staff-
 // entered from the Patient detail panel in the dashboard (see App.js's
 // PatientInsuranceEditor), keyed by ghlContactId. No profile yet reads as
@@ -205,7 +214,8 @@ function useInsurance(profile) {
 
 function OverviewTab({ setNotice, profile, onOpenMessages }) {
   const { balance: billingBalance } = useBillingRecords(profile);
-  const lastVisit = TREATMENT_HISTORY[0];
+  const { history: chartHistory } = useChart(profile);
+  const lastVisit = chartHistory[0];
   const [showForm, setShowForm] = useState(false);
   const [reqWhen, setReqWhen] = useState('');
   const [reqReason, setReqReason] = useState('');
@@ -246,7 +256,7 @@ function OverviewTab({ setNotice, profile, onOpenMessages }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '12px', marginBottom: '16px' }}>
         <StatTile label="Next appointment" value={justRequested ? 'Request pending' : 'None scheduled'} sub={justRequested ? 'Awaiting confirmation' : 'Request one below'} icon={CalendarClock} />
         <StatTile label="Balance due" value={`$${billingBalance}`} color={billingBalance > 0 ? t.amber : t.green} sub="See Billing tab" icon={Receipt} />
-        <StatTile label="Last visit" value={lastVisit.date} sub={lastVisit.procedure} icon={Stethoscope} />
+        <StatTile label="Last visit" value={lastVisit ? lastVisit.date : 'None on file'} sub={lastVisit ? lastVisit.procedure : ''} icon={Stethoscope} />
       </div>
 
       <div style={{ ...cardStyle, marginBottom: '16px' }}>
@@ -315,7 +325,8 @@ function OverviewTab({ setNotice, profile, onOpenMessages }) {
   );
 }
 
-function ChartTab() {
+function ChartTab({ profile }) {
+  const { toothStatus, history, loading } = useChart(profile);
   const [selectedTooth, setSelectedTooth] = useState(null);
   const colorFor = (key) => (key === 'border' ? t.border : t[key]);
   const upper = Array.from({ length: 16 }, (_, i) => i + 1);
@@ -325,7 +336,7 @@ function ChartTab() {
     return (
       <div style={{ display: 'flex', gap: '4px', justifyContent: 'center', flexWrap: 'wrap' }}>
         {nums.map(n => {
-          const status = TOOTH_STATUS[n] || 'healthy';
+          const status = toothStatus[n] || 'healthy';
           const meta = STATUS_META[status];
           const color = colorFor(meta.colorKey);
           const isSelected = selectedTooth === n;
@@ -352,7 +363,25 @@ function ChartTab() {
     );
   }
 
-  const toothEntries = TREATMENT_HISTORY.filter(e => e.teeth.includes(selectedTooth));
+  const toothEntries = history.filter(e => e.teeth.includes(selectedTooth));
+
+  if (loading) {
+    return <div style={{ ...cardStyle, textAlign: 'center', color: t.muted, fontSize: '12.5px' }}>Loading…</div>;
+  }
+
+  if (!profile?.ghlContactId) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <Stethoscope size={17} color={t.purple} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Your dental chart</div>
+        </div>
+        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>
+          Once your practice links your account, your chart and treatment history will show up here.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -397,14 +426,15 @@ function ChartTab() {
           <Info size={17} color={t.brand} />
           <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Treatment history</div>
         </div>
-        {TREATMENT_HISTORY.map((e, i) => (
-          <div key={i} style={{ padding: '12px 0', borderBottom: i < TREATMENT_HISTORY.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
+        {history.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No treatment history on file yet.</div>}
+        {history.map((e, i) => (
+          <div key={e.id} style={{ padding: '12px 0', borderBottom: i < history.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '10px' }}>
               <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink2 }}>{e.procedure}</div>
               <div style={{ fontSize: '11.5px', color: t.muted, whiteSpace: 'nowrap' }}>{e.date}</div>
             </div>
             <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>
-              Tooth {e.teeth.map(n => `#${n}`).join(', ')} · {e.provider}
+              Tooth {e.teeth.map(n => `#${n}`).join(', ') || '—'} · {e.provider}
             </div>
             <div style={{ fontSize: '12px', color: t.mid, marginTop: '5px', lineHeight: '1.5' }}>{e.notes}</div>
           </div>
@@ -1110,7 +1140,7 @@ function PatientPortal() {
         )}
 
         {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} onOpenMessages={() => setTab('messages')} />}
-        {tab === 'chart' && <ChartTab />}
+        {tab === 'chart' && <ChartTab profile={profile} />}
         {tab === 'prescriptions' && <PrescriptionsTab profile={profile} />}
         {tab === 'insurance' && <InsuranceTab setNotice={setNotice} profile={profile} />}
         {tab === 'documents' && <DocumentsTab setNotice={setNotice} profile={profile} />}

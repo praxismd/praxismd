@@ -2456,6 +2456,188 @@ function PatientPrescriptionsEditor({ ghlContactId }) {
   );
 }
 
+const CHART_STATUS_OPTIONS = [
+  { key: 'healthy', label: 'Healthy', color: null },
+  { key: 'watch', label: 'Watching', color: 'teal' },
+  { key: 'filling', label: 'Filling', color: 'amber' },
+  { key: 'crown', label: 'Crown', color: 'purple' },
+  { key: 'rootcanal', label: 'Root canal', color: 'red' },
+];
+
+// Live dental chart (per-tooth status + a treatment log) for one patient —
+// same trust model as Insurance/Prescriptions above (direct client write,
+// scoped to the staff member's own practiceId by Firestore rules). The
+// tooth-status map lives at patientChart/{ghlContactId} as a single doc
+// (updateDoc's dotted-key syntax updates one tooth without clobbering the
+// others); treatment history is its own growing collection.
+function PatientChartEditor({ ghlContactId }) {
+  const t = useTheme();
+  const colorMap = { teal: t.teal, amber: t.amber, purple: t.purple, red: t.red };
+  const [toothStatus, setToothStatus] = useState(null); // null = loading
+  const [history, setHistory] = useState(null);
+  const [selectedTooth, setSelectedTooth] = useState(null);
+  const [settingStatus, setSettingStatus] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [form, setForm] = useState({ date: '', procedure: '', provider: '', teeth: '', notes: '' });
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setToothStatus({}); return; }
+    const unsub = onSnapshot(doc(db, 'patientChart', ghlContactId), snap => {
+      setToothStatus(snap.exists() ? (snap.data().toothStatus || {}) : {});
+    }, () => setToothStatus({}));
+    return unsub;
+  }, [ghlContactId]);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setHistory([]); return; }
+    const q = query(collection(db, 'patientTreatmentHistory'), where('ghlContactId', '==', ghlContactId), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => setHistory([]));
+    return unsub;
+  }, [ghlContactId]);
+
+  async function setTooth(n, status) {
+    setSettingStatus(true);
+    try {
+      const ref = doc(db, 'patientChart', ghlContactId);
+      await setDoc(ref, { practiceId: auth.currentUser.uid, ghlContactId }, { merge: true });
+      await updateDoc(ref, { [`toothStatus.${n}`]: status, updatedAt: serverTimestamp() });
+    } finally {
+      setSettingStatus(false);
+    }
+  }
+
+  async function handleAddTreatment() {
+    if (!form.procedure.trim()) { setSaveError('A procedure is required.'); return; }
+    setSaving(true);
+    setSaveError('');
+    try {
+      const teeth = form.teeth.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+      await addDoc(collection(db, 'patientTreatmentHistory'), {
+        practiceId: auth.currentUser.uid,
+        ghlContactId,
+        date: form.date.trim(),
+        procedure: form.procedure.trim(),
+        provider: form.provider.trim(),
+        teeth,
+        notes: form.notes.trim(),
+        createdAt: serverTimestamp(),
+      });
+      setForm({ date: '', procedure: '', provider: '', teeth: '', notes: '' });
+      setShowForm(false);
+    } catch (err) {
+      setSaveError(err.message || 'Could not add that treatment.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const fieldStyle = { width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '4px', display: 'block' };
+
+  if (toothStatus === null || history === null) {
+    return <div style={{ fontSize: '12px', color: t.muted, textAlign: 'center', padding: '10px' }}>Loading…</div>;
+  }
+
+  const teeth = Array.from({ length: 32 }, (_, i) => i + 1);
+  const selectedStatus = selectedTooth ? (toothStatus[selectedTooth] || 'healthy') : null;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', justifyContent: 'center', marginBottom: '10px' }}>
+        {teeth.map(n => {
+          const status = toothStatus[n] || 'healthy';
+          const opt = CHART_STATUS_OPTIONS.find(o => o.key === status);
+          const color = opt.color ? colorMap[opt.color] : null;
+          const isSelected = selectedTooth === n;
+          return (
+            <button
+              key={n}
+              onClick={() => setSelectedTooth(isSelected ? null : n)}
+              className="px-btn"
+              title={`Tooth #${n} — ${opt.label}`}
+              style={{
+                width: '18px', height: '20px', borderRadius: '5px', fontSize: '8px', fontWeight: '700',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontFamily: 'inherit', padding: 0,
+                background: color ? withAlpha(color, .16) : t.bgCard,
+                borderWidth: isSelected ? '2px' : '1px', borderStyle: 'solid',
+                borderColor: isSelected ? (color || t.brand) : (color ? withAlpha(color, .5) : t.border),
+                color: color || t.muted,
+              }}
+            >{n}</button>
+          );
+        })}
+      </div>
+
+      {selectedTooth && (
+        <div style={{ padding: '10px 12px', background: t.bgRow, borderRadius: '6px', marginBottom: '10px', border: `1px solid ${t.border2}` }}>
+          <div style={{ fontSize: '11.5px', fontWeight: '600', color: t.ink2, marginBottom: '6px' }}>Tooth #{selectedTooth}</div>
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+            {CHART_STATUS_OPTIONS.map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setTooth(selectedTooth, opt.key)}
+                disabled={settingStatus}
+                className="px-btn"
+                style={{
+                  padding: '4px 9px', borderRadius: '5px', fontSize: '11px', fontWeight: '500', cursor: settingStatus ? 'default' : 'pointer', fontFamily: 'inherit',
+                  border: `1px solid ${selectedStatus === opt.key ? (opt.color ? colorMap[opt.color] : t.brand) : t.border}`,
+                  background: selectedStatus === opt.key ? (opt.color ? withAlpha(colorMap[opt.color], .16) : t.brandL) : t.bgCard,
+                  color: selectedStatus === opt.key ? (opt.color ? colorMap[opt.color] : t.brand) : t.mid,
+                }}
+              >{opt.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: '4px' }}>
+        {history.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '8px' }}>No treatment history on file yet.</div>}
+        {history.map(e => (
+          <div key={e.id} style={{ padding: '8px 0', borderBottom: `1px solid ${t.border2}` }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+              <span style={{ fontWeight: '600', color: t.ink2 }}>{e.procedure}</span>
+              <span style={{ color: t.muted }}>{e.date}</span>
+            </div>
+            <div style={{ fontSize: '11px', color: t.muted, marginTop: '2px' }}>Tooth {e.teeth.map(n => `#${n}`).join(', ') || '—'} · {e.provider}</div>
+          </div>
+        ))}
+      </div>
+
+      {showForm ? (
+        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${t.border2}` }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+            <div><label style={labelStyle}>Procedure</label><input value={form.procedure} onChange={e => setForm(f => ({ ...f, procedure: e.target.value }))} placeholder="Crown placed" style={fieldStyle} /></div>
+            <div><label style={labelStyle}>Date</label><input value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} placeholder="Mar 15, 2024" style={fieldStyle} /></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+            <div><label style={labelStyle}>Provider</label><input value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} style={fieldStyle} /></div>
+            <div><label style={labelStyle}>Teeth (comma-separated #)</label><input value={form.teeth} onChange={e => setForm(f => ({ ...f, teeth: e.target.value }))} placeholder="3, 14" style={fieldStyle} /></div>
+          </div>
+          <div style={{ marginBottom: '10px' }}>
+            <label style={labelStyle}>Notes</label>
+            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...fieldStyle, resize: 'vertical' }} />
+          </div>
+          {saveError && (
+            <div style={{ marginBottom: '10px', padding: '8px 10px', background: t.redL, borderRadius: '6px', fontSize: '11.5px', color: t.red }}>{saveError}</div>
+          )}
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn primary onClick={handleAddTreatment} disabled={saving} style={{ flex: 1, justifyContent: 'center' }}>
+              {saving ? <Loader2 size={13} className="px-spin" /> : null} {saving ? 'Adding…' : 'Add'}
+            </Btn>
+            <Btn onClick={() => setShowForm(false)} disabled={saving} style={{ flex: 1, justifyContent: 'center' }}>Cancel</Btn>
+          </div>
+        </div>
+      ) : (
+        <Btn style={{ marginTop: '4px', width: '100%', justifyContent: 'center' }} onClick={() => setShowForm(true)}>Add treatment</Btn>
+      )}
+    </div>
+  );
+}
+
 function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onAddPatient, onBulkAddPatient }) {
   const t = useTheme();
   const q = query.trim().toLowerCase();
@@ -2772,6 +2954,10 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
           <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>PRESCRIPTIONS</div>
             <PatientPrescriptionsEditor ghlContactId={selected.id} />
+          </div>
+          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>DENTAL CHART</div>
+            <PatientChartEditor ghlContactId={selected.id} />
           </div>
         </SlidePanel>
       )}
