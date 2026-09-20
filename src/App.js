@@ -2816,17 +2816,22 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
               ? `${csvResults.filter(r => r.status === 'ok').length} added, ${csvResults.filter(r => r.status === 'error').length} failed.`
               : 'Review the rows below, then confirm to add them all.'}
           </div>
-          <div style={{ maxHeight: '220px', overflowY: 'auto', border: `1px solid ${t.border2}`, borderRadius: '6px', marginBottom: '12px' }}>
+          <div style={{ maxHeight: '260px', overflowY: 'auto', border: `1px solid ${t.border2}`, borderRadius: '6px', marginBottom: '12px' }}>
             {(csvResults || csvRows).map((row, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: i < csvRows.length - 1 ? `1px solid ${t.border2}` : 'none', fontSize: '12.5px' }}>
-                <div>
-                  <span style={{ color: t.ink2, fontWeight: '500' }}>{row.name}</span>
-                  <span style={{ color: t.muted }}> · {row.email || '—'} · {row.phone || '—'}</span>
+              <div key={i} style={{ padding: '8px 12px', borderBottom: i < csvRows.length - 1 ? `1px solid ${t.border2}` : 'none', fontSize: '12.5px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <span style={{ color: t.ink2, fontWeight: '500' }}>{row.name}</span>
+                    <span style={{ color: t.muted }}> · {row.email || '—'} · {row.phone || '—'}</span>
+                  </div>
+                  {csvResults && (
+                    row.status === 'ok'
+                      ? <Pill label="Added" color={t.green} bg={t.greenL} />
+                      : <span style={{ color: t.red, fontSize: '11px', fontWeight: '600', flexShrink: 0 }}>Failed</span>
+                  )}
                 </div>
-                {csvResults && (
-                  row.status === 'ok'
-                    ? <Pill label="Added" color={t.green} bg={t.greenL} />
-                    : <span title={row.message} style={{ color: t.red, fontSize: '11px', fontWeight: '600' }}>Failed</span>
+                {row.status === 'error' && row.message && (
+                  <div style={{ marginTop: '4px', color: t.red, fontSize: '11.5px' }}>{row.message}</div>
                 )}
               </div>
             ))}
