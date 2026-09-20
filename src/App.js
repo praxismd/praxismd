@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, getAppointments, getCalendars, getCampaigns, sendMessage, createContact, isGhlConfigured } from './api/ghl';
@@ -2209,6 +2209,158 @@ function parseCsv(text) {
     }));
 }
 
+const INSURANCE_COVERAGE_CATEGORIES = ['Preventive (cleanings, exams)', 'Basic (fillings)', 'Major (crowns, root canals)'];
+
+// Staff-entered insurance profile for one patient — lives at
+// patientInsurance/{ghlContactId} so the Patient Portal's Insurance tab can
+// read it live by the same ghlContactId link the invite flow establishes.
+// A direct client write (not a Cloud Function) is fine here: it's
+// practice-managed reference data, not something a patient's own account
+// can touch, and Firestore rules scope writes to the patient's own
+// practiceId the same way practices/{uid} is already staff-writable.
+function PatientInsuranceEditor({ ghlContactId }) {
+  const t = useTheme();
+  const [profile, setProfile] = useState(undefined); // undefined = loading, null = none yet
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [form, setForm] = useState({
+    payer: '', plan: '', memberId: '', group: '', effective: '',
+    deductibleUsed: '0', deductibleTotal: '50', annualMaxUsed: '0', annualMaxTotal: '1500',
+    preventivePct: '100', basicPct: '80', majorPct: '50',
+  });
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setProfile(null); return; }
+    let cancelled = false;
+    setProfile(undefined);
+    getDoc(doc(db, 'patientInsurance', ghlContactId)).then(snap => {
+      if (cancelled) return;
+      if (snap.exists()) {
+        const d = snap.data();
+        setProfile(d);
+        setForm({
+          payer: d.payer || '', plan: d.plan || '', memberId: d.memberId || '', group: d.group || '', effective: d.effective || '',
+          deductibleUsed: String(d.deductibleUsed ?? 0), deductibleTotal: String(d.deductibleTotal ?? 50),
+          annualMaxUsed: String(d.annualMaxUsed ?? 0), annualMaxTotal: String(d.annualMaxTotal ?? 1500),
+          preventivePct: String(parseInt(d.coverage?.[0]?.[1]) || 100),
+          basicPct: String(parseInt(d.coverage?.[1]?.[1]) || 80),
+          majorPct: String(parseInt(d.coverage?.[2]?.[1]) || 50),
+        });
+      } else {
+        setProfile(null);
+      }
+    }).catch(() => setProfile(null));
+    return () => { cancelled = true; };
+  }, [ghlContactId]);
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError('');
+    try {
+      await setDoc(doc(db, 'patientInsurance', ghlContactId), {
+        practiceId: auth.currentUser.uid,
+        payer: form.payer.trim(),
+        plan: form.plan.trim(),
+        memberId: form.memberId.trim(),
+        group: form.group.trim(),
+        effective: form.effective.trim(),
+        deductibleUsed: Number(form.deductibleUsed) || 0,
+        deductibleTotal: Number(form.deductibleTotal) || 0,
+        annualMaxUsed: Number(form.annualMaxUsed) || 0,
+        annualMaxTotal: Number(form.annualMaxTotal) || 0,
+        coverage: [
+          [INSURANCE_COVERAGE_CATEGORIES[0], `${form.preventivePct}%`],
+          [INSURANCE_COVERAGE_CATEGORIES[1], `${form.basicPct}%`],
+          [INSURANCE_COVERAGE_CATEGORIES[2], `${form.majorPct}%`],
+        ],
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser.uid,
+      }, { merge: true });
+      setProfile({ ...form });
+      setEditing(false);
+    } catch (err) {
+      setSaveError(err.message || 'Could not save insurance info.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const fieldStyle = { width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '4px', display: 'block' };
+
+  if (profile === undefined) {
+    return <div style={{ fontSize: '12px', color: t.muted, textAlign: 'center', padding: '10px' }}>Loading…</div>;
+  }
+
+  if (!editing) {
+    return (
+      <div>
+        {profile ? (
+          <>
+            <DetailRow label="Payer" value={profile.payer} />
+            <DetailRow label="Plan" value={profile.plan} />
+            <DetailRow label="Member ID" value={profile.memberId} />
+          </>
+        ) : (
+          <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '10px' }}>No insurance on file yet.</div>
+        )}
+        <Btn style={{ marginTop: '10px', width: '100%', justifyContent: 'center' }} onClick={() => setEditing(true)}>
+          {profile ? 'Edit insurance' : 'Add insurance'}
+        </Btn>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+        <div><label style={labelStyle}>Payer</label><input value={form.payer} onChange={e => setForm(f => ({ ...f, payer: e.target.value }))} placeholder="Delta Dental" style={fieldStyle} /></div>
+        <div><label style={labelStyle}>Plan</label><input value={form.plan} onChange={e => setForm(f => ({ ...f, plan: e.target.value }))} placeholder="PPO Plus Premier" style={fieldStyle} /></div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+        <div><label style={labelStyle}>Member ID</label><input value={form.memberId} onChange={e => setForm(f => ({ ...f, memberId: e.target.value }))} style={fieldStyle} /></div>
+        <div><label style={labelStyle}>Group #</label><input value={form.group} onChange={e => setForm(f => ({ ...f, group: e.target.value }))} style={fieldStyle} /></div>
+      </div>
+      <div style={{ marginBottom: '8px' }}>
+        <label style={labelStyle}>Effective date</label>
+        <input value={form.effective} onChange={e => setForm(f => ({ ...f, effective: e.target.value }))} placeholder="Jan 1, 2026" style={fieldStyle} />
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+        <div><label style={labelStyle}>Deductible used / total ($)</label>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input value={form.deductibleUsed} onChange={e => setForm(f => ({ ...f, deductibleUsed: e.target.value }))} style={fieldStyle} />
+            <input value={form.deductibleTotal} onChange={e => setForm(f => ({ ...f, deductibleTotal: e.target.value }))} style={fieldStyle} />
+          </div>
+        </div>
+        <div><label style={labelStyle}>Annual max used / total ($)</label>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <input value={form.annualMaxUsed} onChange={e => setForm(f => ({ ...f, annualMaxUsed: e.target.value }))} style={fieldStyle} />
+            <input value={form.annualMaxTotal} onChange={e => setForm(f => ({ ...f, annualMaxTotal: e.target.value }))} style={fieldStyle} />
+          </div>
+        </div>
+      </div>
+      <div style={{ marginBottom: '10px' }}>
+        <label style={labelStyle}>Coverage % (preventive / basic / major)</label>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <input value={form.preventivePct} onChange={e => setForm(f => ({ ...f, preventivePct: e.target.value }))} style={fieldStyle} />
+          <input value={form.basicPct} onChange={e => setForm(f => ({ ...f, basicPct: e.target.value }))} style={fieldStyle} />
+          <input value={form.majorPct} onChange={e => setForm(f => ({ ...f, majorPct: e.target.value }))} style={fieldStyle} />
+        </div>
+      </div>
+      {saveError && (
+        <div style={{ marginBottom: '10px', padding: '8px 10px', background: t.redL, borderRadius: '6px', fontSize: '11.5px', color: t.red }}>{saveError}</div>
+      )}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <Btn primary onClick={handleSave} disabled={saving} style={{ flex: 1, justifyContent: 'center' }}>
+          {saving ? <Loader2 size={13} className="px-spin" /> : null} {saving ? 'Saving…' : 'Save'}
+        </Btn>
+        <Btn onClick={() => setEditing(false)} disabled={saving} style={{ flex: 1, justifyContent: 'center' }}>Cancel</Btn>
+      </div>
+    </div>
+  );
+}
+
 function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onAddPatient, onBulkAddPatient }) {
   const t = useTheme();
   const q = query.trim().toLowerCase();
@@ -2517,6 +2669,10 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
             {inviteState[selected.id] && inviteState[selected.id] !== 'sending' && inviteState[selected.id] !== 'sent' && (
               <div style={{ marginTop: '6px', fontSize: '12px', color: t.red }}>{inviteState[selected.id]}</div>
             )}
+          </div>
+          <div style={{ marginTop: '22px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>INSURANCE</div>
+            <PatientInsuranceEditor ghlContactId={selected.id} />
           </div>
         </SlidePanel>
       )}

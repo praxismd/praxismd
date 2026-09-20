@@ -42,12 +42,6 @@ const TREATMENT_HISTORY = [
   { date: 'Jul 22, 2022', teeth: [30], procedure: 'Crown placed', provider: 'Dr. Rivera', notes: 'Crown placed after prior filling failed.' },
 ];
 
-const INSURANCE = {
-  payer: 'Delta Dental', plan: 'PPO Plus Premier', memberId: 'DD-2284910', group: 'GRP-4471', effective: 'Jan 1, 2026',
-  coverage: [['Preventive (cleanings, exams)', '100%'], ['Basic (fillings)', '80%'], ['Major (crowns, root canals)', '50%']],
-  deductible: { used: 0, total: 50 },
-  annualMax: { used: 640, total: 1500 },
-};
 
 const PRESCRIPTIONS_SEED = [
   { id: 'rx1', name: 'Chlorhexidine Rinse 0.12%', dosage: 'Rinse 15mL twice daily', prescriber: 'Dr. Rivera', prescribedDate: 'Nov 2, 2023', refillsRemaining: 2, status: 'active' },
@@ -153,6 +147,26 @@ function useDocuments(profile) {
   }, [profile?.ghlContactId]);
 
   return { docs, loading };
+}
+
+// Live insurance profile for the signed-in patient — a single doc, staff-
+// entered from the Patient detail panel in the dashboard (see App.js's
+// PatientInsuranceEditor), keyed by ghlContactId. No profile yet reads as
+// "no insurance on file," same as any other not-yet-populated real record.
+function useInsurance(profile) {
+  const [record, setRecord] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !profile?.ghlContactId) { setLoading(false); return; }
+    const unsub = onSnapshot(doc(db, 'patientInsurance', profile.ghlContactId), snap => {
+      setRecord(snap.exists() ? snap.data() : null);
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, [profile?.ghlContactId]);
+
+  return { record, loading };
 }
 
 function OverviewTab({ setNotice, profile, onOpenMessages }) {
@@ -439,7 +453,8 @@ function BillingTab({ setNotice, profile }) {
   );
 }
 
-function InsuranceTab({ setNotice }) {
+function InsuranceTab({ setNotice, profile }) {
+  const { record: insurance, loading } = useInsurance(profile);
   const [showForm, setShowForm] = useState(false);
   const [payer, setPayer] = useState('');
   const [memberId, setMemberId] = useState('');
@@ -459,31 +474,42 @@ function InsuranceTab({ setNotice }) {
           <Shield size={17} color={t.brand} />
           <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Your plan</div>
         </div>
-        <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '16px' }}>{INSURANCE.payer} · {INSURANCE.plan}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
-          <DetailRow label="Member ID" value={INSURANCE.memberId} />
-          <DetailRow label="Group number" value={INSURANCE.group} />
-          <DetailRow label="Effective date" value={INSURANCE.effective} />
-        </div>
 
-        <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>COVERAGE BREAKDOWN</div>
-        {INSURANCE.coverage.map(([label, pct], i) => (
-          <div key={i} style={{ marginBottom: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>{label}</span><span style={{ fontWeight: '600', color: t.ink2 }}>{pct}</span></div>
-            <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.brand, width: pct }} /></div>
+        {loading ? (
+          <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '16px 0' }}>Loading…</div>
+        ) : !insurance ? (
+          <div style={{ fontSize: '12.5px', color: t.muted, padding: '10px 0' }}>
+            {profile?.ghlContactId ? 'No insurance on file yet — your practice can add it.' : "No insurance on file yet — once your practice links your account, their record of your plan will show up here."}
           </div>
-        ))}
+        ) : (
+          <>
+            <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '16px' }}>{insurance.payer} · {insurance.plan}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '20px' }}>
+              <DetailRow label="Member ID" value={insurance.memberId} />
+              <DetailRow label="Group number" value={insurance.group} />
+              <DetailRow label="Effective date" value={insurance.effective} />
+            </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '20px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>Deductible</span><span style={{ fontWeight: '600', color: t.ink2 }}>${INSURANCE.deductible.used} of ${INSURANCE.deductible.total}</span></div>
-            <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.teal, width: `${(INSURANCE.deductible.used / INSURANCE.deductible.total) * 100}%` }} /></div>
-          </div>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>Annual max used</span><span style={{ fontWeight: '600', color: t.ink2 }}>${INSURANCE.annualMax.used} of ${INSURANCE.annualMax.total}</span></div>
-            <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.purple, width: `${(INSURANCE.annualMax.used / INSURANCE.annualMax.total) * 100}%` }} /></div>
-          </div>
-        </div>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: t.muted, marginBottom: '10px' }}>COVERAGE BREAKDOWN</div>
+            {(insurance.coverage || []).map(([label, pct], i) => (
+              <div key={i} style={{ marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>{label}</span><span style={{ fontWeight: '600', color: t.ink2 }}>{pct}</span></div>
+                <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.brand, width: pct }} /></div>
+              </div>
+            ))}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '20px', paddingTop: '18px', borderTop: `1px solid ${t.border2}` }}>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>Deductible</span><span style={{ fontWeight: '600', color: t.ink2 }}>${insurance.deductibleUsed} of ${insurance.deductibleTotal}</span></div>
+                <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.teal, width: `${insurance.deductibleTotal ? (insurance.deductibleUsed / insurance.deductibleTotal) * 100 : 0}%` }} /></div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: t.mid, marginBottom: '5px' }}><span>Annual max used</span><span style={{ fontWeight: '600', color: t.ink2 }}>${insurance.annualMaxUsed} of ${insurance.annualMaxTotal}</span></div>
+                <div style={{ height: '4px', borderRadius: '3px', background: t.border, overflow: 'hidden' }}><div style={{ height: '100%', borderRadius: '3px', background: t.purple, width: `${insurance.annualMaxTotal ? (insurance.annualMaxUsed / insurance.annualMaxTotal) * 100 : 0}%` }} /></div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <div style={cardStyle}>
@@ -986,7 +1012,7 @@ function PatientPortal() {
         {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} onOpenMessages={() => setTab('messages')} />}
         {tab === 'chart' && <ChartTab />}
         {tab === 'prescriptions' && <PrescriptionsTab />}
-        {tab === 'insurance' && <InsuranceTab setNotice={setNotice} />}
+        {tab === 'insurance' && <InsuranceTab setNotice={setNotice} profile={profile} />}
         {tab === 'documents' && <DocumentsTab setNotice={setNotice} profile={profile} />}
         {tab === 'billing' && <BillingTab setNotice={setNotice} profile={profile} />}
         {tab === 'family' && <FamilyTab setNotice={setNotice} />}
