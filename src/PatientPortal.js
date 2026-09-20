@@ -43,10 +43,6 @@ const TREATMENT_HISTORY = [
 ];
 
 
-const FAMILY_SEED = [
-  { id: 'f1', name: 'Alex Thompson', relation: 'Spouse', dob: 'Apr 12, 1988', lastVisit: 'Feb 3, 2026' },
-  { id: 'f2', name: 'Maya Thompson', relation: 'Child', dob: 'Sep 30, 2015', lastVisit: 'Jan 20, 2026' },
-];
 
 const TABS = [
   { key: 'overview', label: 'Overview', Icon: Home },
@@ -59,14 +55,15 @@ const TABS = [
   { key: 'messages', label: 'Messages', Icon: MessageSquare },
 ];
 
-function PortalBtn({ children, onClick, primary }) {
+function PortalBtn({ children, onClick, primary, disabled }) {
   return (
     <button
-      onClick={onClick} className="px-btn"
+      onClick={onClick} disabled={disabled} className="px-btn"
       style={{
         display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '10px',
         border: primary ? 'none' : `1px solid ${t.border}`, background: primary ? t.brand : t.bgCard,
-        color: primary ? 'white' : t.mid, fontSize: '13px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit',
+        color: primary ? 'white' : t.mid, fontSize: '13px', fontWeight: '600', cursor: disabled ? 'default' : 'pointer', fontFamily: 'inherit',
+        opacity: disabled ? .6 : 1,
       }}
     >{children}</button>
   );
@@ -161,6 +158,29 @@ function usePrescriptions(profile) {
   }, [profile?.ghlContactId]);
 
   return { prescriptions, loading };
+}
+
+// Live family-member list for the signed-in patient — unlike billing,
+// documents, insurance and prescriptions (all staff-authored), this is the
+// patient's own informational record of dependents, so it's read and
+// written directly by the patient's own account, scoped to their linked
+// ghlContactId by the Firestore rule (see the patientFamily rule given to
+// the practice).
+function useFamily(profile) {
+  const [family, setFamily] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !profile?.ghlContactId) { setLoading(false); return; }
+    const q = query(collection(db, 'patientFamily'), where('ghlContactId', '==', profile.ghlContactId), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, snap => {
+      setFamily(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, [profile?.ghlContactId]);
+
+  return { family, loading };
 }
 
 // Live insurance profile for the signed-in patient — a single doc, staff-
@@ -736,22 +756,56 @@ function PrescriptionsTab({ profile }) {
   );
 }
 
-function FamilyTab({ setNotice }) {
-  const [family, setFamily] = useState(FAMILY_SEED);
+function FamilyTab({ setNotice, profile }) {
+  const { family, loading } = useFamily(profile);
   const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: '', relation: 'Child', dob: '' });
 
-  function addMember() {
+  async function addMember() {
     if (!form.name.trim() || !form.dob.trim()) {
       setNotice('Add a name and date of birth to continue.');
       return;
     }
-    setFamily(f => [...f, { id: `f-new-${Date.now()}`, name: form.name.trim(), relation: form.relation, dob: form.dob.trim(), lastVisit: null }]);
-    setForm({ name: '', relation: 'Child', dob: '' });
-    setShowForm(false);
+    setSaving(true);
+    try {
+      await addDoc(collection(db, 'patientFamily'), {
+        ghlContactId: profile.ghlContactId,
+        practiceId: profile.practiceId,
+        name: form.name.trim(),
+        relation: form.relation,
+        dob: form.dob.trim(),
+        lastVisit: null,
+        createdAt: serverTimestamp(),
+      });
+      setForm({ name: '', relation: 'Child', dob: '' });
+      setShowForm(false);
+    } catch (err) {
+      setNotice(err.message || 'Could not add that family member.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+
+  if (loading) {
+    return <div style={{ ...cardStyle, textAlign: 'center', color: t.muted, fontSize: '12.5px' }}>Loading…</div>;
+  }
+
+  if (!profile?.ghlContactId) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <Users size={17} color={t.brand} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Family on this account</div>
+        </div>
+        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>
+          Once your practice links your account, you'll be able to add family members here.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={cardStyle}>
@@ -773,7 +827,7 @@ function FamilyTab({ setNotice }) {
             </select>
             <input value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} placeholder="Date of birth" style={inputStyle} />
           </div>
-          <PortalBtn primary onClick={addMember}>Add to account</PortalBtn>
+          <PortalBtn primary onClick={addMember} disabled={saving}>{saving ? 'Adding…' : 'Add to account'}</PortalBtn>
         </div>
       )}
 
@@ -1061,7 +1115,7 @@ function PatientPortal() {
         {tab === 'insurance' && <InsuranceTab setNotice={setNotice} profile={profile} />}
         {tab === 'documents' && <DocumentsTab setNotice={setNotice} profile={profile} />}
         {tab === 'billing' && <BillingTab setNotice={setNotice} profile={profile} />}
-        {tab === 'family' && <FamilyTab setNotice={setNotice} />}
+        {tab === 'family' && <FamilyTab setNotice={setNotice} profile={profile} />}
         {tab === 'messages' && <MessagesTab profile={profile} />}
 
         {tab === 'overview' && (
