@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Check, X, ArrowRight, RotateCcw, Bot, ClipboardList, Receipt, Shield,
   Smile, CreditCard, Contact, Sparkles, Star, Menu, TrendingDown, PhoneOff,
-  FileWarning, Megaphone, Activity, Quote, Stethoscope, ShieldCheck,
+  FileWarning, Megaphone, Activity, Stethoscope, ShieldCheck,
 } from './icons';
 
 // Self-contained palette — the landing page is always light mode and never
@@ -126,14 +126,6 @@ const PRICING_PLANS = [
       'Dedicated success manager',
     ],
   },
-];
-
-// TODO: replace with real customer testimonials before launch — these are
-// placeholder quotes for demonstration purposes only.
-const TESTIMONIALS = [
-  { quote: 'PraxisMD paid for itself in the first two weeks — we reactivated 11 patients we’d completely written off.', name: 'Dr. Lauren Ferris', practice: 'Ferris Family Dental', location: 'Austin, TX', stars: 5 },
-  { quote: 'The AI front desk alone saves my team six hours a week. We haven’t missed a call since we turned it on.', name: 'Marcus Webb', practice: 'Coastal Dental Group', location: 'Charleston, SC', stars: 5 },
-  { quote: 'We finally have a real handle on denied claims. Our collections are up almost 20% in three months.', name: 'Dr. Priya Nair', practice: 'Nair Orthodontics', location: 'San Jose, CA', stars: 5 },
 ];
 
 const FOOTER_COLUMNS = [
@@ -377,8 +369,6 @@ function Landing() {
         .px-fcard:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.07); border-color: ${withAlpha(C.brand, .3)}; }
         .px-problem-card { transition: transform .15s ease, box-shadow .15s ease; }
         .px-problem-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.06); }
-        .px-tcard { transition: transform .15s ease, box-shadow .15s ease; }
-        .px-tcard:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.06); }
         .px-hero-mockup { transition: transform .4s ease; }
         .px-hero-mockup:hover { transform: perspective(1400px) rotateX(0deg) scale(1); }
         .px-footer-link { transition: color .12s ease; }
@@ -393,7 +383,6 @@ function Landing() {
           .px-features-grid { grid-template-columns: 1fr 1fr !important; }
           .px-problem-grid { grid-template-columns: 1fr !important; }
           .px-solution-grid { grid-template-columns: 1fr !important; }
-          .px-testimonial-grid { grid-template-columns: 1fr !important; }
           .px-why-grid { grid-template-columns: 1fr !important; }
           .px-footer-grid { grid-template-columns: 1fr 1fr !important; }
           .px-hero-headline { font-size: 34px !important; }
@@ -599,31 +588,6 @@ function Landing() {
           </div>
           <div style={{ textAlign: 'center', fontSize: '12.5px', color: C.muted, marginTop: '36px' }}>
             All plans include a signed BAA, HIPAA-compliant infrastructure, and free data migration onboarding — no setup fees, cancel anytime.
-          </div>
-        </Reveal>
-      </div>
-
-      {/* TESTIMONIALS */}
-      <div id="testimonials" style={{ padding: '80px 26px' }}>
-        <Reveal style={{ maxWidth: '1080px', margin: '0 auto' }}>
-          <SectionLabel>Testimonials</SectionLabel>
-          <h2 style={{ fontSize: '30px', fontWeight: '700', color: C.ink, textAlign: 'center', margin: '0 0 44px', letterSpacing: '-.5px' }}>
-            What practices are saying
-          </h2>
-          <div className="px-testimonial-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px' }}>
-            {TESTIMONIALS.map((tItem, i) => (
-              <div key={i} className="px-tcard" style={{ background: C.bgAlt, borderRadius: '16px', padding: '24px 22px', border: `1px solid ${C.border}` }}>
-                <Quote size={22} color={withAlpha(C.brand, .35)} style={{ marginBottom: '12px' }} />
-                <div style={{ fontSize: '13.5px', color: C.ink2, lineHeight: '1.6', marginBottom: '18px' }}>“{tItem.quote}”</div>
-                <div style={{ display: 'flex', gap: '2px', marginBottom: '10px' }}>
-                  {Array.from({ length: tItem.stars }).map((_, s) => (
-                    <Star key={s} size={13} color={C.amber} fill={C.amber} />
-                  ))}
-                </div>
-                <div style={{ fontSize: '13px', fontWeight: '700', color: C.ink }}>{tItem.name}</div>
-                <div style={{ fontSize: '12px', color: C.muted }}>{tItem.practice} · {tItem.location}</div>
-              </div>
-            ))}
           </div>
         </Reveal>
       </div>
