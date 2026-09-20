@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './firebase';
+import { signPatientDocument } from './api/patients';
 import { light, withAlpha } from './theme';
 import {
   CalendarClock, MessageSquare, User, LogOut, Loader2, AlertTriangle,
@@ -47,13 +48,6 @@ const INSURANCE = {
   deductible: { used: 0, total: 50 },
   annualMax: { used: 640, total: 1500 },
 };
-
-const DOCUMENTS_SEED = [
-  { id: 'doc1', name: 'New patient health history', signed: true, date: 'Aug 2, 2026' },
-  { id: 'doc2', name: 'HIPAA consent form', signed: true, date: 'Aug 2, 2026' },
-  { id: 'doc3', name: 'Financial responsibility agreement', signed: false, date: null },
-  { id: 'doc4', name: 'Treatment plan consent — Crown #3', signed: false, date: null },
-];
 
 const PRESCRIPTIONS_SEED = [
   { id: 'rx1', name: 'Chlorhexidine Rinse 0.12%', dosage: 'Rinse 15mL twice daily', prescriber: 'Dr. Rivera', prescribedDate: 'Nov 2, 2023', refillsRemaining: 2, status: 'active' },
@@ -137,6 +131,28 @@ function useBillingRecords(profile) {
 
   const balance = records.filter(r => r.status === 'pending').reduce((sum, r) => sum + (r.amount || 0), 0);
   return { records, balance, loading };
+}
+
+// Live consent documents for the signed-in patient — seeded automatically
+// (see functions/index.js's seedStandardConsentDocuments) the first time
+// their account links to a practice via an invite. Same ghlContactId match
+// as billing; a patient without one sees no documents, which is accurate —
+// nothing's been assigned to link back to.
+function useDocuments(profile) {
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !profile?.ghlContactId) { setLoading(false); return; }
+    const q = query(collection(db, 'patientDocuments'), where('ghlContactId', '==', profile.ghlContactId), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, snap => {
+      setDocs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, [profile?.ghlContactId]);
+
+  return { docs, loading };
 }
 
 function OverviewTab({ setNotice, profile, onOpenMessages }) {
@@ -489,17 +505,42 @@ function InsuranceTab({ setNotice }) {
   );
 }
 
-function DocumentsTab({ setNotice }) {
-  const [docs, setDocs] = useState(DOCUMENTS_SEED);
-  const [signing, setSigning] = useState(null);
+function DocumentsTab({ setNotice, profile }) {
+  const { docs, loading } = useDocuments(profile);
+  const [signing, setSigning] = useState(null); // doc id currently expanded
+  const [signState, setSignState] = useState({}); // doc id -> 'signing' | error string
 
-  function sign(id) {
-    setDocs(ds => ds.map(d => d.id === id ? { ...d, signed: true, date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) } : d));
-    setSigning(null);
+  async function sign(id) {
+    setSignState(s => ({ ...s, [id]: 'signing' }));
+    try {
+      await signPatientDocument(id);
+      setSigning(null);
+      setSignState(s => { const next = { ...s }; delete next[id]; return next; });
+    } catch (err) {
+      setSignState(s => ({ ...s, [id]: err.message || 'Could not sign that document.' }));
+    }
   }
 
   const pending = docs.filter(d => !d.signed);
   const signed = docs.filter(d => d.signed);
+
+  if (loading) {
+    return <div style={{ ...cardStyle, textAlign: 'center', color: t.muted, fontSize: '12.5px' }}>Loading…</div>;
+  }
+
+  if (docs.length === 0) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <FileText size={17} color={t.purple} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Your documents</div>
+        </div>
+        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>
+          {profile?.ghlContactId ? 'No documents on file yet.' : "No documents yet — once your practice links your account, your intake forms will show up here."}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -521,7 +562,12 @@ function DocumentsTab({ setNotice }) {
                   <div style={{ fontSize: '12px', color: t.mid, marginBottom: '10px', lineHeight: '1.6' }}>
                     By signing below, you confirm you've read and agree to this form.
                   </div>
-                  <PortalBtn primary onClick={() => sign(d.id)}><CheckCircle2 size={13} /> I agree — sign document</PortalBtn>
+                  <PortalBtn primary onClick={() => sign(d.id)}>
+                    {signState[d.id] === 'signing' ? <Loader2 size={13} className="px-spin" /> : <CheckCircle2 size={13} />} {signState[d.id] === 'signing' ? 'Signing…' : 'I agree — sign document'}
+                  </PortalBtn>
+                  {signState[d.id] && signState[d.id] !== 'signing' && (
+                    <div style={{ marginTop: '8px', fontSize: '11.5px', color: t.red }}>{signState[d.id]}</div>
+                  )}
                 </div>
               )}
             </div>
@@ -537,7 +583,9 @@ function DocumentsTab({ setNotice }) {
         {signed.map(d => (
           <div key={d.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: `1px solid ${t.border2}` }}>
             <div style={{ fontSize: '13px', color: t.ink2 }}>{d.name}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: t.green }}><CheckCircle2 size={13} /> Signed {d.date}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: t.green }}>
+              <CheckCircle2 size={13} /> Signed {d.signedAt?.toDate ? d.signedAt.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+            </div>
           </div>
         ))}
         {signed.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>No signed documents yet.</div>}
@@ -939,7 +987,7 @@ function PatientPortal() {
         {tab === 'chart' && <ChartTab />}
         {tab === 'prescriptions' && <PrescriptionsTab />}
         {tab === 'insurance' && <InsuranceTab setNotice={setNotice} />}
-        {tab === 'documents' && <DocumentsTab setNotice={setNotice} />}
+        {tab === 'documents' && <DocumentsTab setNotice={setNotice} profile={profile} />}
         {tab === 'billing' && <BillingTab setNotice={setNotice} profile={profile} />}
         {tab === 'family' && <FamilyTab setNotice={setNotice} />}
         {tab === 'messages' && <MessagesTab profile={profile} />}
