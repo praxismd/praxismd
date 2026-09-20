@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -8,8 +8,9 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, googleProvider, isFirebaseConfigured } from './firebase';
+import { redeemPatientInvite } from './api/patients';
 import { light, withAlpha } from './theme';
-import { ArrowLeft, Eye, EyeOff, Loader2, AlertTriangle, ShieldCheck } from './icons';
+import { ArrowLeft, Eye, EyeOff, Loader2, AlertTriangle, ShieldCheck, CheckCircle2 } from './icons';
 
 const t = light;
 
@@ -58,12 +59,16 @@ const inputStyle = {
 
 function Auth() {
   const navigate = useNavigate();
-  const [role, setRole] = useState('staff'); // 'staff' | 'patient'
-  const [mode, setMode] = useState('login'); // 'login' | 'signup' | 'forgot'
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite') || '';
+  const [role, setRole] = useState(inviteToken ? 'patient' : 'staff'); // 'staff' | 'patient'
+  const [mode, setMode] = useState(inviteToken ? 'signup' : 'login'); // 'login' | 'signup' | 'forgot'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  // 'checking' | 'valid' | 'invalid' | 'expired' | 'used' | '' (no invite)
+  const [inviteStatus, setInviteStatus] = useState(inviteToken ? 'checking' : '');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -83,6 +88,29 @@ function Auth() {
   const [useBackupCode, setUseBackupCode] = useState(false);
   const [backupCodeValue, setBackupCodeValue] = useState('');
   const [twoFAError, setTwoFAError] = useState('');
+
+  useEffect(() => {
+    if (!inviteToken || !isFirebaseConfigured) return;
+    setRole('patient');
+    setMode('signup');
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, 'patientInvites', inviteToken));
+        if (cancelled) return;
+        if (!snap.exists()) { setInviteStatus('invalid'); return; }
+        const invite = snap.data();
+        if (invite.used) { setInviteStatus('used'); return; }
+        if (invite.expiresAt && invite.expiresAt.toMillis() < Date.now()) { setInviteStatus('expired'); return; }
+        setInviteStatus('valid');
+        if (invite.contactName) setPatientName(invite.contactName);
+      } catch {
+        if (!cancelled) setInviteStatus('invalid');
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inviteToken]);
 
   if (!isFirebaseConfigured) {
     return (
@@ -217,6 +245,15 @@ function Auth() {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       if (role === 'patient') {
         await ensurePatientDoc(cred.user, { name: patientName, phone: patientPhone, dob: patientDob });
+        if (inviteToken && inviteStatus === 'valid') {
+          try {
+            await redeemPatientInvite(inviteToken);
+          } catch (err) {
+            // Account was created either way — surface this to the patient
+            // as a heads-up rather than blocking them out of their new account.
+            console.error('Invite redemption failed:', err);
+          }
+        }
         navigate('/patient');
       } else {
         await ensurePracticeDoc(cred.user, { ownerName, practiceName, phone, address, pmSoftware });
@@ -331,7 +368,25 @@ function Auth() {
             </button>
           )}
 
-          {mode !== 'forgot' && (
+          {inviteToken && (inviteStatus === 'checking' || inviteStatus === 'valid') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '9px', background: t.brandL, color: t.brand, border: `1px solid ${withAlpha(t.brand, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '18px' }}>
+              {inviteStatus === 'checking' ? (
+                <><Loader2 size={14} className="px-spin" /> Checking your invite link…</>
+              ) : (
+                <><CheckCircle2 size={14} /> {patientName ? `Invited as ${patientName} — ` : "You're invited — "}finish setting up your account below.</>
+              )}
+            </div>
+          )}
+          {inviteToken && (inviteStatus === 'invalid' || inviteStatus === 'expired' || inviteStatus === 'used') && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '9px', background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '18px' }}>
+              <AlertTriangle size={14} />
+              {inviteStatus === 'expired' && "This invite link has expired — ask your practice to text you a new one."}
+              {inviteStatus === 'used' && 'This invite link has already been used. Sign in instead, or ask your practice for a new one.'}
+              {inviteStatus === 'invalid' && "This invite link isn't valid. You can still sign up below, or ask your practice for a new link."}
+            </div>
+          )}
+
+          {mode !== 'forgot' && !inviteToken && (
             <div style={{ display: 'flex', background: t.bgRow, borderRadius: '12px', padding: '4px', marginBottom: '20px', border: `1px solid ${t.border2}` }}>
               {[['staff', 'Employee / Doctor'], ['patient', 'Patient']].map(([key, label]) => (
                 <button

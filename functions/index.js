@@ -21,7 +21,12 @@
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
+const { randomBytes } = require('crypto');
+const admin = require('firebase-admin');
 const Stripe = require('stripe');
+
+admin.initializeApp();
+const db = admin.firestore();
 
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
 const ghlApiKey = defineSecret('GHL_API_KEY');
@@ -31,8 +36,12 @@ const GHL_API_VERSION = '2021-07-28';
 // — not a secret, just pinned here too so a caller can't point this proxy
 // at a different sub-account by passing a different locationId.
 const GHL_LOCATION_ID = 'MJIYE0wyUSwdoXjflQns';
+// Matches the HashRouter's public URL (see .github/workflows/deploy-pages.yml
+// / GitHub Pages) — where a patient invite link points.
+const APP_BASE_URL = 'https://praxismd.github.io/praxismd';
 
 const MAX_PAYMENT_LINK_AMOUNT = 50000; // dollars — sanity cap, not a real business limit
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // patient invite links expire after 7 days
 
 const ALLOWED_GHL_ROUTES = [
   { method: 'GET', pathname: '/contacts/' },
@@ -144,4 +153,102 @@ exports.ghlProxy = onCall({ secrets: [ghlApiKey] }, async (request) => {
     throw new HttpsError('internal', data?.message || data?.error || `GoHighLevel request failed (${res.status}).`);
   }
   return data;
+});
+
+// Staff-side: creates a one-time signup link for a specific GHL contact and
+// texts it to them. A `patients/{uid}` doc has no inherent link to a
+// practice or a GHL contact — the invite token is what carries that link,
+// so it can be established server-side (never trusting a client-supplied
+// practiceId) the moment the patient actually signs up. See
+// redeemPatientInvite below for the other half of this flow.
+exports.createPatientInvite = onCall({ secrets: [ghlApiKey] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to invite a patient.');
+  }
+
+  const { contactId, contactName, contactPhone } = request.data || {};
+  if (!contactId || typeof contactId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A contact is required.');
+  }
+  if (!contactPhone || typeof contactPhone !== 'string' || contactPhone === '—') {
+    throw new HttpsError('invalid-argument', 'This contact needs a phone number on file to be invited.');
+  }
+
+  const token = randomBytes(24).toString('base64url');
+  await db.collection('patientInvites').doc(token).set({
+    practiceId: request.auth.uid,
+    ghlContactId: contactId,
+    contactName: typeof contactName === 'string' ? contactName : '',
+    createdBy: request.auth.uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt: admin.firestore.Timestamp.fromMillis(Date.now() + INVITE_TTL_MS),
+    used: false,
+  });
+
+  const signupUrl = `${APP_BASE_URL}/#/login?invite=${token}`;
+  const message = `You're invited to set up your PraxisMD patient portal — book appointments, message your practice, and view your account online: ${signupUrl}`;
+
+  let res;
+  try {
+    res = await fetch(`${GHL_BASE_URL}/conversations/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${ghlApiKey.value()}`,
+        Version: GHL_API_VERSION,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ type: 'SMS', contactId, message }),
+    });
+  } catch (err) {
+    throw new HttpsError('unavailable', 'Could not reach GoHighLevel to send the invite — try again.');
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new HttpsError('internal', data?.message || data?.error || `Could not text the invite (${res.status}).`);
+  }
+
+  return { sent: true };
+});
+
+// Patient-side: called right after createUserWithEmailAndPassword when
+// signing up via an invite link (see src/Auth.js), so the new account gets
+// linked to the inviting practice + GHL contact from a token only the
+// practice's own SMS delivered — never from anything the client claims
+// about itself.
+exports.redeemPatientInvite = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to redeem an invite.');
+  }
+
+  const { token } = request.data || {};
+  if (!token || typeof token !== 'string') {
+    throw new HttpsError('invalid-argument', 'A valid invite token is required.');
+  }
+
+  const ref = db.collection('patientInvites').doc(token);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new HttpsError('not-found', 'This invite link is invalid.');
+  }
+  const invite = snap.data();
+  if (invite.used) {
+    throw new HttpsError('failed-precondition', 'This invite link has already been used.');
+  }
+  if (invite.expiresAt && invite.expiresAt.toMillis() < Date.now()) {
+    throw new HttpsError('failed-precondition', 'This invite link has expired — ask your practice to send a new one.');
+  }
+
+  await db.collection('patients').doc(request.auth.uid).set({
+    practiceId: invite.practiceId,
+    ghlContactId: invite.ghlContactId,
+  }, { merge: true });
+
+  await ref.update({
+    used: true,
+    usedAt: admin.firestore.FieldValue.serverTimestamp(),
+    usedByUid: request.auth.uid,
+  });
+
+  return { practiceId: invite.practiceId, ghlContactId: invite.ghlContactId, contactName: invite.contactName || '' };
 });

@@ -6,6 +6,7 @@ import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './them
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, getAppointments, getCalendars, getCampaigns, sendMessage, isGhlConfigured } from './api/ghl';
 import { createPaymentLink, isStripeConfigured } from './api/stripe';
+import { createPatientInvite } from './api/patients';
 import {
   LayoutDashboard, InboxIcon, Megaphone, RotateCcw, CalendarIcon,
   ClipboardList, Users, Contact, Shield, Star, Smile, Bot, Receipt, CreditCard,
@@ -2174,6 +2175,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
   const [sortKey, setSortKey] = useState(null); // 'name' | 'tag' | 'dateAdded'
   const [sortDir, setSortDir] = useState('asc');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [inviteState, setInviteState] = useState({}); // patientId -> 'sending' | 'sent' | error string
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPhone, setNewPhone] = useState('');
@@ -2185,6 +2187,16 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
       return;
     }
     setShowAddForm(s => !s);
+  }
+
+  async function handleInvite(patient) {
+    setInviteState(s => ({ ...s, [patient.id]: 'sending' }));
+    try {
+      await createPatientInvite(patient.id, patient.name, patient.phone);
+      setInviteState(s => ({ ...s, [patient.id]: 'sent' }));
+    } catch (err) {
+      setInviteState(s => ({ ...s, [patient.id]: err.message || 'Could not send the invite.' }));
+    }
   }
 
   function submitNewPatient() {
@@ -2349,6 +2361,24 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
           <div style={{ display: 'flex', gap: '8px', marginTop: '22px' }}>
             <Btn primary style={{ flex: 1, justifyContent: 'center' }}>Message</Btn>
             <Btn style={{ flex: 1, justifyContent: 'center' }}>Schedule</Btn>
+          </div>
+          <div style={{ marginTop: '10px' }}>
+            {inviteState[selected.id] === 'sent' ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '6px', background: t.greenL, color: t.green, fontSize: '12.5px', fontWeight: '600' }}>
+                <Check size={14} /> Invite texted — they'll get a link to set up their portal.
+              </div>
+            ) : inviteState[selected.id] === 'sending' ? (
+              <Btn disabled style={{ width: '100%', justifyContent: 'center' }}>
+                <Loader2 size={14} className="px-spin" /> Sending invite…
+              </Btn>
+            ) : (
+              <Btn style={{ width: '100%', justifyContent: 'center' }} onClick={() => handleInvite(selected)}>
+                <UserPlus size={14} /> Invite to portal
+              </Btn>
+            )}
+            {inviteState[selected.id] && inviteState[selected.id] !== 'sending' && inviteState[selected.id] !== 'sent' && (
+              <div style={{ marginTop: '6px', fontSize: '12px', color: t.red }}>{inviteState[selected.id]}</div>
+            )}
           </div>
         </SlidePanel>
       )}
