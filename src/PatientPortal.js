@@ -754,6 +754,26 @@ function PatientPortal() {
   const [profile, setProfile] = useState(null);
   const [notice, setNotice] = useState('');
   const [tab, setTab] = useState('overview');
+  const tabsRowRef = useRef(null);
+
+  // The tab row scrolls horizontally instead of wrapping (there isn't room
+  // for all 8 tabs at once), which touch users can swipe but desktop mouse
+  // users have no default way to reach — translate an ordinary vertical
+  // wheel scroll into horizontal scroll here so it's reachable either way.
+  useEffect(() => {
+    const el = tabsRowRef.current;
+    if (!el) return;
+    function onWheel(e) {
+      if (e.deltaY === 0 || el.scrollWidth <= el.clientWidth) return;
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // authChecked flips from false to true once the real content (including
+    // the tab row) mounts — re-run then so the ref isn't still null.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked]);
 
   useEffect(() => {
     if (!isFirebaseConfigured) { setAuthChecked(true); return; }
@@ -826,9 +846,10 @@ function PatientPortal() {
         .px-tab:hover { color: ${t.ink} !important; }
         @keyframes pxFadeIn { from { opacity: 0; } to { opacity: 1; } }
         .px-expand { animation: pxFadeIn .15s ease; }
-        .px-tabs-row::-webkit-scrollbar { display: none; }
-        .px-tabs-row { scrollbar-width: none; }
+        .px-tabs-row { scrollbar-width: thin; }
         @media (max-width: 640px) {
+          .px-tabs-row::-webkit-scrollbar { display: none; }
+          .px-tabs-row { scrollbar-width: none; }
           [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
           [style*="grid-template-columns"] > * { min-width: 0 !important; }
         }
@@ -860,7 +881,7 @@ function PatientPortal() {
           </div>
         </div>
 
-        <div className="px-tabs-row" style={{ display: 'flex', gap: '4px', borderBottom: `1px solid ${t.border}`, marginBottom: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div ref={tabsRowRef} className="px-tabs-row" style={{ display: 'flex', gap: '4px', borderBottom: `1px solid ${t.border}`, marginBottom: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {TABS.map(tb => (
             <button
               key={tb.key}
