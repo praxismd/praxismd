@@ -826,6 +826,12 @@ function PatientPortal() {
         .px-tab:hover { color: ${t.ink} !important; }
         @keyframes pxFadeIn { from { opacity: 0; } to { opacity: 1; } }
         .px-expand { animation: pxFadeIn .15s ease; }
+        .px-tabs-row::-webkit-scrollbar { display: none; }
+        .px-tabs-row { scrollbar-width: none; }
+        @media (max-width: 640px) {
+          [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
+          [style*="grid-template-columns"] > * { min-width: 0 !important; }
+        }
       `}</style>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 28px', borderBottom: `1px solid ${t.border}`, background: t.bgCard }}>
@@ -854,14 +860,14 @@ function PatientPortal() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '4px', borderBottom: `1px solid ${t.border}`, marginBottom: '20px' }}>
+        <div className="px-tabs-row" style={{ display: 'flex', gap: '4px', borderBottom: `1px solid ${t.border}`, marginBottom: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {TABS.map(tb => (
             <button
               key={tb.key}
               onClick={() => setTab(tb.key)}
               className="px-tab"
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap',
                 padding: '10px 4px', marginRight: '24px', background: 'transparent', border: 'none',
                 borderBottom: tab === tb.key ? `2px solid ${t.brand}` : '2px solid transparent',
                 color: tab === tb.key ? t.ink : t.muted, fontWeight: tab === tb.key ? '600' : '500',
