@@ -43,22 +43,29 @@ const ALLOWED_GHL_ROUTES = [
   { method: 'POST', pathname: '/conversations/messages' },
 ];
 
+// Stripe does not sign a HIPAA Business Associate Agreement on any plan —
+// its position is that it isn't a business associate because payment data
+// alone isn't PHI. That's only true as long as nothing identifying rides
+// along with it, so this deliberately never sends a patient's name, or
+// anything else that could identify them or their treatment, to Stripe —
+// not in the product name, not in metadata, not anywhere. The link amount
+// and a generic billing category (e.g. "Co-pay collection") are the only
+// details Stripe ever sees; the practice's own systems (GHL/Firestore) are
+// what map a sent link back to a specific patient.
 exports.createPaymentLink = onCall({ secrets: [stripeSecretKey] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'You must be signed in to send a payment link.');
   }
 
-  const { patientName, amount, type } = request.data || {};
+  const { amount, type } = request.data || {};
   const parsedAmount = Number(String(amount).replace(/[^0-9.]/g, ''));
-  if (!patientName || typeof patientName !== 'string') {
-    throw new HttpsError('invalid-argument', 'A patient name is required.');
-  }
   if (!parsedAmount || parsedAmount <= 0) {
     throw new HttpsError('invalid-argument', 'A positive amount is required.');
   }
   if (parsedAmount > MAX_PAYMENT_LINK_AMOUNT) {
     throw new HttpsError('invalid-argument', `Amount can't exceed $${MAX_PAYMENT_LINK_AMOUNT.toLocaleString()}.`);
   }
+  const billingCategory = typeof type === 'string' && type.trim() ? type.trim() : 'Payment';
 
   const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2024-06-20' });
 
@@ -68,14 +75,12 @@ exports.createPaymentLink = onCall({ secrets: [stripeSecretKey] }, async (reques
     const price = await stripe.prices.create({
       currency: 'usd',
       unit_amount: Math.round(parsedAmount * 100),
-      product_data: { name: `${type || 'Payment'} — ${patientName}` },
+      product_data: { name: billingCategory },
     });
 
     const link = await stripe.paymentLinks.create({
       line_items: [{ price: price.id, quantity: 1 }],
       metadata: {
-        patientName,
-        type: type || '',
         createdBy: request.auth.uid,
       },
     });

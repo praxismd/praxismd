@@ -2437,7 +2437,7 @@ function Payments({ contacts }) {
     setSmsError('');
     setSending(true);
     try {
-      const res = await createPaymentLink(selectedContact.name, amount, reqType);
+      const res = await createPaymentLink(amount, reqType);
       setLinkUrl(res?.url || '');
     } catch (err) {
       setError(err.message || 'Something went wrong.');
