@@ -31,3 +31,16 @@ export async function redeemPatientInvite(token) {
   const res = await call({ token });
   return res.data; // { practiceId, ghlContactId, contactName }
 }
+
+// Patient-side: signs one of their own standard consent documents (seeded
+// automatically when their account first links to a practice). Routed
+// through a function rather than a direct client write so the signature
+// timestamp and signer are always set server-side.
+export async function signPatientDocument(docId) {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase isn\'t connected yet — add REACT_APP_FIREBASE_* to your .env.local.');
+  }
+  const call = httpsCallable(functions, 'signPatientDocument');
+  const res = await call({ docId });
+  return res.data; // { signed: true }
+}

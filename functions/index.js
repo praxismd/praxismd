@@ -312,5 +312,73 @@ exports.redeemPatientInvite = onCall(async (request) => {
     usedByUid: request.auth.uid,
   });
 
+  await seedStandardConsentDocuments(invite.practiceId, invite.ghlContactId);
+
   return { practiceId: invite.practiceId, ghlContactId: invite.ghlContactId, contactName: invite.contactName || '' };
+});
+
+const STANDARD_CONSENT_DOCUMENTS = [
+  'New patient health history',
+  'HIPAA consent form',
+  'Financial responsibility agreement',
+];
+
+// Every new patient needs to sign the same handful of standard intake
+// forms — seed them unsigned the first time a patient links to a practice,
+// so there's something real for the portal's Documents tab to show instead
+// of nothing. Skips patients who already have documents (e.g. a re-sent
+// invite) so this never creates duplicates.
+async function seedStandardConsentDocuments(practiceId, ghlContactId) {
+  const existing = await db.collection('patientDocuments').where('ghlContactId', '==', ghlContactId).limit(1).get();
+  if (!existing.empty) return;
+  const batch = db.batch();
+  STANDARD_CONSENT_DOCUMENTS.forEach(name => {
+    const ref = db.collection('patientDocuments').doc();
+    batch.set(ref, {
+      practiceId,
+      ghlContactId,
+      name,
+      signed: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  });
+  await batch.commit();
+}
+
+// Patient-side: signs one of their own standard consent documents. Routed
+// through a function (rather than a direct client write) so the signature
+// timestamp and signer are always set server-side — never something the
+// client could backdate or attribute to someone else.
+exports.signPatientDocument = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to sign a document.');
+  }
+
+  const { docId } = request.data || {};
+  if (!docId || typeof docId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A document is required.');
+  }
+
+  const patientSnap = await db.collection('patients').doc(request.auth.uid).get();
+  const ghlContactId = patientSnap.exists ? patientSnap.data().ghlContactId : null;
+  if (!ghlContactId) {
+    throw new HttpsError('failed-precondition', 'Your account isn\'t linked to a practice yet.');
+  }
+
+  const docRef = db.collection('patientDocuments').doc(docId);
+  const docSnap = await docRef.get();
+  if (!docSnap.exists || docSnap.data().ghlContactId !== ghlContactId) {
+    throw new HttpsError('not-found', 'That document could not be found.');
+  }
+  if (docSnap.data().signed) {
+    return { signed: true };
+  }
+
+  await docRef.update({
+    signed: true,
+    signedAt: admin.firestore.FieldValue.serverTimestamp(),
+    signedByUid: request.auth.uid,
+  });
+
+  return { signed: true };
 });
