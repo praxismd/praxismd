@@ -4,7 +4,7 @@ import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
-import { getContacts, getConversations, getAppointments, getCalendars, getCampaigns, sendMessage, createContact, isGhlConfigured } from './api/ghl';
+import { getContacts, getConversations, getAppointments, getCalendars, getFreeSlots, createAppointment, getCampaigns, sendMessage, createContact, isGhlConfigured } from './api/ghl';
 import { createPaymentLink, isStripeConfigured } from './api/stripe';
 import { createPatientInvite } from './api/patients';
 import {
@@ -616,6 +616,16 @@ function App() {
   const [demoContacts, setDemoContacts] = useState(DEMO_CONTACTS);
   const contacts = isGhlConfigured ? (contactsData || []).map(mapContact) : demoContacts;
 
+  // Live count for the sidebar's "Appointment Requests" badge — real,
+  // unlike the other nav badges here which are still static placeholders.
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    const q = query(collection(db, 'appointmentRequests'), where('status', '==', 'pending'));
+    const unsub = onSnapshot(q, snap => setPendingRequestsCount(snap.size), () => {});
+    return unsub;
+  }, []);
+
   const { data: campaignsData, loading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useGhlFetch(getCampaigns);
   const ghlCampaigns = isGhlConfigured ? (campaignsData || []).map(mapCampaign) : null;
 
@@ -802,7 +812,7 @@ function App() {
           {isTabVisible('campaigns', userRole, rolePermissions) && <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
           {isTabVisible('recall', userRole, rolePermissions) && <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={navigateTo} badge="89" badgeColor={t.amber} collapsed={!showFull} />}
           {isTabVisible('calendar', userRole, rolePermissions) && <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
-          {isTabVisible('appointmentrequests', userRole, rolePermissions) && <NavItem label="Appointment Requests" Icon={CalendarPlus} tab="appointmentrequests" active={activeTab} onClick={navigateTo} badge={String(APPOINTMENT_REQUESTS_SEED.filter(r => r.status === 'pending').length)} badgeColor={t.amber} collapsed={!showFull} />}
+          {isTabVisible('appointmentrequests', userRole, rolePermissions) && <NavItem label="Appointment Requests" Icon={CalendarPlus} tab="appointmentrequests" active={activeTab} onClick={navigateTo} badge={pendingRequestsCount > 0 ? String(pendingRequestsCount) : undefined} badgeColor={t.amber} collapsed={!showFull} />}
           {isTabVisible('waitlist', userRole, rolePermissions) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={navigateTo} badge="12" badgeColor={t.teal} collapsed={!showFull} />}
           {PRACTICE_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Practice" collapsed={!showFull} />}
           {isTabVisible('patients', userRole, rolePermissions) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
@@ -4345,28 +4355,67 @@ function formatTime12h(time24) {
   return `${h12}:${String(m).padStart(2, '0')} ${period}`;
 }
 
-const APPOINTMENT_REQUESTS_SEED = [
-  { id: 'ar1', patientName: 'Sarah Malone', requestedDate: 'Sep 22, 2026', preferredTime: 'Morning (9–11am)', apptType: 'Cleaning', requestedDoctor: 'Dr. Rivera', insurance: 'Delta Dental — Active', notes: 'Prefers an early appointment, works nights.', status: 'pending', emergency: false, conflict: false },
-  { id: 'ar2', patientName: 'Tom Alvarez', requestedDate: 'Sep 20, 2026', preferredTime: 'ASAP', apptType: 'Emergency Exam', requestedDoctor: 'Any available doctor', insurance: 'Cigna Dental — Active', notes: 'Severe tooth pain since last night, possible abscess.', status: 'pending', emergency: true, conflict: false },
-  { id: 'ar3', patientName: 'Priya Patel', requestedDate: 'Sep 25, 2026', preferredTime: 'Afternoon (1–3pm)', apptType: 'Crown', requestedDoctor: 'Dr. Alvarez', insurance: 'Aetna — Active', notes: 'Follow-up on the temporary crown from last visit.', status: 'pending', emergency: false, conflict: false },
-  { id: 'ar4', patientName: 'James Coleman Jr.', requestedDate: 'Sep 19, 2026', preferredTime: 'Morning (9–11am)', apptType: 'Implant Consultation', requestedDoctor: 'Dr. Cho', insurance: 'No insurance on file', notes: 'Requested slot conflicts with Dr. Cho’s existing 9:30am booking — needs rescheduling.', status: 'pending', emergency: false, conflict: true },
-  { id: 'ar5', patientName: 'Angela Ruiz', requestedDate: 'Sep 15, 2026', preferredTime: 'Afternoon (1–3pm)', apptType: 'Cleaning', requestedDoctor: 'Any available doctor', insurance: 'MetLife — Active', notes: 'Regular 6-month cleaning.', status: 'confirmed', emergency: false, conflict: false },
-];
+function formatSlotFull(iso) {
+  return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
 
+function formatSlotTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+// YYYY-MM-DD for the confirm modal's date input — starts from whatever the
+// patient actually requested (if they used the real picker) so staff lands
+// on the right day immediately instead of today by default.
+function requestDateIso(request) {
+  const d = request?.requestedSlot ? new Date(request.requestedSlot) : new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Real appointmentRequests/{id} docs (written by the Patient Portal's
+// OverviewTab — see PatientPortal.js) carry a real GHL calendarId +
+// requestedSlot ISO timestamp when the patient used the live slot picker,
+// so confirming here can book the *exact* real slot they asked for with one
+// click — no re-typing a date/time that already exists. Staff can still
+// pick a different real open slot before confirming if needed. A request
+// with no linked ghlContactId (patient not yet matched to a GHL contact)
+// can't be auto-booked; confirming just records the status and staff
+// books it manually in GHL.
 function AppointmentRequests() {
   const t = useTheme();
-  const [requests, setRequests] = useState(APPOINTMENT_REQUESTS_SEED);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [filter, setFilter] = useState('All');
   const [confirmTarget, setConfirmTarget] = useState(null);
   const [declineTarget, setDeclineTarget] = useState(null);
-  const [suggestTarget, setSuggestTarget] = useState(null);
-  const [confirmForm, setConfirmForm] = useState({ date: '', time: '', doctor: '', notes: '' });
   const [declineMessage, setDeclineMessage] = useState('');
-  const [suggestTime, setSuggestTime] = useState('');
+  const [declining, setDeclining] = useState(false);
+  const [declineError, setDeclineError] = useState('');
   const [notice, setNotice] = useState('');
+
+  const [calendars, setCalendars] = useState([]);
+  const [calendarsLoading, setCalendarsLoading] = useState(false);
+  const [confirmCalendarId, setConfirmCalendarId] = useState('');
+  const [confirmDate, setConfirmDate] = useState('');
+  const [confirmSlots, setConfirmSlots] = useState([]);
+  const [confirmSlotsLoading, setConfirmSlotsLoading] = useState(false);
+  const [confirmSlotsError, setConfirmSlotsError] = useState('');
+  const [confirmSlot, setConfirmSlot] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setLoading(false); return; }
+    const q = query(collection(db, 'appointmentRequests'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, err => { console.error('appointmentRequests listener failed:', err); setLoadError(err.message || 'Could not load requests.'); setLoading(false); });
+    return unsub;
+  }, []);
 
   const confirmedCount = requests.filter(r => r.status === 'confirmed').length;
   const declinedCount = requests.filter(r => r.status === 'declined').length;
@@ -4381,73 +4430,147 @@ function AppointmentRequests() {
   });
 
   function openConfirm(r) {
-    setConfirmForm({ date: r.requestedDate, time: r.preferredTime, doctor: r.requestedDoctor, notes: '' });
+    setConfirmError('');
     setConfirmTarget(r);
+    setConfirmCalendarId(r.calendarId || '');
+    setConfirmDate(requestDateIso(r));
+    setConfirmSlot(r.requestedSlot || '');
   }
 
-  function submitConfirm() {
-    setRequests(rs => rs.map(r => r.id === confirmTarget.id ? { ...r, status: 'confirmed', assignedDoctor: confirmForm.doctor } : r));
-    setNotice(`Confirmation sent to ${confirmTarget.patientName} for ${confirmForm.date}, ${confirmForm.time} with ${confirmForm.doctor}.`);
-    setConfirmTarget(null);
-    setTimeout(() => setNotice(''), 4000);
+  // Real calendars, loaded once the first time the confirm modal opens.
+  useEffect(() => {
+    if (!confirmTarget || !isGhlConfigured || calendars.length > 0) return;
+    setCalendarsLoading(true);
+    getCalendars().then(cals => {
+      setCalendars(cals);
+      setCalendarsLoading(false);
+      setConfirmCalendarId(id => id || (cals[0]?.id ?? ''));
+    }).catch(() => setCalendarsLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmTarget]);
+
+  // Real open slots for the chosen calendar + day — refetched live so a
+  // slot another patient just grabbed can never be double-booked.
+  useEffect(() => {
+    if (!confirmTarget || !confirmCalendarId || !confirmDate) { setConfirmSlots([]); return; }
+    let cancelled = false;
+    setConfirmSlotsLoading(true);
+    setConfirmSlotsError('');
+    const dayStart = new Date(`${confirmDate}T00:00:00`).getTime();
+    const dayEnd = new Date(`${confirmDate}T23:59:59`).getTime();
+    getFreeSlots(confirmCalendarId, { startDate: dayStart, endDate: dayEnd }).then(data => {
+      if (cancelled) return;
+      const flat = Object.values(data || {}).flatMap(v => v?.slots || []).sort();
+      setConfirmSlots(flat);
+      setConfirmSlotsLoading(false);
+    }).catch(err => {
+      if (cancelled) return;
+      setConfirmSlotsError(err.message || 'Could not load open times.');
+      setConfirmSlotsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [confirmTarget, confirmCalendarId, confirmDate]);
+
+  async function submitConfirm() {
+    const r = confirmTarget;
+    if (!confirmCalendarId || !confirmSlot) {
+      setConfirmError('Pick a calendar and an open time to continue.');
+      return;
+    }
+    setConfirming(true);
+    setConfirmError('');
+    const calendarName = calendars.find(c => c.id === confirmCalendarId)?.name || '';
+    try {
+      if (r.ghlContactId) {
+        const result = await createAppointment({ calendarId: confirmCalendarId, contactId: r.ghlContactId, startTime: confirmSlot, title: `${r.patientName} — ${calendarName || 'Appointment'}` });
+        await updateDoc(doc(db, 'appointmentRequests', r.id), {
+          status: 'confirmed', calendarId: confirmCalendarId, calendarName,
+          confirmedSlot: confirmSlot, ghlAppointmentId: result?.id || result?.event?.id || null,
+          confirmedAt: serverTimestamp(),
+        });
+        try {
+          await sendMessage(r.ghlContactId, `Your appointment is confirmed for ${formatSlotFull(confirmSlot)}. See you then!`);
+        } catch {
+          // The booking itself succeeded — a failed confirmation text isn't worth surfacing as an error.
+        }
+      } else {
+        await updateDoc(doc(db, 'appointmentRequests', r.id), {
+          status: 'confirmed', calendarId: confirmCalendarId, calendarName,
+          confirmedSlot: confirmSlot, confirmedAt: serverTimestamp(),
+        });
+      }
+      setNotice(`Confirmed ${r.patientName} for ${formatSlotFull(confirmSlot)}.`);
+      setConfirmTarget(null);
+      setTimeout(() => setNotice(''), 5000);
+    } catch (err) {
+      setConfirmError(err.message || 'Could not book this appointment.');
+    } finally {
+      setConfirming(false);
+    }
   }
 
-  function submitDecline() {
-    setRequests(rs => rs.map(r => r.id === declineTarget.id ? { ...r, status: 'declined' } : r));
-    setNotice(`Decline sent to ${declineTarget.patientName}${declineMessage.trim() ? ' with your message.' : '.'}`);
-    setDeclineTarget(null);
-    setDeclineMessage('');
-    setTimeout(() => setNotice(''), 4000);
-  }
-
-  function submitSuggestion() {
-    setNotice(`Alternate time "${suggestTime}" suggested to ${suggestTarget.patientName}.`);
-    setSuggestTarget(null);
-    setSuggestTime('');
-    setTimeout(() => setNotice(''), 4000);
+  async function submitDecline() {
+    setDeclining(true);
+    setDeclineError('');
+    try {
+      await updateDoc(doc(db, 'appointmentRequests', declineTarget.id), { status: 'declined', declineMessage: declineMessage.trim() });
+      if (declineTarget.ghlContactId && declineMessage.trim()) {
+        try { await sendMessage(declineTarget.ghlContactId, declineMessage.trim()); } catch { /* best-effort */ }
+      }
+      setNotice(`Decline sent to ${declineTarget.patientName}.`);
+      setDeclineTarget(null);
+      setDeclineMessage('');
+      setTimeout(() => setNotice(''), 4000);
+    } catch (err) {
+      setDeclineError(err.message || 'Could not decline this request.');
+    } finally {
+      setDeclining(false);
+    }
   }
 
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
-        <StatCard label="Total requests this week" value={String(requests.length)} color={t.brand} accent={t.accentBlue} sub="Across all channels" />
-        <StatCard label="Average response time" value="38 min" color={t.teal} accent={t.accentTeal} sub="From request to reply" />
+        <StatCard label="Total requests" value={String(requests.length)} color={t.brand} accent={t.accentBlue} sub="Across all channels" />
+        <StatCard label="Pending" value={String(requests.filter(r => r.status === 'pending').length)} color={t.amber} accent={t.accentAmber} sub="Awaiting your response" />
         <StatCard label="Confirmation rate" value={`${confirmationRate}%`} color={t.green} accent={t.accentGreen} sub="Of resolved requests" />
       </div>
 
       {notice && (
         <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '6px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{notice}</div>
       )}
+      {loadError && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.redL, borderRadius: '6px', fontSize: '12.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{loadError}</div>
+      )}
 
       <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
         <FilterPillGroup options={['All', 'Pending', 'Confirmed', 'Declined']} value={filter} onChange={setFilter} />
       </div>
 
-      {filtered.length === 0 && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No requests match this filter.</Card>}
+      {loading && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>Loading…</Card>}
 
-      {filtered.map(r => (
-        <Card key={r.id} className="px-card" style={{ marginBottom: '12px', borderColor: r.emergency ? withAlpha(t.accentRed, .3) : undefined }}>
+      {!loading && filtered.length === 0 && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No requests match this filter.</Card>}
+
+      {!loading && filtered.map(r => (
+        <Card key={r.id} className="px-card" style={{ marginBottom: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-            <Ava initials={initialsOf(r.patientName)} bg={r.emergency ? t.redL : t.brandL} color={r.emergency ? t.red : t.brand} />
+            <Ava initials={initialsOf(r.patientName || 'Patient')} bg={t.brandL} color={t.brand} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
                 <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}><PII>{r.patientName}</PII></span>
-                {r.emergency && <Pill label="Emergency" color={t.red} bg={t.redL} />}
-                {r.conflict && <Pill label="Scheduling conflict" color={t.amber} bg={t.amberL} />}
                 {r.status !== 'pending' && <Pill label={r.status === 'confirmed' ? 'Confirmed' : 'Declined'} color={r.status === 'confirmed' ? t.green : t.muted} bg={r.status === 'confirmed' ? t.greenL : t.bgRow} />}
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px 18px', fontSize: '12.5px', color: t.mid, marginBottom: '8px' }}>
-                <div><span style={{ color: t.muted }}>Requested:</span> {r.requestedDate} · {r.preferredTime}</div>
-                <div><span style={{ color: t.muted }}>Type:</span> {r.apptType}</div>
-                <div><span style={{ color: t.muted }}>Doctor requested:</span> {r.requestedDoctor}</div>
-                <div><span style={{ color: t.muted }}>Insurance:</span> {r.insurance}</div>
+                <div><span style={{ color: t.muted }}>Requested:</span> {r.requestedSlot ? formatSlotFull(r.requestedSlot) : (r.preferredWhen || '—')}</div>
+                {r.calendarName && <div><span style={{ color: t.muted }}>Type:</span> {r.calendarName}</div>}
+                {r.patientPhone && <div><span style={{ color: t.muted }}>Phone:</span> <PII>{r.patientPhone}</PII></div>}
+                {r.status === 'confirmed' && r.confirmedSlot && <div><span style={{ color: t.muted }}>Confirmed for:</span> {formatSlotFull(r.confirmedSlot)}</div>}
               </div>
-              {r.notes && <div style={{ fontSize: '12.5px', color: t.ink2, background: t.bgRow, borderRadius: '8px', padding: '8px 11px', marginBottom: r.status === 'pending' ? '10px' : 0 }}>{r.notes}</div>}
+              {r.reason && <div style={{ fontSize: '12.5px', color: t.ink2, background: t.bgRow, borderRadius: '8px', padding: '8px 11px', marginBottom: r.status === 'pending' ? '10px' : 0 }}>{r.reason}</div>}
               {r.status === 'pending' && (
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   <Btn small primary onClick={() => openConfirm(r)}><Check size={12} /> Confirm</Btn>
                   <Btn small onClick={() => setDeclineTarget(r)}>Decline</Btn>
-                  <Btn small onClick={() => setSuggestTarget(r)}><Clock size={12} /> Suggest different time</Btn>
                 </div>
               )}
             </div>
@@ -4457,25 +4580,60 @@ function AppointmentRequests() {
 
       {confirmTarget && (
         <Modal title={`Confirm — ${confirmTarget.patientName}`} onClose={() => setConfirmTarget(null)}>
-          <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Date</label>
-            <input value={confirmForm.date} onChange={e => setConfirmForm(f => ({ ...f, date: e.target.value }))} style={inputStyle} />
-          </div>
-          <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Time</label>
-            <input value={confirmForm.time} onChange={e => setConfirmForm(f => ({ ...f, time: e.target.value }))} style={inputStyle} />
-          </div>
-          <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Assign to doctor</label>
-            <select value={confirmForm.doctor} onChange={e => setConfirmForm(f => ({ ...f, doctor: e.target.value }))} style={inputStyle}>
-              {DOCTORS_SEED.map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
-          <div style={{ marginBottom: '18px' }}>
-            <label style={labelStyle}>Internal notes (optional)</label>
-            <textarea value={confirmForm.notes} onChange={e => setConfirmForm(f => ({ ...f, notes: e.target.value }))} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-          </div>
-          <Btn primary onClick={submitConfirm}><Send size={13} /> Send confirmation</Btn>
+          {!confirmTarget.ghlContactId && (
+            <div style={{ marginBottom: '14px', padding: '10px 12px', background: t.amberL, borderRadius: '6px', fontSize: '11.5px', color: t.amber, border: `1px solid ${withAlpha(t.accentAmber, .15)}` }}>
+              This patient isn't linked to a GHL contact yet, so this won't auto-book — you'll need to add the appointment in GHL yourself. Confirming here just marks the request resolved.
+            </div>
+          )}
+          {!isGhlConfigured ? (
+            <div style={{ fontSize: '12.5px', color: t.muted }}>Connect GoHighLevel to pick a real calendar slot here.</div>
+          ) : (
+            <>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={labelStyle}>Calendar</label>
+                {calendarsLoading ? (
+                  <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>Loading…</div>
+                ) : (
+                  <select value={confirmCalendarId} onChange={e => setConfirmCalendarId(e.target.value)} style={inputStyle}>
+                    <option value="">Select a calendar…</option>
+                    {calendars.map(c => <option key={c.id} value={c.id}>{c.name || c.id}</option>)}
+                  </select>
+                )}
+              </div>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={labelStyle}>Date</label>
+                <input type="date" value={confirmDate} onChange={e => setConfirmDate(e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ marginBottom: '18px' }}>
+                <label style={labelStyle}>Open times</label>
+                {confirmSlotsLoading ? (
+                  <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>Loading…</div>
+                ) : confirmSlotsError ? (
+                  <div style={{ fontSize: '12px', color: t.red }}>{confirmSlotsError}</div>
+                ) : confirmSlots.length === 0 ? (
+                  <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>No open times this day — try another date.</div>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {confirmSlots.map(iso => (
+                      <button
+                        key={iso} type="button" onClick={() => setConfirmSlot(iso)} className="px-btn"
+                        style={{
+                          padding: '7px 12px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit',
+                          border: confirmSlot === iso ? 'none' : `1px solid ${t.border}`,
+                          background: confirmSlot === iso ? t.brand : t.bgCard,
+                          color: confirmSlot === iso ? 'white' : t.mid,
+                        }}
+                      >{formatSlotTime(iso)}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+          {confirmError && <div style={{ marginBottom: '12px', fontSize: '11.5px', color: t.red }}>{confirmError}</div>}
+          <Btn primary onClick={submitConfirm} disabled={confirming}>
+            {confirming ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} {confirming ? 'Booking…' : 'Confirm & book'}
+          </Btn>
         </Modal>
       )}
 
@@ -4489,17 +4647,8 @@ function AppointmentRequests() {
               style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
             />
           </div>
-          <Btn primary onClick={submitDecline}><Send size={13} /> Send decline</Btn>
-        </Modal>
-      )}
-
-      {suggestTarget && (
-        <Modal title={`Suggest a different time — ${suggestTarget.patientName}`} onClose={() => setSuggestTarget(null)}>
-          <div style={{ marginBottom: '18px' }}>
-            <label style={labelStyle}>Suggested date & time</label>
-            <input value={suggestTime} onChange={e => setSuggestTime(e.target.value)} placeholder="e.g. Sep 23, 2:00pm" style={inputStyle} />
-          </div>
-          <Btn primary onClick={submitSuggestion} disabled={!suggestTime.trim()}><Send size={13} /> Send suggestion</Btn>
+          {declineError && <div style={{ marginBottom: '12px', fontSize: '11.5px', color: t.red }}>{declineError}</div>}
+          <Btn primary onClick={submitDecline} disabled={declining}>{declining ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} {declining ? 'Sending…' : 'Send decline'}</Btn>
         </Modal>
       )}
     </div>
