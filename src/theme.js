@@ -8,7 +8,7 @@ export const light = {
   ink: '#1A1B1E',
   ink2: '#2C2D30',
   mid: '#52555C',
-  muted: '#8A8D94',
+  muted: '#6D6F75', // WCAG AA (4.5:1) against bgCard and bgPage — the original #8A8D94 only cleared 3.3:1
   border: '#DDDFE3',
   border2: '#EDEEF0',
   brand: '#2563EB',
@@ -61,7 +61,7 @@ export const dark = {
   ink: '#E8E9EC',
   ink2: '#D0D2D8',
   mid: '#9EA1A8',
-  muted: '#6B6E75',
+  muted: '#81858E', // WCAG AA (4.5:1) against bgCard and bgPage — the original #6B6E75 only cleared 3.3:1
   border: '#2E2F33',
   border2: '#26272B',
   brand: '#3B82F6',

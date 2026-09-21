@@ -42,10 +42,10 @@ function GoogleIcon() {
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, htmlFor, children }) {
   return (
     <div style={{ marginBottom: '14px' }}>
-      <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>{label}</label>
+      <label htmlFor={htmlFor} style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>{label}</label>
       {children}
     </div>
   );
@@ -305,8 +305,20 @@ function Auth() {
         .px-authlink { color: ${t.brand}; text-decoration: none; font-weight: 500; }
         .px-authlink:hover { text-decoration: underline; }
         input:focus, select:focus { outline: 2px solid ${withAlpha(t.teal, .35)}; }
+        a:focus-visible, button:focus-visible, [tabindex]:focus-visible,
+        input:focus-visible, select:focus-visible, textarea:focus-visible {
+          outline: 2px solid ${t.brand};
+          outline-offset: 2px;
+        }
         @keyframes pxSpin { to { transform: rotate(360deg); } }
         .px-spin { animation: pxSpin .6s linear infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001ms !important;
+          }
+        }
       `}</style>
 
       <div style={{ width: '100%', maxWidth: cardWidth, transition: 'max-width .15s ease' }}>
@@ -332,6 +344,7 @@ function Auth() {
             <form onSubmit={verify2FA}>
               {useBackupCode ? (
                 <input
+                  aria-label="Backup code"
                   value={backupCodeValue}
                   onChange={e => setBackupCodeValue(e.target.value)}
                   placeholder="XXXX-XXXX"
@@ -339,6 +352,7 @@ function Auth() {
                 />
               ) : (
                 <input
+                  aria-label="6-digit verification code"
                   value={twoFACode}
                   onChange={e => setTwoFACode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="000000"
@@ -393,6 +407,7 @@ function Auth() {
                   key={key}
                   type="button"
                   onClick={() => switchRole(key)}
+                  aria-pressed={role === key}
                   className="px-btn"
                   style={{
                     flex: 1, padding: '8px 10px', borderRadius: '9px', border: 'none',
@@ -429,8 +444,8 @@ function Auth() {
 
           {mode === 'forgot' ? (
             <form onSubmit={handleForgotPassword}>
-              <Field label="Email">
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@practice.com" style={inputStyle} />
+              <Field label="Email" htmlFor="auth-forgot-email">
+                <input id="auth-forgot-email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@practice.com" style={inputStyle} />
               </Field>
               <button type="submit" disabled={loading} className="px-btn" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '11px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', cursor: loading ? 'default' : 'pointer', opacity: loading ? .7 : 1, marginTop: '4px' }}>
                 {loading && <Loader2 size={14} className="px-spin" />} Send reset link
@@ -439,31 +454,31 @@ function Auth() {
           ) : (
             <form onSubmit={mode === 'login' ? handleLogin : handleSignup}>
               {mode === 'signup' && role === 'staff' && (
-                <Field label="Your name">
-                  <input required value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Dr. Rivera" style={inputStyle} />
+                <Field label="Your name" htmlFor="auth-owner-name">
+                  <input id="auth-owner-name" required value={ownerName} onChange={e => setOwnerName(e.target.value)} placeholder="Dr. Rivera" style={inputStyle} />
                 </Field>
               )}
 
               {mode === 'signup' && role === 'staff' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <Field label="Practice name">
-                    <input required value={practiceName} onChange={e => setPracticeName(e.target.value)} placeholder="Bright Smiles Dental" style={inputStyle} />
+                  <Field label="Practice name" htmlFor="auth-practice-name">
+                    <input id="auth-practice-name" required value={practiceName} onChange={e => setPracticeName(e.target.value)} placeholder="Bright Smiles Dental" style={inputStyle} />
                   </Field>
-                  <Field label="Phone number">
-                    <input required value={phone} onChange={e => setPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
+                  <Field label="Phone number" htmlFor="auth-practice-phone">
+                    <input id="auth-practice-phone" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
                   </Field>
                 </div>
               )}
 
               {mode === 'signup' && role === 'staff' && (
-                <Field label="Practice address">
-                  <input required value={address} onChange={e => setAddress(e.target.value)} placeholder="4210 W Bay Ave, Tampa FL 33616" style={inputStyle} />
+                <Field label="Practice address" htmlFor="auth-practice-address">
+                  <input id="auth-practice-address" required value={address} onChange={e => setAddress(e.target.value)} placeholder="4210 W Bay Ave, Tampa FL 33616" style={inputStyle} />
                 </Field>
               )}
 
               {mode === 'signup' && role === 'staff' && (
-                <Field label="Practice management software">
-                  <select value={pmSoftware} onChange={e => setPmSoftware(e.target.value)} style={inputStyle}>
+                <Field label="Practice management software" htmlFor="auth-pm-software">
+                  <select id="auth-pm-software" value={pmSoftware} onChange={e => setPmSoftware(e.target.value)} style={inputStyle}>
                     {PM_SOFTWARE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </Field>
@@ -471,37 +486,37 @@ function Auth() {
 
               {mode === 'signup' && role === 'patient' && (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <Field label="Full name">
-                    <input required value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="Jordan Ellis" style={inputStyle} />
+                  <Field label="Full name" htmlFor="auth-patient-name">
+                    <input id="auth-patient-name" required value={patientName} onChange={e => setPatientName(e.target.value)} placeholder="Jordan Ellis" style={inputStyle} />
                   </Field>
-                  <Field label="Phone number">
-                    <input required value={patientPhone} onChange={e => setPatientPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
+                  <Field label="Phone number" htmlFor="auth-patient-phone">
+                    <input id="auth-patient-phone" required value={patientPhone} onChange={e => setPatientPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
                   </Field>
                 </div>
               )}
 
               {mode === 'signup' && role === 'patient' && (
-                <Field label="Date of birth">
-                  <input type="date" required value={patientDob} onChange={e => setPatientDob(e.target.value)} style={inputStyle} />
+                <Field label="Date of birth" htmlFor="auth-patient-dob">
+                  <input id="auth-patient-dob" type="date" required value={patientDob} onChange={e => setPatientDob(e.target.value)} style={inputStyle} />
                 </Field>
               )}
 
-              <Field label="Email">
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@practice.com" style={inputStyle} />
+              <Field label="Email" htmlFor="auth-email">
+                <input id="auth-email" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@practice.com" style={inputStyle} />
               </Field>
 
               <div style={{ display: mode === 'signup' ? 'grid' : 'block', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <Field label="Password">
+                <Field label="Password" htmlFor="auth-password">
                   <div style={{ position: 'relative' }}>
-                    <input type={showPassword ? 'text' : 'password'} required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" style={{ ...inputStyle, paddingRight: '38px' }} />
-                    <button type="button" onClick={() => setShowPassword(s => !s)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.muted, cursor: 'pointer', display: 'flex' }}>
+                    <input id="auth-password" type={showPassword ? 'text' : 'password'} required minLength={6} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" style={{ ...inputStyle, paddingRight: '38px' }} />
+                    <button type="button" onClick={() => setShowPassword(s => !s)} aria-label={showPassword ? 'Hide password' : 'Show password'} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.muted, cursor: 'pointer', display: 'flex' }}>
                       {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
                 </Field>
                 {mode === 'signup' && (
-                  <Field label="Confirm password">
-                    <input type={showPassword ? 'text' : 'password'} required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" style={inputStyle} />
+                  <Field label="Confirm password" htmlFor="auth-confirm-password">
+                    <input id="auth-confirm-password" type={showPassword ? 'text' : 'password'} required minLength={6} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="••••••••" style={inputStyle} />
                   </Field>
                 )}
               </div>
