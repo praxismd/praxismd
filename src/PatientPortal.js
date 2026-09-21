@@ -402,13 +402,14 @@ function OverviewTab({ setNotice, profile, onOpenMessages }) {
           {isGhlConfigured && !calendarsError ? (
             <>
               <div style={{ marginBottom: '12px' }}>
-                <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Appointment type</label>
+                <label htmlFor="pp-appt-calendar" style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Appointment type</label>
                 {calendarsLoading ? (
                   <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>Loading…</div>
                 ) : calendars.length === 0 ? (
                   <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>Your practice hasn't set up online booking yet.</div>
                 ) : (
                   <select
+                    id="pp-appt-calendar"
                     value={selectedCalendarId} onChange={e => setSelectedCalendarId(e.target.value)}
                     style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}
                   >
@@ -418,8 +419,9 @@ function OverviewTab({ setNotice, profile, onOpenMessages }) {
               </div>
               {calendars.length > 0 && (
                 <div style={{ marginBottom: '12px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Day</label>
+                  <label htmlFor="pp-appt-date" style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Day</label>
                   <input
+                    id="pp-appt-date"
                     type="date" value={selectedDate} min={todayIsoDate()} onChange={e => setSelectedDate(e.target.value)}
                     style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
                   />
@@ -454,8 +456,9 @@ function OverviewTab({ setNotice, profile, onOpenMessages }) {
             </>
           ) : (
             <div style={{ marginBottom: '12px' }}>
-              <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>When works for you?</label>
+              <label htmlFor="pp-req-when" style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>When works for you?</label>
               <input
+                id="pp-req-when"
                 value={reqWhen} onChange={e => setReqWhen(e.target.value)} placeholder="e.g. Next Tuesday afternoon"
                 style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
               />
@@ -463,8 +466,9 @@ function OverviewTab({ setNotice, profile, onOpenMessages }) {
           )}
 
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Reason for visit</label>
+            <label htmlFor="pp-req-reason" style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Reason for visit</label>
             <input
+              id="pp-req-reason"
               value={reqReason} onChange={e => setReqReason(e.target.value)} placeholder="e.g. Routine cleaning, tooth pain..."
               style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
             />
@@ -506,6 +510,8 @@ function ChartTab({ profile }) {
               onClick={() => setSelectedTooth(isSelected ? null : n)}
               className="px-btn px-tooth"
               title={`Tooth #${n} — ${meta.label}`}
+              aria-label={`Tooth #${n} — ${meta.label}`}
+              aria-pressed={isSelected}
               style={{
                 width: '28px', height: '30px', borderRadius: '10px 10px 6px 6px', fontSize: '10px', fontWeight: '700',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontFamily: 'inherit',
@@ -842,8 +848,8 @@ function InsuranceTab({ setNotice, profile }) {
         {showForm && (
           <div className="px-expand" style={{ marginTop: '14px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-              <input value={payer} onChange={e => setPayer(e.target.value)} placeholder="New insurance payer" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
-              <input value={memberId} onChange={e => setMemberId(e.target.value)} placeholder="Member ID" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+              <input aria-label="New insurance payer" value={payer} onChange={e => setPayer(e.target.value)} placeholder="New insurance payer" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+              <input aria-label="Member ID" value={memberId} onChange={e => setMemberId(e.target.value)} placeholder="Member ID" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
             </div>
             <PortalBtn primary onClick={submitUpdate}>Send to practice</PortalBtn>
           </div>
@@ -1109,11 +1115,11 @@ function FamilyTab({ setNotice, profile }) {
       {showForm && (
         <div className="px-expand" style={{ padding: '14px', background: t.bgRow, borderRadius: '10px', marginBottom: '14px', border: `1px solid ${t.border2}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Full name" style={inputStyle} />
-            <select value={form.relation} onChange={e => setForm(f => ({ ...f, relation: e.target.value }))} style={inputStyle}>
+            <input aria-label="Full name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Full name" style={inputStyle} />
+            <select aria-label="Relation" value={form.relation} onChange={e => setForm(f => ({ ...f, relation: e.target.value }))} style={inputStyle}>
               {['Spouse', 'Child', 'Parent', 'Other'].map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <input value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} placeholder="Date of birth" style={inputStyle} />
+            <input aria-label="Date of birth" value={form.dob} onChange={e => setForm(f => ({ ...f, dob: e.target.value }))} placeholder="Date of birth" style={inputStyle} />
           </div>
           <PortalBtn primary onClick={addMember} disabled={saving}>{saving ? 'Adding…' : 'Add to account'}</PortalBtn>
         </div>
@@ -1230,6 +1236,7 @@ function MessagesTab({ profile }) {
 
       <div style={{ display: 'flex', gap: '8px' }}>
         <input
+          aria-label="Message"
           value={draft} onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') send(); }}
           placeholder="Type a message…"
@@ -1343,13 +1350,32 @@ function PatientPortal() {
         @keyframes pxFadeIn { from { opacity: 0; } to { opacity: 1; } }
         .px-expand { animation: pxFadeIn .15s ease; }
         .px-tabs-row { scrollbar-width: thin; }
+        a:focus-visible, button:focus-visible, [tabindex]:focus-visible,
+        input:focus-visible, select:focus-visible, textarea:focus-visible {
+          outline: 2px solid ${t.brand};
+          outline-offset: 2px;
+        }
+        .px-skip-link {
+          position: absolute; top: -999px; left: 12px; z-index: 1000;
+          background: ${t.brand}; color: white; padding: 10px 16px; border-radius: 6px;
+          font-size: 13px; font-weight: 600; text-decoration: none;
+        }
+        .px-skip-link:focus { top: 12px; }
         @media (max-width: 640px) {
           .px-tabs-row::-webkit-scrollbar { display: none; }
           .px-tabs-row { scrollbar-width: none; }
           [style*="grid-template-columns"] { grid-template-columns: 1fr !important; }
           [style*="grid-template-columns"] > * { min-width: 0 !important; }
         }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001ms !important;
+          }
+        }
       `}</style>
+      <a href="#main-content" className="px-skip-link">Skip to main content</a>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 28px', borderBottom: `1px solid ${t.border}`, background: t.bgCard }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '9px', textDecoration: 'none' }}>
@@ -1377,11 +1403,12 @@ function PatientPortal() {
           </div>
         </div>
 
-        <div ref={tabsRowRef} className="px-tabs-row" style={{ display: 'flex', gap: '4px', borderBottom: `1px solid ${t.border}`, marginBottom: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <nav ref={tabsRowRef} aria-label="Patient portal sections" className="px-tabs-row" style={{ display: 'flex', gap: '4px', borderBottom: `1px solid ${t.border}`, marginBottom: '20px', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {TABS.map(tb => (
             <button
               key={tb.key}
               onClick={() => setTab(tb.key)}
+              aria-current={tab === tb.key ? 'page' : undefined}
               className="px-tab"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: '6px', flexShrink: 0, whiteSpace: 'nowrap',
@@ -1392,12 +1419,13 @@ function PatientPortal() {
               }}
             ><tb.Icon size={14} />{tb.label}</button>
           ))}
-        </div>
+        </nav>
 
         {notice && (
-          <div style={{ background: t.tealL, color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, borderRadius: '10px', padding: '10px 14px', fontSize: '12.5px', marginBottom: '18px' }}>{notice}</div>
+          <div role="status" style={{ background: t.tealL, color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, borderRadius: '10px', padding: '10px 14px', fontSize: '12.5px', marginBottom: '18px' }}>{notice}</div>
         )}
 
+        <main id="main-content">
         {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} onOpenMessages={() => setTab('messages')} />}
         {tab === 'chart' && <ChartTab profile={profile} />}
         {tab === 'treatmentPlans' && <TreatmentPlansTab profile={profile} />}
@@ -1424,6 +1452,7 @@ function PatientPortal() {
             </div>
           </div>
         )}
+        </main>
       </div>
     </div>
   );
