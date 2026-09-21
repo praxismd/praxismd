@@ -4421,69 +4421,66 @@ function AppointmentRequests() {
 }
 
 // ─── TREATMENT PLANS ───────────────────────────────────────
-const TREATMENT_PLANS_SEED = [
-  {
-    id: 'tp1', patientName: 'James Lee', planName: 'Full Mouth Restoration', createdDate: 'Aug 20, 2026',
-    procedures: [
-      { code: 'D2740', name: 'Crown', cost: 1200, status: 'Accepted' },
-      { code: 'D2740', name: 'Crown', cost: 1200, status: 'Accepted' },
-      { code: 'D4341', name: 'Periodontal Scaling', cost: 280, status: 'Pending' },
-    ],
-  },
-  {
-    id: 'tp2', patientName: 'Robert Park', planName: 'Implant Replacement', createdDate: 'Sep 5, 2026',
-    procedures: [
-      { code: 'D6010', name: 'Implant Placement', cost: 3200, status: 'Pending' },
-      { code: 'D1110', name: 'Cleaning', cost: 150, status: 'Accepted' },
-    ],
-  },
-  {
-    id: 'tp3', patientName: 'Sarah Martinez', planName: 'Preventive Care Plan', createdDate: 'Jul 12, 2026',
-    procedures: [
-      { code: 'D1110', name: 'Cleaning', cost: 150, status: 'Accepted' },
-      { code: 'D1110', name: 'Cleaning', cost: 150, status: 'Accepted' },
-    ],
-  },
-  {
-    id: 'tp4', patientName: 'David Wong', planName: 'Crown & Scaling', createdDate: 'Sep 1, 2026',
-    procedures: [
-      { code: 'D2740', name: 'Crown', cost: 1200, status: 'Declined' },
-      { code: 'D4341', name: 'Scaling', cost: 280, status: 'Accepted' },
-    ],
-  },
-];
+const PROC_STATUS_COLOR = { accepted: 'green', pending: 'amber', declined: 'red' };
+const PROC_STATUS_LABEL = { accepted: 'Accepted', pending: 'Pending', declined: 'Declined' };
 
-const PROC_STATUS_COLOR = { Accepted: 'green', Pending: 'amber', Declined: 'red' };
+function formatPlanDate(ts) {
+  return ts?.toDate ? ts.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+}
 
+// Staff propose treatment plans (patientTreatmentPlans/{id}, staff-written
+// and scoped by practiceId, same trust model as Insurance/Prescriptions);
+// patients accept or decline each procedure from the Patient Portal via the
+// respondToTreatmentPlan Cloud Function. Procedures live as a map keyed by
+// string index rather than an array so a patient's response to one
+// procedure can be written with a single dotted field path
+// (`procedures.${i}.status`) without a read-modify-write race against a
+// staff edit to the same plan.
 function TreatmentPlans({ contacts }) {
   const t = useTheme();
-  const [plans, setPlans] = useState(TREATMENT_PLANS_SEED);
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState('active');
   const [expandedId, setExpandedId] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ patient: '', planName: '', procedures: [{ code: '', cost: '' }] });
-  const [sentNotice, setSentNotice] = useState('');
+  const [createForm, setCreateForm] = useState({ contactId: '', planName: '', procedures: [{ code: '', cost: '' }] });
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [sendState, setSendState] = useState({}); // plan id -> 'sending' | 'sent' | error string
   const contactList = contacts || [];
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth.currentUser) { setLoading(false); return; }
+    const q = query(collection(db, 'patientTreatmentPlans'), where('practiceId', '==', auth.currentUser.uid), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setPlans(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, []);
+
   const enriched = plans.map(p => {
-    const totalValue = p.procedures.reduce((sum, pr) => sum + pr.cost, 0);
-    const accepted = p.procedures.filter(pr => pr.status === 'Accepted').length;
-    const pending = p.procedures.filter(pr => pr.status === 'Pending').length;
-    const declined = p.procedures.filter(pr => pr.status === 'Declined').length;
+    const procedures = Object.entries(p.procedures || {})
+      .map(([i, pr]) => ({ ...pr, index: Number(i) }))
+      .sort((a, b) => a.index - b.index);
+    const totalValue = procedures.reduce((sum, pr) => sum + (pr.cost || 0), 0);
+    const accepted = procedures.filter(pr => pr.status === 'accepted').length;
+    const pending = procedures.filter(pr => pr.status === 'pending').length;
+    const declined = procedures.filter(pr => pr.status === 'declined').length;
     const isActive = pending > 0;
     const statusLabel = isActive ? 'In progress' : (declined > 0 && accepted === 0 ? 'Declined' : 'Completed');
-    return { ...p, totalValue, accepted, pending, declined, isActive, statusLabel };
+    return { ...p, procedures, totalValue, accepted, pending, declined, isActive, statusLabel };
   });
 
   const visible = enriched.filter(p => view === 'active' ? p.isActive : !p.isActive);
 
   const allProcedures = enriched.flatMap(p => p.procedures);
-  const resolvedProcedures = allProcedures.filter(pr => pr.status === 'Accepted' || pr.status === 'Declined');
+  const resolvedProcedures = allProcedures.filter(pr => pr.status === 'accepted' || pr.status === 'declined');
   const acceptanceRate = resolvedProcedures.length > 0
-    ? Math.round((resolvedProcedures.filter(pr => pr.status === 'Accepted').length / resolvedProcedures.length) * 100)
+    ? Math.round((resolvedProcedures.filter(pr => pr.status === 'accepted').length / resolvedProcedures.length) * 100)
     : 0;
 
   function addProcedureRow() {
@@ -4494,22 +4491,51 @@ function TreatmentPlans({ contacts }) {
     setCreateForm(f => ({ ...f, procedures: f.procedures.map((p, j) => j === i ? { ...p, [field]: value } : p) }));
   }
 
-  function createPlan() {
-    if (!createForm.patient.trim() || !createForm.planName.trim()) return;
-    const procedures = createForm.procedures
-      .filter(p => p.code.trim() && p.cost)
-      .map(p => ({ code: p.code.trim(), name: p.code.trim(), cost: Number(p.cost) || 0, status: 'Pending' }));
-    setPlans(list => [{
-      id: `tp-new-${Date.now()}`, patientName: createForm.patient.trim(), planName: createForm.planName.trim(),
-      createdDate: 'Just now', procedures: procedures.length ? procedures : [{ code: '—', name: '—', cost: 0, status: 'Pending' }],
-    }, ...list]);
-    setShowCreate(false);
-    setCreateForm({ patient: '', planName: '', procedures: [{ code: '', cost: '' }] });
+  async function createPlan() {
+    const contact = contactList.find(c => c.id === createForm.contactId);
+    if (!contact || !createForm.planName.trim()) {
+      setCreateError('Select a patient and name the plan to continue.');
+      return;
+    }
+    const rows = createForm.procedures.filter(p => p.code.trim() && p.cost);
+    if (rows.length === 0) {
+      setCreateError('Add at least one procedure.');
+      return;
+    }
+    const procedures = {};
+    rows.forEach((p, i) => {
+      procedures[i] = { code: p.code.trim(), name: p.code.trim(), cost: Number(p.cost) || 0, status: 'pending' };
+    });
+    setCreating(true);
+    setCreateError('');
+    try {
+      await addDoc(collection(db, 'patientTreatmentPlans'), {
+        practiceId: auth.currentUser.uid,
+        ghlContactId: contact.id,
+        patientName: contact.name,
+        planName: createForm.planName.trim(),
+        procedures,
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser.uid,
+      });
+      setShowCreate(false);
+      setCreateForm({ contactId: '', planName: '', procedures: [{ code: '', cost: '' }] });
+    } catch (err) {
+      setCreateError(err.message || 'Could not create the plan.');
+    } finally {
+      setCreating(false);
+    }
   }
 
-  function sendToPatient(plan) {
-    setSentNotice(`Payment and approval link sent to ${plan.patientName} via SMS.`);
-    setTimeout(() => setSentNotice(''), 4000);
+  async function sendToPatient(plan) {
+    setSendState(s => ({ ...s, [plan.id]: 'sending' }));
+    try {
+      await sendMessage(plan.ghlContactId, `Hi ${plan.patientName}, your treatment plan "${plan.planName}" is ready to review — log into your patient portal to accept or decline each procedure.`);
+      setSendState(s => ({ ...s, [plan.id]: 'sent' }));
+      setTimeout(() => setSendState(s => { const next = { ...s }; delete next[plan.id]; return next; }), 4000);
+    } catch (err) {
+      setSendState(s => ({ ...s, [plan.id]: err.message || 'Could not send the text.' }));
+    }
   }
 
   return (
@@ -4519,10 +4545,6 @@ function TreatmentPlans({ contacts }) {
         <StatCard label="Active plan value" value={`$${enriched.filter(p => p.isActive).reduce((s, p) => s + p.totalValue, 0).toLocaleString()}`} color={t.brand} accent={t.accentBlue} sub="Across in-progress plans" />
         <StatCard label="Plans this month" value={String(plans.length)} color={t.purple} accent={t.accentPurple} sub="Created across all patients" />
       </div>
-
-      {sentNotice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.greenL, borderRadius: '6px', fontSize: '12.5px', color: t.green, border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>{sentNotice}</div>
-      )}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
         <div style={{ display: 'flex', gap: '6px' }}>
@@ -4536,9 +4558,11 @@ function TreatmentPlans({ contacts }) {
         <Btn primary onClick={() => setShowCreate(true)}><Plus size={14} /> Create treatment plan</Btn>
       </div>
 
-      {visible.length === 0 && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No {view === 'active' ? 'active' : 'completed'} plans.</Card>}
+      {loading && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>Loading…</Card>}
 
-      {visible.map(p => {
+      {!loading && visible.length === 0 && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>No {view === 'active' ? 'active' : 'completed'} plans.</Card>}
+
+      {!loading && visible.map(p => {
         const isExpanded = expandedId === p.id;
         const total = p.procedures.length;
         return (
@@ -4550,7 +4574,7 @@ function TreatmentPlans({ contacts }) {
                   <span style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}><PII>{p.patientName}</PII></span>
                   <span style={{ fontSize: '12.5px', color: t.muted }}>· {p.planName}</span>
                 </div>
-                <div style={{ fontSize: '11.5px', color: t.muted }}>${p.totalValue.toLocaleString()} · {total} procedure{total === 1 ? '' : 's'} · Created {p.createdDate}</div>
+                <div style={{ fontSize: '11.5px', color: t.muted }}>${p.totalValue.toLocaleString()} · {total} procedure{total === 1 ? '' : 's'} · Created {formatPlanDate(p.createdAt)}</div>
                 <div style={{ display: 'flex', height: '3px', borderRadius: '3px', overflow: 'hidden', marginTop: '8px', background: t.bgRow }}>
                   {p.accepted > 0 && <div style={{ width: `${(p.accepted / total) * 100}%`, background: t.green }} />}
                   {p.pending > 0 && <div style={{ width: `${(p.pending / total) * 100}%`, background: t.amber }} />}
@@ -4566,12 +4590,19 @@ function TreatmentPlans({ contacts }) {
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '8px 0', borderBottom: i < p.procedures.length - 1 ? `1px solid ${t.border2}` : 'none' }}>
                     <span style={{ fontSize: '11.5px', fontWeight: '600', color: t.muted, width: '54px', flexShrink: 0 }}>{pr.code}</span>
                     <span style={{ flex: 1, fontSize: '13px', color: t.ink2 }}>{pr.name}</span>
-                    <span style={{ fontSize: '13px', color: t.mid, width: '70px', textAlign: 'right' }}>${pr.cost.toLocaleString()}</span>
-                    <Pill label={pr.status} color={t[PROC_STATUS_COLOR[pr.status]]} bg={t[`${PROC_STATUS_COLOR[pr.status]}L`]} />
+                    <span style={{ fontSize: '13px', color: t.mid, width: '70px', textAlign: 'right' }}>${(pr.cost || 0).toLocaleString()}</span>
+                    <Pill label={PROC_STATUS_LABEL[pr.status] || pr.status} color={t[PROC_STATUS_COLOR[pr.status]]} bg={t[`${PROC_STATUS_COLOR[pr.status]}L`]} />
                   </div>
                 ))}
                 {p.isActive && (
-                  <Btn small primary style={{ marginTop: '10px' }} onClick={() => sendToPatient(p)}><Send size={12} /> Send to patient</Btn>
+                  <>
+                    <Btn small primary style={{ marginTop: '10px' }} disabled={sendState[p.id] === 'sending'} onClick={() => sendToPatient(p)}>
+                      {sendState[p.id] === 'sending' ? <Loader2 size={12} className="px-spin" /> : <Send size={12} />} {sendState[p.id] === 'sent' ? 'Sent to patient' : 'Send to patient'}
+                    </Btn>
+                    {sendState[p.id] && sendState[p.id] !== 'sending' && sendState[p.id] !== 'sent' && (
+                      <div style={{ marginTop: '8px', fontSize: '11.5px', color: t.red }}>{sendState[p.id]}</div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -4583,10 +4614,10 @@ function TreatmentPlans({ contacts }) {
         <Modal title="Create treatment plan" onClose={() => setShowCreate(false)}>
           <div style={{ marginBottom: '12px' }}>
             <label style={labelStyle}>Patient</label>
-            <input value={createForm.patient} onChange={e => setCreateForm(f => ({ ...f, patient: e.target.value }))} placeholder="Search patients…" list="tp-patient-list" style={inputStyle} />
-            <datalist id="tp-patient-list">
-              {contactList.map(c => <option key={c.id} value={c.name} />)}
-            </datalist>
+            <select value={createForm.contactId} onChange={e => setCreateForm(f => ({ ...f, contactId: e.target.value }))} style={inputStyle}>
+              <option value="">Select a patient…</option>
+              {contactList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
           <div style={{ marginBottom: '12px' }}>
             <label style={labelStyle}>Plan name</label>
@@ -4600,7 +4631,8 @@ function TreatmentPlans({ contacts }) {
             </div>
           ))}
           <Btn small onClick={addProcedureRow} style={{ marginBottom: '18px' }}><Plus size={12} /> Add procedure</Btn>
-          <Btn primary onClick={createPlan}>Create plan</Btn>
+          {createError && <div style={{ marginBottom: '12px', fontSize: '11.5px', color: t.red }}>{createError}</div>}
+          <Btn primary onClick={createPlan} disabled={creating}>{creating ? <Loader2 size={13} className="px-spin" /> : null} {creating ? 'Creating…' : 'Create plan'}</Btn>
         </Modal>
       )}
     </div>

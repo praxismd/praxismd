@@ -3,12 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './firebase';
-import { signPatientDocument, requestPrescriptionRefill } from './api/patients';
+import { signPatientDocument, requestPrescriptionRefill, respondToTreatmentPlan } from './api/patients';
 import { light, withAlpha } from './theme';
 import {
   CalendarClock, MessageSquare, User, LogOut, Loader2, AlertTriangle,
   Stethoscope, Receipt, CreditCard, Download, Info, Home, Shield, FileText, CheckCircle2, PenLine,
-  PillIcon, Users, Plus, RotateCcw,
+  PillIcon, Users, Plus, RotateCcw, ClipboardList, X,
 } from './icons';
 
 const t = light;
@@ -31,6 +31,7 @@ const STATUS_META = {
 const TABS = [
   { key: 'overview', label: 'Overview', Icon: Home },
   { key: 'chart', label: 'My Chart', Icon: Stethoscope },
+  { key: 'treatmentPlans', label: 'Treatment Plans', Icon: ClipboardList },
   { key: 'prescriptions', label: 'Prescriptions', Icon: PillIcon },
   { key: 'insurance', label: 'Insurance', Icon: Shield },
   { key: 'documents', label: 'Documents', Icon: FileText },
@@ -190,6 +191,29 @@ function useChart(profile) {
   }, [profile?.ghlContactId]);
 
   return { toothStatus, history, loading };
+}
+
+// Live treatment plans for the signed-in patient — staff propose these from
+// the dashboard's Treatment Plans tab (see App.js's TreatmentPlans),
+// matched by ghlContactId like everything else. Procedures are stored as a
+// map keyed by string index rather than an array (see respondToTreatmentPlan
+// in functions/index.js) so accepting/declining one procedure never risks
+// clobbering another patient action or a staff edit made at the same time.
+function useTreatmentPlans(profile) {
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !profile?.ghlContactId) { setLoading(false); return; }
+    const q = query(collection(db, 'patientTreatmentPlans'), where('ghlContactId', '==', profile.ghlContactId), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setPlans(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, [profile?.ghlContactId]);
+
+  return { plans, loading };
 }
 
 // Live insurance profile for the signed-in patient — a single doc, staff-
@@ -440,6 +464,104 @@ function ChartTab({ profile }) {
           </div>
         ))}
       </div>
+    </>
+  );
+}
+
+const PLAN_PROC_STATUS_COLOR = { accepted: 'green', pending: 'amber', declined: 'red' };
+const PLAN_PROC_STATUS_LABEL = { accepted: 'Accepted', pending: 'Pending', declined: 'Declined' };
+
+function formatPlanDate(ts) {
+  return ts?.toDate ? ts.toDate().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+}
+
+function TreatmentPlansTab({ profile }) {
+  const { plans, loading } = useTreatmentPlans(profile);
+  const [respondState, setRespondState] = useState({}); // "planId:index" -> 'responding' | error string
+
+  async function respond(planId, index, response) {
+    const key = `${planId}:${index}`;
+    setRespondState(s => ({ ...s, [key]: 'responding' }));
+    try {
+      await respondToTreatmentPlan(planId, index, response);
+      setRespondState(s => { const next = { ...s }; delete next[key]; return next; });
+    } catch (err) {
+      setRespondState(s => ({ ...s, [key]: err.message || 'Could not send your response.' }));
+    }
+  }
+
+  if (loading) {
+    return <div style={{ ...cardStyle, textAlign: 'center', color: t.muted, fontSize: '12.5px' }}>Loading…</div>;
+  }
+
+  if (plans.length === 0) {
+    return (
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <ClipboardList size={17} color={t.brand} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Your treatment plans</div>
+        </div>
+        <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '10px' }}>
+          {profile?.ghlContactId ? 'No treatment plans on file yet.' : "No treatment plans yet — once your practice links your account, any plans they propose will show up here."}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {plans.map(plan => {
+        const procedures = Object.entries(plan.procedures || {})
+          .map(([i, pr]) => ({ ...pr, index: Number(i) }))
+          .sort((a, b) => a.index - b.index);
+        const totalValue = procedures.reduce((sum, pr) => sum + (pr.cost || 0), 0);
+        const pendingCount = procedures.filter(pr => pr.status === 'pending').length;
+        return (
+          <div key={plan.id} style={{ ...cardStyle, marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <ClipboardList size={17} color={t.brand} />
+                <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>{plan.planName}</div>
+              </div>
+              <div style={{ fontSize: '12px', fontWeight: '600', color: t.ink2 }}>${totalValue.toLocaleString()}</div>
+            </div>
+            <div style={{ fontSize: '11.5px', color: t.muted, marginBottom: '14px' }}>
+              Proposed {formatPlanDate(plan.createdAt)} {pendingCount > 0 ? `· ${pendingCount} procedure${pendingCount === 1 ? '' : 's'} awaiting your response` : '· All procedures resolved'}
+            </div>
+            {procedures.map(pr => {
+              const key = `${plan.id}:${pr.index}`;
+              const state = respondState[key];
+              return (
+                <div key={pr.index} style={{ padding: '12px 14px', background: t.bgRow, borderRadius: '10px', marginBottom: '8px', border: `1px solid ${t.border2}` }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink2 }}>{pr.name}</div>
+                      <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{pr.code} · ${(pr.cost || 0).toLocaleString()}</div>
+                    </div>
+                    {pr.status === 'pending' ? (
+                      state === 'responding' ? (
+                        <PortalBtn><Loader2 size={13} className="px-spin" /> Sending…</PortalBtn>
+                      ) : (
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          <PortalBtn onClick={() => respond(plan.id, pr.index, 'declined')}><X size={13} /> Decline</PortalBtn>
+                          <PortalBtn primary onClick={() => respond(plan.id, pr.index, 'accepted')}><CheckCircle2 size={13} /> Accept</PortalBtn>
+                        </div>
+                      )
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11.5px', color: t[PLAN_PROC_STATUS_COLOR[pr.status]], whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        <CheckCircle2 size={13} /> {PLAN_PROC_STATUS_LABEL[pr.status] || pr.status}
+                      </div>
+                    )}
+                  </div>
+                  {state && state !== 'responding' && (
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: t.red }}>{state}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
     </>
   );
 }
@@ -1141,6 +1263,7 @@ function PatientPortal() {
 
         {tab === 'overview' && <OverviewTab setNotice={setNotice} profile={profile} onOpenMessages={() => setTab('messages')} />}
         {tab === 'chart' && <ChartTab profile={profile} />}
+        {tab === 'treatmentPlans' && <TreatmentPlansTab profile={profile} />}
         {tab === 'prescriptions' && <PrescriptionsTab profile={profile} />}
         {tab === 'insurance' && <InsuranceTab setNotice={setNotice} profile={profile} />}
         {tab === 'documents' && <DocumentsTab setNotice={setNotice} profile={profile} />}

@@ -54,3 +54,14 @@ export async function requestPrescriptionRefill(prescriptionId) {
   const res = await call({ prescriptionId });
   return res.data; // { requested: true }
 }
+
+// Patient-side: accepts or declines one procedure on one of their own
+// treatment plans.
+export async function respondToTreatmentPlan(planId, procedureIndex, response) {
+  if (!isFirebaseConfigured) {
+    throw new Error('Firebase isn\'t connected yet — add REACT_APP_FIREBASE_* to your .env.local.');
+  }
+  const call = httpsCallable(functions, 'respondToTreatmentPlan');
+  const res = await call({ planId, procedureIndex, response });
+  return res.data; // { status }
+}
