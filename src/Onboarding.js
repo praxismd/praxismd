@@ -50,10 +50,10 @@ const inputStyle = {
   boxSizing: 'border-box',
 };
 
-function Field({ label, children }) {
+function Field({ label, htmlFor, children }) {
   return (
     <div style={{ marginBottom: '14px' }}>
-      <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>{label}</label>
+      <label htmlFor={htmlFor} style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>{label}</label>
       {children}
     </div>
   );
@@ -62,11 +62,11 @@ function Field({ label, children }) {
 function ProgressBar({ step }) {
   const pct = (step / STEPS.length) * 100;
   return (
-    <div style={{ marginBottom: '24px' }}>
+    <nav aria-label={`Onboarding progress: step ${step} of ${STEPS.length}, ${STEPS[step - 1].label}`} style={{ marginBottom: '24px' }}>
       <div style={{ height: '5px', borderRadius: '3px', background: t.border, overflow: 'hidden', marginBottom: '18px' }}>
         <div style={{ height: '100%', borderRadius: '3px', background: t.brand, width: `${pct}%`, transition: 'width .25s ease' }} />
       </div>
-      <div style={{ display: 'flex', alignItems: 'center' }}>
+      <div style={{ display: 'flex', alignItems: 'center' }} aria-hidden="true">
         {STEPS.map((s, i) => {
           const idx = i + 1;
           const complete = idx < step;
@@ -91,7 +91,7 @@ function ProgressBar({ step }) {
           );
         })}
       </div>
-    </div>
+    </nav>
   );
 }
 
@@ -225,7 +225,7 @@ function Onboarding() {
 
   if (!authChecked || loadingDoc) {
     return (
-      <div style={{ fontFamily: 'Inter, sans-serif', minHeight: '100vh', background: t.bgPage, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div role="status" aria-label="Loading" style={{ fontFamily: 'Inter, sans-serif', minHeight: '100vh', background: t.bgPage, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Loader2 size={22} color={t.brand} className="px-spin" />
         <style>{`@keyframes pxSpin { to { transform: rotate(360deg); } } .px-spin { animation: pxSpin .7s linear infinite; }`}</style>
       </div>
@@ -238,11 +238,23 @@ function Onboarding() {
         .px-btn { transition: transform .08s ease, box-shadow .15s ease; }
         .px-btn:active { transform: scale(0.97); }
         input:focus, select:focus { outline: 2px solid ${withAlpha(t.teal, .35)}; }
+        a:focus-visible, button:focus-visible, [tabindex]:focus-visible,
+        input:focus-visible, select:focus-visible, textarea:focus-visible {
+          outline: 2px solid ${t.brand};
+          outline-offset: 2px;
+        }
         @keyframes pxSpin { to { transform: rotate(360deg); } }
         .px-spin { animation: pxSpin .6s linear infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001ms !important;
+          }
+        }
       `}</style>
 
-      <div style={{ maxWidth: '560px', margin: '0 auto' }}>
+      <main style={{ maxWidth: '560px', margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '9px', marginBottom: '28px' }}>
           <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: t.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '13px' }}>Px</div>
           <span style={{ fontSize: '19px', fontWeight: '700', color: t.ink }}>PraxisMD</span>
@@ -252,26 +264,26 @@ function Onboarding() {
           <ProgressBar step={step} />
 
           {error && (
-            <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '18px' }}>{error}</div>
+            <div role="alert" style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.accentRed, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '18px' }}>{error}</div>
           )}
 
           {step === 1 && (
             <StepShell title="Tell us about your practice" subtitle="We'll use this on patient-facing messages, forms, and claims.">
-              <Field label="Practice name">
-                <input required value={practiceName} onChange={e => setPracticeName(e.target.value)} placeholder="Bright Smiles Dental" style={inputStyle} />
+              <Field label="Practice name" htmlFor="ob-practice-name">
+                <input id="ob-practice-name" required value={practiceName} onChange={e => setPracticeName(e.target.value)} placeholder="Bright Smiles Dental" style={inputStyle} />
               </Field>
-              <Field label="Address">
-                <input required value={address} onChange={e => setAddress(e.target.value)} placeholder="4210 W Bay Ave, Tampa FL 33616" style={inputStyle} />
+              <Field label="Address" htmlFor="ob-address">
+                <input id="ob-address" required value={address} onChange={e => setAddress(e.target.value)} placeholder="4210 W Bay Ave, Tampa FL 33616" style={inputStyle} />
               </Field>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <Field label="Phone number">
-                  <input required value={phone} onChange={e => setPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
+                <Field label="Phone number" htmlFor="ob-phone">
+                  <input id="ob-phone" required value={phone} onChange={e => setPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
                 </Field>
-                <Field label="NPI number">
-                  <input value={npi} onChange={e => setNpi(e.target.value)} placeholder="1234567890" style={inputStyle} />
+                <Field label="NPI number" htmlFor="ob-npi">
+                  <input id="ob-npi" value={npi} onChange={e => setNpi(e.target.value)} placeholder="1234567890" style={inputStyle} />
                 </Field>
               </div>
-              <button onClick={handleStep1Next} disabled={saving} className="px-btn" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '11px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? .7 : 1, marginTop: '6px' }}>
+              <button type="button" onClick={handleStep1Next} disabled={saving} className="px-btn" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '11px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? .7 : 1, marginTop: '6px' }}>
                 {saving ? <Loader2 size={14} className="px-spin" /> : <>Continue <ArrowRight size={14} /></>}
               </button>
             </StepShell>
@@ -279,8 +291,8 @@ function Onboarding() {
 
           {step === 2 && (
             <StepShell title="Connect your practice management software" subtitle="Select what you use, then follow the steps to connect it.">
-              <Field label="Practice management software">
-                <select value={pmSoftware} onChange={e => setPmSoftware(e.target.value)} style={inputStyle}>
+              <Field label="Practice management software" htmlFor="ob-pm-software">
+                <select id="ob-pm-software" value={pmSoftware} onChange={e => setPmSoftware(e.target.value)} style={inputStyle}>
                   {PM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
               </Field>
@@ -293,10 +305,10 @@ function Onboarding() {
                 </ol>
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setStep(1)} className="px-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '11px 16px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '13.5px', fontWeight: '500', cursor: 'pointer' }}>
+                <button type="button" onClick={() => setStep(1)} className="px-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '11px 16px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '13.5px', fontWeight: '500', cursor: 'pointer' }}>
                   <ArrowLeft size={14} /> Back
                 </button>
-                <button onClick={handleStep2Next} disabled={saving} className="px-btn" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '11px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? .7 : 1 }}>
+                <button type="button" onClick={handleStep2Next} disabled={saving} className="px-btn" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '11px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? .7 : 1 }}>
                   {saving ? <Loader2 size={14} className="px-spin" /> : <>I've connected {pmSoftware} <ArrowRight size={14} /></>}
                 </button>
               </div>
@@ -305,17 +317,17 @@ function Onboarding() {
 
           {step === 3 && (
             <StepShell title="Set up your phone number" subtitle="PraxisMD routes calls and texts through your OpenPhone number.">
-              <Field label="OpenPhone number">
-                <input required value={openPhoneNumber} onChange={e => setOpenPhoneNumber(e.target.value)} placeholder="(813) 555-0199" style={inputStyle} />
+              <Field label="OpenPhone number" htmlFor="ob-openphone">
+                <input id="ob-openphone" required value={openPhoneNumber} onChange={e => setOpenPhoneNumber(e.target.value)} placeholder="(813) 555-0199" style={inputStyle} />
               </Field>
               <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '20px', lineHeight: '1.5' }}>
                 Don't have an OpenPhone number yet? Create one at openphone.com, then paste it here — PraxisMD will use it for AI front desk calls, reminders, and two-way texting.
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={() => setStep(2)} className="px-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '11px 16px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '13.5px', fontWeight: '500', cursor: 'pointer' }}>
+                <button type="button" onClick={() => setStep(2)} className="px-btn" style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '11px 16px', borderRadius: '10px', border: `1px solid ${t.border}`, background: t.bgCard, color: t.ink2, fontSize: '13.5px', fontWeight: '500', cursor: 'pointer' }}>
                   <ArrowLeft size={14} /> Back
                 </button>
-                <button onClick={handleStep3Next} disabled={saving} className="px-btn" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '11px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? .7 : 1 }}>
+                <button type="button" onClick={handleStep3Next} disabled={saving} className="px-btn" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '11px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? .7 : 1 }}>
                   {saving ? <Loader2 size={14} className="px-spin" /> : <>Continue <ArrowRight size={14} /></>}
                 </button>
               </div>
@@ -347,13 +359,13 @@ function Onboarding() {
                   </div>
                 </div>
               </div>
-              <button onClick={handleFinish} disabled={saving} className="px-btn" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '12px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '14px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? .7 : 1 }}>
+              <button type="button" onClick={handleFinish} disabled={saving} className="px-btn" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px', padding: '12px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '14px', fontWeight: '600', cursor: saving ? 'default' : 'pointer', opacity: saving ? .7 : 1 }}>
                 {saving ? <Loader2 size={14} className="px-spin" /> : <>Go to dashboard <ArrowRight size={14} /></>}
               </button>
             </StepShell>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }
