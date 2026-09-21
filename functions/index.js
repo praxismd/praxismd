@@ -423,3 +423,50 @@ exports.requestPrescriptionRefill = onCall(async (request) => {
 
   return { requested: true };
 });
+
+// Patient-side: accepts or declines one procedure on one of their own
+// treatment plans. Procedures are stored as a map keyed by index (not an
+// array) so this can update a single procedure's status with a dotted
+// field path — updateDoc's `procedures.${i}.status` — without a
+// read-modify-write race against a staff member editing the same plan.
+// Routed through a function so a patient can only ever flip this one
+// status field, never the procedure's code/name/cost.
+exports.respondToTreatmentPlan = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to respond to a treatment plan.');
+  }
+
+  const { planId, procedureIndex, response } = request.data || {};
+  if (!planId || typeof planId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A treatment plan is required.');
+  }
+  if (procedureIndex === undefined || procedureIndex === null || isNaN(Number(procedureIndex))) {
+    throw new HttpsError('invalid-argument', 'A procedure is required.');
+  }
+  if (response !== 'accepted' && response !== 'declined') {
+    throw new HttpsError('invalid-argument', 'Response must be "accepted" or "declined".');
+  }
+
+  const patientSnap = await db.collection('patients').doc(request.auth.uid).get();
+  const ghlContactId = patientSnap.exists ? patientSnap.data().ghlContactId : null;
+  if (!ghlContactId) {
+    throw new HttpsError('failed-precondition', 'Your account isn\'t linked to a practice yet.');
+  }
+
+  const planRef = db.collection('patientTreatmentPlans').doc(planId);
+  const planSnap = await planRef.get();
+  if (!planSnap.exists || planSnap.data().ghlContactId !== ghlContactId) {
+    throw new HttpsError('not-found', 'That treatment plan could not be found.');
+  }
+  const idx = String(Number(procedureIndex));
+  if (!planSnap.data().procedures || !(idx in planSnap.data().procedures)) {
+    throw new HttpsError('not-found', 'That procedure could not be found.');
+  }
+
+  await planRef.update({
+    [`procedures.${idx}.status`]: response,
+    [`procedures.${idx}.respondedAt`]: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { status: response };
+});
