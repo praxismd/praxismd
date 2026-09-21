@@ -620,11 +620,27 @@ function App() {
   // unlike the other nav badges here which are still static placeholders.
   const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
   useEffect(() => {
-    if (!isFirebaseConfigured) return;
-    const q = query(collection(db, 'appointmentRequests'), where('status', '==', 'pending'));
+    if (!isFirebaseConfigured || !auth.currentUser) return;
+    const q = query(collection(db, 'appointmentRequests'), where('practiceId', '==', auth.currentUser.uid), where('status', '==', 'pending'));
     const unsub = onSnapshot(q, snap => setPendingRequestsCount(snap.size), () => {});
     return unsub;
   }, []);
+
+  // Live count for the sidebar's "Waitlist" badge.
+  const [waitlistCount, setWaitlistCount] = useState(0);
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth.currentUser) return;
+    const q = query(collection(db, 'waitlistEntries'), where('practiceId', '==', auth.currentUser.uid));
+    const unsub = onSnapshot(q, snap => setWaitlistCount(snap.size), () => {});
+    return unsub;
+  }, []);
+
+  // Real unread-conversation count for the sidebar's "Inbox" badge — fetched
+  // once on load the same way Inbox itself fetches conversations (GHL's API
+  // isn't a live push source like Firestore, so this doesn't update until
+  // the next page load or Inbox's own refetch).
+  const { data: sidebarConversations } = useGhlFetch(getConversations);
+  const unreadInboxCount = isGhlConfigured ? (sidebarConversations || []).filter(c => c.unreadCount).length : 0;
 
   const { data: campaignsData, loading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useGhlFetch(getCampaigns);
   const ghlCampaigns = isGhlConfigured ? (campaignsData || []).map(mapCampaign) : null;
@@ -808,12 +824,12 @@ function App() {
         <nav style={{ padding: showFull ? '8px 12px' : '8px 8px', flex: 1, overflowY: 'auto' }}>
           {MAIN_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Main" collapsed={!showFull} />}
           {isTabVisible('overview', userRole, rolePermissions) && <NavItem label="Overview" Icon={LayoutDashboard} tab="overview" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
-          {isTabVisible('inbox', userRole, rolePermissions) && <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={navigateTo} badge="4" badgeColor={t.red} collapsed={!showFull} />}
+          {isTabVisible('inbox', userRole, rolePermissions) && <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={navigateTo} badge={unreadInboxCount > 0 ? String(unreadInboxCount) : undefined} badgeColor={t.red} collapsed={!showFull} />}
           {isTabVisible('campaigns', userRole, rolePermissions) && <NavItem label="Campaigns" Icon={Megaphone} tab="campaigns" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
           {isTabVisible('recall', userRole, rolePermissions) && <NavItem label="Recall" Icon={RotateCcw} tab="recall" active={activeTab} onClick={navigateTo} badge="89" badgeColor={t.amber} collapsed={!showFull} />}
           {isTabVisible('calendar', userRole, rolePermissions) && <NavItem label="Calendar" Icon={CalendarIcon} tab="calendar" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
           {isTabVisible('appointmentrequests', userRole, rolePermissions) && <NavItem label="Appointment Requests" Icon={CalendarPlus} tab="appointmentrequests" active={activeTab} onClick={navigateTo} badge={pendingRequestsCount > 0 ? String(pendingRequestsCount) : undefined} badgeColor={t.amber} collapsed={!showFull} />}
-          {isTabVisible('waitlist', userRole, rolePermissions) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={navigateTo} badge="12" badgeColor={t.teal} collapsed={!showFull} />}
+          {isTabVisible('waitlist', userRole, rolePermissions) && <NavItem label="Waitlist" Icon={ClipboardList} tab="waitlist" active={activeTab} onClick={navigateTo} badge={waitlistCount > 0 ? String(waitlistCount) : undefined} badgeColor={t.teal} collapsed={!showFull} />}
           {PRACTICE_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Practice" collapsed={!showFull} />}
           {isTabVisible('patients', userRole, rolePermissions) && <NavItem label="Patients" Icon={Users} tab="patients" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
           {isTabVisible('portal', userRole, rolePermissions) && <NavItem label="Patient Portal" Icon={Contact} tab="portal" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
@@ -1453,8 +1469,8 @@ function Inbox({ contacts }) {
   }, []);
 
   useEffect(() => {
-    if (!isFirebaseConfigured) return;
-    const q = query(collection(db, 'patientMessages'), orderBy('createdAt', 'asc'));
+    if (!isFirebaseConfigured || !auth.currentUser) return;
+    const q = query(collection(db, 'patientMessages'), where('practiceId', '==', auth.currentUser.uid), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, snap => {
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const byUid = {};
@@ -1536,6 +1552,7 @@ function Inbox({ contacts }) {
         await addDoc(collection(db, 'patientMessages'), {
           patientUid: selected.uid,
           patientName: selected.name,
+          practiceId: auth.currentUser.uid,
           sender: 'staff',
           text,
           createdAt: serverTimestamp(),
@@ -2053,8 +2070,8 @@ function PatientRequests() {
   const [loading, setLoading] = useState(isFirebaseConfigured);
 
   useEffect(() => {
-    if (!isFirebaseConfigured) { setLoading(false); return; }
-    const q = query(collection(db, 'appointmentRequests'), orderBy('createdAt', 'desc'));
+    if (!isFirebaseConfigured || !auth.currentUser) { setLoading(false); return; }
+    const q = query(collection(db, 'appointmentRequests'), where('practiceId', '==', auth.currentUser.uid), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, snap => {
       setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
@@ -4408,8 +4425,8 @@ function AppointmentRequests() {
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
   useEffect(() => {
-    if (!isFirebaseConfigured) { setLoading(false); return; }
-    const q = query(collection(db, 'appointmentRequests'), orderBy('createdAt', 'desc'));
+    if (!isFirebaseConfigured || !auth.currentUser) { setLoading(false); return; }
+    const q = query(collection(db, 'appointmentRequests'), where('practiceId', '==', auth.currentUser.uid), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, snap => {
       setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);

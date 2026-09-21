@@ -1183,6 +1183,7 @@ function MessagesTab({ profile }) {
       await addDoc(collection(db, 'patientMessages'), {
         patientUid: user.uid,
         patientName: profile?.name || user.email,
+        practiceId: profile?.practiceId || null,
         sender: 'patient',
         text: draft.trim(),
         createdAt: serverTimestamp(),
