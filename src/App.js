@@ -4910,6 +4910,7 @@ function MembershipPlans({ contacts }) {
   const [linkGenerating, setLinkGenerating] = useState(false);
   const [linkError, setLinkError] = useState('');
   const [cancelState, setCancelState] = useState({}); // member id -> 'saving' | error string
+  const [deletePlanState, setDeletePlanState] = useState({}); // plan id -> 'confirm' | 'deleting' | error string
   const [loadError, setLoadError] = useState('');
   const contactList = contacts || [];
 
@@ -5054,6 +5055,24 @@ function MembershipPlans({ contacts }) {
     }
   }
 
+  // Two-click delete: first click arms a "Confirm delete?" state, second
+  // click (within the same render) actually deletes. Only removes the plan
+  // itself — existing enrollments on it are left alone (the members table
+  // already handles a missing plan gracefully, showing "—" for plan/price).
+  async function deletePlan(id) {
+    if (deletePlanState[id] !== 'confirm') {
+      setDeletePlanState(s => ({ ...s, [id]: 'confirm' }));
+      return;
+    }
+    setDeletePlanState(s => ({ ...s, [id]: 'deleting' }));
+    try {
+      await deleteDoc(doc(db, 'membershipPlans', id));
+      setDeletePlanState(s => { const next = { ...s }; delete next[id]; return next; });
+    } catch (err) {
+      setDeletePlanState(s => ({ ...s, [id]: err.message || 'Could not delete.' }));
+    }
+  }
+
   const monthlyNum = Number(createForm.monthlyPrice) || 0;
   const annualNum = Number(createForm.annualPrice) || 0;
   const annualSavings = monthlyNum > 0 && annualNum > 0 ? Math.max(0, monthlyNum * 12 - annualNum) : 0;
@@ -5097,7 +5116,7 @@ function MembershipPlans({ contacts }) {
                   <span style={{ fontSize: '12px', color: t.muted }}>/mo · ${plan.annualPrice}/yr</span>
                 </div>
                 <div style={{ fontSize: '12px', color: t.green, fontWeight: '600', marginBottom: '12px' }}>${stats.revenue.toLocaleString()}/mo revenue</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                   {(plan.benefits || []).map((b, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', color: t.mid }}>
                       <Check size={13} color={t.green} style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -5105,6 +5124,19 @@ function MembershipPlans({ contacts }) {
                     </div>
                   ))}
                 </div>
+                {deletePlanState[plan.id] === 'deleting' ? (
+                  <Loader2 size={13} className="px-spin" color={t.muted} />
+                ) : (
+                  <button
+                    onClick={() => deletePlan(plan.id)} className="px-btn"
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', fontSize: '11.5px', fontWeight: '600', color: deletePlanState[plan.id] === 'confirm' ? t.red : t.muted }}
+                  >
+                    <Trash2 size={12} /> {deletePlanState[plan.id] === 'confirm' ? 'Click again to delete' : 'Delete plan'}
+                  </button>
+                )}
+                {deletePlanState[plan.id] && deletePlanState[plan.id] !== 'confirm' && deletePlanState[plan.id] !== 'deleting' && (
+                  <div style={{ marginTop: '6px', fontSize: '11px', color: t.red }}>{deletePlanState[plan.id]}</div>
+                )}
               </Card>
             );
           })}
