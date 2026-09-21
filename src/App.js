@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, createContext, useContext } from 'react';
+import { useState, useEffect, useRef, useId, createContext, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
 import { collection, query, where, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
@@ -252,11 +252,11 @@ function GlobalSearchModal({ open, onClose, contacts, campaigns, query, setQuery
   function go(tab) { setActiveTab(tab); onClose(); }
 
   const sectionLabelStyle = { fontSize: '10.5px', fontWeight: '700', color: t.muted, textTransform: 'uppercase', letterSpacing: '.5px', padding: '10px 4px 6px' };
-  const rowStyle = { display: 'flex', alignItems: 'center', gap: '11px', padding: '9px 8px', borderRadius: '9px', cursor: 'pointer' };
+  const rowStyle = { display: 'flex', alignItems: 'center', gap: '11px', padding: '9px 8px', borderRadius: '9px', cursor: 'pointer', width: '100%', textAlign: 'left', border: 'none', background: 'transparent', fontFamily: 'inherit' };
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(15,15,20,.5)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh' }}>
-      <div onClick={e => e.stopPropagation()} className="px-glass" style={{ width: '560px', maxWidth: '92vw', maxHeight: '66vh', borderRadius: '10px', boxShadow: '0 24px 60px rgba(0,0,0,.35)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Search" className="px-glass" style={{ width: '560px', maxWidth: '92vw', maxHeight: '66vh', borderRadius: '10px', boxShadow: '0 24px 60px rgba(0,0,0,.35)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '15px 16px', borderBottom: `1px solid ${t.border2}`, flexShrink: 0 }}>
           <Search size={16} color={t.muted} />
           <input
@@ -276,14 +276,14 @@ function GlobalSearchModal({ open, onClose, contacts, campaigns, query, setQuery
             <div>
               <div style={sectionLabelStyle}>Patients</div>
               {patientResults.map(p => (
-                <div key={p.id} className="px-row" onClick={() => go('patients')} style={rowStyle}>
+                <button key={p.id} type="button" className="px-row" onClick={() => go('patients')} style={rowStyle}>
                   <Ava initials={initialsOf(p.name)} bg={t.brandL} color={t.brand} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{p.name}</PII></div>
                     <div style={{ fontSize: '11px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><PII>{p.email}</PII></div>
                   </div>
                   <Pill label={p.tag || 'Active'} color={t.brand} bg={t.brandL} />
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -292,7 +292,7 @@ function GlobalSearchModal({ open, onClose, contacts, campaigns, query, setQuery
             <div>
               <div style={sectionLabelStyle}>Campaigns</div>
               {campaignResults.map((c, i) => (
-                <div key={i} className="px-row" onClick={() => go('campaigns')} style={rowStyle}>
+                <button key={i} type="button" className="px-row" onClick={() => go('campaigns')} style={rowStyle}>
                   <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: t.brandL, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <Megaphone size={14} color={t.brand} />
                   </div>
@@ -301,7 +301,7 @@ function GlobalSearchModal({ open, onClose, contacts, campaigns, query, setQuery
                     <div style={{ fontSize: '11px', color: t.muted, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.sub}</div>
                   </div>
                   <Pill label={c.pill} color={t[c.pillColor] || t.brand} bg={t[`${c.pillColor}L`] || t.brandL} />
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -310,12 +310,12 @@ function GlobalSearchModal({ open, onClose, contacts, campaigns, query, setQuery
             <div>
               <div style={sectionLabelStyle}>Quick actions</div>
               {quickActions.map(tab => (
-                <div key={tab} className="px-row" onClick={() => go(tab)} style={rowStyle}>
+                <button key={tab} type="button" className="px-row" onClick={() => go(tab)} style={rowStyle}>
                   <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: t.bgRow, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                     <ArrowRight size={14} color={t.mid} />
                   </div>
                   <div style={{ fontSize: '13px', color: t.ink2 }}>Go to {TAB_LABELS[tab]}</div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -752,8 +752,30 @@ function App() {
         opacity: 0; pointer-events: none; transition: opacity .12s ease; z-index: 200;
       }
       .px-tooltip-wrap:hover .px-tooltip-bubble { opacity: 1; }
-      input:focus, select:focus { outline: 2px solid ${withAlpha(t.teal, .35)}; }
+      input:focus, select:focus, textarea:focus { outline: 2px solid ${withAlpha(t.teal, .35)}; }
       body { line-height: 1.6; }
+      /* Visible keyboard focus on every interactive element — mouse/touch
+         clicks don't trigger :focus-visible, so this never adds a ring
+         around a click, only around real keyboard navigation. */
+      a:focus-visible, button:focus-visible, [tabindex]:focus-visible,
+      input:focus-visible, select:focus-visible, textarea:focus-visible {
+        outline: 2px solid ${t.brand};
+        outline-offset: 2px;
+      }
+      .px-skip-link {
+        position: absolute; top: -999px; left: 12px; z-index: 1000;
+        background: ${t.brand}; color: white; padding: 10px 16px; border-radius: 6px;
+        font-size: 13px; font-weight: 600; text-decoration: none;
+      }
+      .px-skip-link:focus { top: 12px; }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
       @keyframes pxSpin { to { transform: rotate(360deg); } }
       .px-spin { animation: pxSpin .7s linear infinite; }
       @keyframes pxSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
@@ -777,6 +799,7 @@ function App() {
       }
     `}</style>
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'Inter, sans-serif' }}>
+      <a href="#main-content" className="px-skip-link">Skip to main content</a>
 
       {/* SIDEBAR */}
       {isMobileView && mobileDrawerOpen && (
@@ -821,7 +844,7 @@ function App() {
           )}
         </div>
 
-        <nav style={{ padding: showFull ? '8px 12px' : '8px 8px', flex: 1, overflowY: 'auto' }}>
+        <nav aria-label="Main navigation" style={{ padding: showFull ? '8px 12px' : '8px 8px', flex: 1, overflowY: 'auto' }}>
           {MAIN_TABS.some(tb => isTabVisible(tb, userRole, rolePermissions)) && <NavSection label="Main" collapsed={!showFull} />}
           {isTabVisible('overview', userRole, rolePermissions) && <NavItem label="Overview" Icon={LayoutDashboard} tab="overview" active={activeTab} onClick={navigateTo} collapsed={!showFull} />}
           {isTabVisible('inbox', userRole, rolePermissions) && <NavItem label="Inbox" Icon={InboxIcon} tab="inbox" active={activeTab} onClick={navigateTo} badge={unreadInboxCount > 0 ? String(unreadInboxCount) : undefined} badgeColor={t.red} collapsed={!showFull} />}
@@ -1008,7 +1031,7 @@ function App() {
         </div>
 
         {/* PAGE CONTENT */}
-        <div key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
+        <main id="main-content" key={activeTab} className="px-page-transition" style={{ padding: '22px 26px', flex: 1 }}>
           {gate('overview', <Overview setActiveTab={setActiveTab} userRole={userRole} />)}
           {gate('inbox', <Inbox contacts={contacts} userRole={userRole} />)}
           {gate('campaigns', <Campaigns userRole={userRole} ghlCampaigns={ghlCampaigns} loading={campaignsLoading} error={campaignsError} onRetry={refetchCampaigns} />)}
@@ -1030,7 +1053,7 @@ function App() {
           {gate('waitlist', <Waitlist contacts={contacts} userRole={userRole} />)}
           {gate('calendar', <Calendar userRole={userRole} />)}
           {gate('appointmentrequests', <AppointmentRequests userRole={userRole} />)}
-        </div>
+        </main>
       </div>
 
       <GlobalSearchModal
@@ -1098,25 +1121,29 @@ function NavItem({ label, Icon, tab, active, onClick, badge, badgeColor, collaps
   const t = useTheme();
   const isActive = active === tab;
   return (
-    <div
+    <button
+      type="button"
       className="px-navitem px-tooltip-wrap"
       onClick={() => onClick(tab)}
+      aria-current={isActive ? 'page' : undefined}
       style={{
         display: 'flex', alignItems: 'center', gap: collapsed ? 0 : '10px',
         justifyContent: collapsed ? 'center' : 'flex-start',
         padding: collapsed ? '10px 0' : '8px 11px',
         borderRadius: '4px', marginBottom: '1px',
         borderLeft: `2px solid ${isActive ? t.brand : 'transparent'}`,
+        borderTop: 'none', borderRight: 'none', borderBottom: 'none',
         background: 'transparent',
         color: isActive ? t.brand : t.muted,
         cursor: 'pointer', fontSize: '13px', fontWeight: isActive ? '600' : '400',
+        width: '100%', textAlign: 'left', fontFamily: 'inherit',
       }}
     >
       <Icon size={16} style={{ flexShrink: 0 }} />
       {!collapsed && <span style={{ flex: 1 }}>{label}</span>}
       {!collapsed && badge && <span style={{ fontSize: '10px', fontWeight: '600', padding: '2px 7px', borderRadius: '4px', background: badgeColor + '22', color: badgeColor }}>{badge}</span>}
       {collapsed && <span className="px-tooltip-bubble">{label}{badge ? ` · ${badge}` : ''}</span>}
-    </div>
+    </button>
   );
 }
 
@@ -1135,8 +1162,29 @@ function StatCard({ label, value, color, accent, sub, icon: ValueIcon, decorIcon
   );
 }
 
+// Fires onClick from the keyboard the same way a real button would (Enter
+// or Space) — used on the handful of shared components below that render a
+// clickable <div> instead of a <button> for layout reasons.
+function clickableDivProps(onClick) {
+  if (!onClick) return {};
+  return {
+    role: 'button',
+    tabIndex: 0,
+    onKeyDown: e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(e); }
+    },
+  };
+}
+
 function Card({ children, style, onClick, className }) {
-  return <div className={className ? `px-card px-glass ${className}` : 'px-card px-glass'} onClick={onClick} style={{ borderRadius: '8px', padding: '16px', ...style }}>{children}</div>;
+  return (
+    <div
+      className={className ? `px-card px-glass ${className}` : 'px-card px-glass'}
+      onClick={onClick}
+      {...clickableDivProps(onClick)}
+      style={{ borderRadius: '8px', padding: '16px', ...style }}
+    >{children}</div>
+  );
 }
 
 function CardTitle({ children }) {
@@ -1150,7 +1198,14 @@ function Pill({ label, color, bg }) {
 
 function RowItem({ children, style, onClick }) {
   const t = useTheme();
-  return <div className="px-row" onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 0', borderRadius: 0, background: 'transparent', borderBottom: `1px solid ${t.rowBorder}`, ...style }}>{children}</div>;
+  return (
+    <div
+      className="px-row"
+      onClick={onClick}
+      {...clickableDivProps(onClick)}
+      style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 0', borderRadius: 0, background: 'transparent', borderBottom: `1px solid ${t.rowBorder}`, ...style }}
+    >{children}</div>
+  );
 }
 
 function Ava({ initials, bg, color }) {
@@ -1216,18 +1271,50 @@ function ErrorState({ message, onRetry }) {
   );
 }
 
+// Shared behavior for Modal/SlidePanel: Escape closes it, focus moves into
+// the dialog on open and returns to whatever triggered it on close, and Tab
+// is trapped inside the dialog so keyboard focus can never silently land on
+// background content while it's open.
+function useDialogA11y(onClose) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    const container = ref.current;
+    const focusable = container?.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    (focusable?.[0] || container)?.focus();
+
+    function onKeyDown(e) {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key !== 'Tab' || !focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return ref;
+}
+
 function SlidePanel({ title, subtitle, onClose, children }) {
   const t = useTheme();
+  const dialogRef = useDialogA11y(onClose);
+  const titleId = useId();
   return (
     <>
       <div onClick={onClose} className="px-panel-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 200 }} />
-      <div className="px-panel px-glass" style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: '420px', maxWidth: '92vw', borderLeft: `1px solid ${t.glassBorder}`, boxShadow: '-8px 0 30px rgba(0,0,0,.18)', zIndex: 201, overflowY: 'auto' }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="px-panel px-glass" style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: '420px', maxWidth: '92vw', borderLeft: `1px solid ${t.glassBorder}`, boxShadow: '-8px 0 30px rgba(0,0,0,.18)', zIndex: 201, overflowY: 'auto' }}>
         <div className="px-glass" style={{ padding: '16px 20px', borderBottom: `1px solid ${t.rowBorder}`, borderLeft: 'none', borderRight: 'none', borderTop: 'none', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'sticky', top: 0 }}>
           <div>
-            <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
+            <div id={titleId} style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
             {subtitle && <div style={{ fontSize: '12px', color: t.muted, marginTop: '2px' }}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '6px', flexShrink: 0 }}>
+          <button onClick={onClose} aria-label="Close panel" style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '6px', flexShrink: 0 }}>
             <X size={16} />
           </button>
         </div>
@@ -1263,13 +1350,15 @@ function ToggleSwitch({ checked, onChange }) {
 
 function Modal({ title, onClose, children }) {
   const t = useTheme();
+  const dialogRef = useDialogA11y(onClose);
+  const titleId = useId();
   return (
     <>
       <div onClick={onClose} className="px-panel-backdrop" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.35)', zIndex: 300 }} />
-      <div className="px-expand px-glass" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '420px', maxWidth: '92vw', maxHeight: '86vh', overflowY: 'auto', borderRadius: '10px', border: `1px solid ${t.glassBorder}`, boxShadow: '0 20px 60px rgba(0,0,0,.25)', zIndex: 301 }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className="px-expand px-glass" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', width: '420px', maxWidth: '92vw', maxHeight: '86vh', overflowY: 'auto', borderRadius: '10px', border: `1px solid ${t.glassBorder}`, boxShadow: '0 20px 60px rgba(0,0,0,.25)', zIndex: 301 }}>
         <div className="px-glass" style={{ padding: '16px 20px', borderBottom: `1px solid ${t.rowBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0 }}>
-          <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
-          <button onClick={onClose} style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '6px' }}>
+          <div id={titleId} style={{ fontSize: '15px', fontWeight: '700', color: t.ink }}>{title}</div>
+          <button onClick={onClose} aria-label="Close dialog" style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '6px' }}>
             <X size={16} />
           </button>
         </div>
@@ -1461,6 +1550,13 @@ function Inbox({ contacts }) {
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
   const contactList = contacts || [];
+
+  useEffect(() => {
+    if (!lightboxSrc) return;
+    function onKeyDown(e) { if (e.key === 'Escape') setLightboxSrc(null); }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [lightboxSrc]);
 
   useEffect(() => {
     function onResize() { setIsMobileView(window.innerWidth < 860); }
@@ -1746,12 +1842,18 @@ function Inbox({ contacts }) {
                   <div key={i} style={{ alignSelf: m.sender === 'staff' ? 'flex-end' : 'flex-start', maxWidth: '70%' }}>
                     {m.attachment ? (
                       m.attachment.kind === 'image' ? (
-                        <img
-                          src={m.attachment.dataUrl}
-                          alt={m.attachment.name}
+                        <button
+                          type="button"
                           onClick={() => setLightboxSrc(m.attachment.dataUrl)}
-                          style={{ maxWidth: '220px', maxHeight: '220px', borderRadius: '12px', cursor: 'pointer', display: 'block', border: `1px solid ${t.border}` }}
-                        />
+                          aria-label={`View full size: ${m.attachment.name}`}
+                          style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'block' }}
+                        >
+                          <img
+                            src={m.attachment.dataUrl}
+                            alt={m.attachment.name}
+                            style={{ maxWidth: '220px', maxHeight: '220px', borderRadius: '12px', display: 'block', border: `1px solid ${t.border}` }}
+                          />
+                        </button>
                       ) : (
                         <a
                           href={m.attachment.dataUrl}
@@ -1841,7 +1943,7 @@ function Inbox({ contacts }) {
       )}
 
       {lightboxSrc && (
-        <div onClick={() => setLightboxSrc(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', cursor: 'zoom-out' }}>
+        <div onClick={() => setLightboxSrc(null)} role="dialog" aria-modal="true" aria-label="Image preview" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', cursor: 'zoom-out' }}>
           <img src={lightboxSrc} alt="" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '6px', boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} />
           <button type="button" onClick={() => setLightboxSrc(null)} style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,.15)', borderRadius: '6px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <X size={18} color="white" />
