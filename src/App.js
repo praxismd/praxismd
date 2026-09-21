@@ -989,7 +989,7 @@ function App() {
           {gate('recall', <Recall userRole={userRole} />)}
           {gate('patients', <Patients query={patientQuery} onQueryChange={setPatientQuery} contacts={contacts} loading={contactsLoading} error={contactsError} onRetry={refetchContacts} onAddPatient={isGhlConfigured ? addGhlPatient : addDemoPatient} onBulkAddPatient={isGhlConfigured ? addGhlPatientOnly : addDemoPatient} userRole={userRole} />)}
           {gate('billing', <Billing userRole={userRole} />)}
-          {gate('membershipplans', <MembershipPlans userRole={userRole} />)}
+          {gate('membershipplans', <MembershipPlans contacts={contacts} userRole={userRole} />)}
           {gate('payments', <Payments userRole={userRole} contacts={contacts} />)}
           {gate('reports', <Reports userRole={userRole} />)}
           {gate('settings', <Settings userRole={userRole} rolePermissions={rolePermissions} onUpdatePermissions={updateRolePermissions} onRoleChange={setUserRole} brandColor={brandColor} onBrandColorChange={setBrandColor} />)}
@@ -4724,32 +4724,56 @@ function TreatmentPlans({ contacts }) {
 }
 
 // ─── MEMBERSHIP PLANS ──────────────────────────────────────
-const MEMBERSHIP_PLANS_SEED = [
-  { id: 'mp1', name: 'Basic', monthlyPrice: 29, annualPrice: 299, benefits: ['2 cleanings per year', '1 X-ray set per year', '10% off all other procedures'] },
-  { id: 'mp2', name: 'Premium', monthlyPrice: 49, annualPrice: 499, benefits: ['Everything in Basic', 'Free teeth whitening once a year', 'Priority scheduling'] },
-];
-
-const MEMBERSHIP_MEMBERS_SEED = [
-  { id: 'mm1', patientName: 'Maria Chen', planId: 'mp2', joinDate: 'Jan 15, 2026', nextBilling: 'Oct 15, 2026', status: 'Active' },
-  { id: 'mm2', patientName: 'David Wong', planId: 'mp1', joinDate: 'Mar 3, 2026', nextBilling: 'Oct 3, 2026', status: 'Active' },
-  { id: 'mm3', patientName: 'Sarah Martinez', planId: 'mp2', joinDate: 'May 20, 2026', nextBilling: 'Oct 20, 2026', status: 'Active' },
-  { id: 'mm4', patientName: 'James Lee', planId: 'mp1', joinDate: 'Jul 8, 2026', nextBilling: 'Sep 8, 2026', status: 'Failed' },
-  { id: 'mm5', patientName: 'Priya Patel', planId: 'mp1', joinDate: 'Aug 1, 2026', nextBilling: 'Oct 1, 2026', status: 'Active' },
-];
-
-function MembershipPlans() {
+// Plans (membershipPlans/{id}) and enrollments (membershipEnrollments/{id})
+// are both staff-written and scoped by practiceId — internal front-desk
+// data, same plain staff-only rule as waitlistEntries. There's no recurring
+// Stripe subscription plumbed in yet (src/api/stripe.js's
+// createPaymentPlan is still a stub — only one-time payment links are
+// live), so enrolling a patient charges their first payment as a real
+// one-time Stripe link via the same createPaymentLink Cloud Function
+// Payments uses, rather than faking a subscription that doesn't exist.
+// "Next billing" is intentionally not shown — nothing here automates it.
+function MembershipPlans({ contacts }) {
   const t = useTheme();
-  const [plans, setPlans] = useState(MEMBERSHIP_PLANS_SEED);
-  const [members] = useState(MEMBERSHIP_MEMBERS_SEED);
+  const [plans, setPlans] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState({ name: '', monthlyPrice: '', annualPrice: '', benefits: [''] });
-  const [linkNotice, setLinkNotice] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [showEnroll, setShowEnroll] = useState(false);
+  const [enrollForm, setEnrollForm] = useState({ contactId: '', planId: '' });
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollError, setEnrollError] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+  const [smsSent, setSmsSent] = useState(false);
+  const [smsError, setSmsError] = useState('');
+  const [linkGenerating, setLinkGenerating] = useState(false);
+  const [linkError, setLinkError] = useState('');
+  const [cancelState, setCancelState] = useState({}); // member id -> 'saving' | error string
+  const contactList = contacts || [];
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
   const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
 
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth.currentUser) { setLoading(false); return; }
+    const uid = auth.currentUser.uid;
+    const unsubPlans = onSnapshot(query(collection(db, 'membershipPlans'), where('practiceId', '==', uid), orderBy('createdAt', 'asc')), snap => {
+      setPlans(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => {});
+    const unsubMembers = onSnapshot(query(collection(db, 'membershipEnrollments'), where('practiceId', '==', uid), orderBy('createdAt', 'desc')), snap => {
+      setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return () => { unsubPlans(); unsubMembers(); };
+  }, []);
+
   const planById = Object.fromEntries(plans.map(p => [p.id, p]));
-  const activeMembers = members.filter(m => m.status === 'Active');
+  const activeMembers = members.filter(m => m.status === 'active');
   const mrr = activeMembers.reduce((sum, m) => sum + (planById[m.planId]?.monthlyPrice || 0), 0);
 
   function planStats(plan) {
@@ -4765,20 +4789,112 @@ function MembershipPlans() {
     setCreateForm(f => ({ ...f, benefits: [...f.benefits, ''] }));
   }
 
-  function createPlan() {
-    if (!createForm.name.trim() || !createForm.monthlyPrice) return;
-    setPlans(list => [...list, {
-      id: `mp-new-${Date.now()}`, name: createForm.name.trim(),
-      monthlyPrice: Number(createForm.monthlyPrice) || 0, annualPrice: Number(createForm.annualPrice) || 0,
-      benefits: createForm.benefits.filter(b => b.trim()),
-    }]);
-    setShowCreate(false);
-    setCreateForm({ name: '', monthlyPrice: '', annualPrice: '', benefits: [''] });
+  async function createPlan() {
+    if (!createForm.name.trim() || !createForm.monthlyPrice) {
+      setCreateError('Name the plan and set a monthly price to continue.');
+      return;
+    }
+    setCreating(true);
+    setCreateError('');
+    try {
+      await addDoc(collection(db, 'membershipPlans'), {
+        practiceId: auth.currentUser.uid,
+        name: createForm.name.trim(),
+        monthlyPrice: Number(createForm.monthlyPrice) || 0,
+        annualPrice: Number(createForm.annualPrice) || 0,
+        benefits: createForm.benefits.filter(b => b.trim()),
+        createdAt: serverTimestamp(),
+      });
+      setShowCreate(false);
+      setCreateForm({ name: '', monthlyPrice: '', annualPrice: '', benefits: [''] });
+    } catch (err) {
+      setCreateError(err.message || 'Could not create the plan.');
+    } finally {
+      setCreating(false);
+    }
   }
 
-  function generateLink() {
-    setLinkNotice('Stripe payment link generated: pay.stripe.com/praxismd-' + (createForm.name.trim().toLowerCase().replace(/\s+/g, '-') || 'plan') + ' (demo)');
-    setTimeout(() => setLinkNotice(''), 5000);
+  function resetEnrollLinkState() {
+    setLinkUrl('');
+    setCopied(false);
+    setSmsSent(false);
+    setSmsError('');
+    setLinkError('');
+  }
+
+  async function enrollMember() {
+    const contact = contactList.find(c => c.id === enrollForm.contactId);
+    const plan = planById[enrollForm.planId];
+    if (!contact || !plan) {
+      setEnrollError('Select a patient and a plan to continue.');
+      return;
+    }
+    setEnrolling(true);
+    setEnrollError('');
+    try {
+      await addDoc(collection(db, 'membershipEnrollments'), {
+        practiceId: auth.currentUser.uid,
+        ghlContactId: contact.id,
+        patientName: contact.name,
+        planId: plan.id,
+        status: 'active',
+        createdAt: serverTimestamp(),
+      });
+    } catch (err) {
+      setEnrollError(err.message || 'Could not enroll this patient.');
+    } finally {
+      setEnrolling(false);
+    }
+  }
+
+  async function generateEnrollLink() {
+    const contact = contactList.find(c => c.id === enrollForm.contactId);
+    const plan = planById[enrollForm.planId];
+    if (!contact || !plan) { setLinkError('Select a patient and a plan first.'); return; }
+    setLinkGenerating(true);
+    setLinkError('');
+    try {
+      const res = await createPaymentLink(contact.id, plan.monthlyPrice, `${plan.name} membership — first payment`);
+      setLinkUrl(res?.url || '');
+    } catch (err) {
+      setLinkError(err.message || 'Could not generate a payment link.');
+    } finally {
+      setLinkGenerating(false);
+    }
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(linkUrl);
+      setCopied(true);
+    } catch {
+      // clipboard API unavailable — link is still shown for manual copy
+    }
+  }
+
+  async function handleSendSms() {
+    const contact = contactList.find(c => c.id === enrollForm.contactId);
+    if (!contact) return;
+    setSmsError('');
+    setSmsSending(true);
+    try {
+      await sendMessage(contact.id, `Here's your secure payment link to activate your membership: ${linkUrl}`);
+      setSmsSent(true);
+    } catch (err) {
+      setSmsError(err.message || 'Could not send the text.');
+    } finally {
+      setSmsSending(false);
+    }
+  }
+
+  async function cancelMembership(id) {
+    setCancelState(s => ({ ...s, [id]: 'saving' }));
+    try {
+      await updateDoc(doc(db, 'membershipEnrollments', id), { status: 'canceled', canceledAt: serverTimestamp() });
+      setCancelState(s => { const next = { ...s }; delete next[id]; return next; });
+    } catch (err) {
+      setCancelState(s => ({ ...s, [id]: err.message || 'Could not cancel.' }));
+    }
   }
 
   const monthlyNum = Number(createForm.monthlyPrice) || 0;
@@ -4790,63 +4906,81 @@ function MembershipPlans() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="Total members" value={String(members.length)} color={t.brand} accent={t.accentBlue} sub={`${activeMembers.length} active`} />
         <StatCard label="Monthly recurring revenue" value={`$${mrr.toLocaleString()}`} color={t.green} accent={t.accentGreen} sub="From active memberships" />
-        <StatCard label="Members added this month" value="3" color={t.purple} accent={t.accentPurple} sub="↑ growing steadily" />
+        <StatCard label="Plans offered" value={String(plans.length)} color={t.purple} accent={t.accentPurple} sub="Across your practice" />
       </div>
 
-      <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ fontSize: '15px', fontWeight: '700', color: t.ink, marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
         Plans
-        <Btn primary onClick={() => setShowCreate(true)}><Plus size={14} /> Create membership plan</Btn>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Btn onClick={() => setShowEnroll(true)}><UserPlus size={14} /> Enroll patient</Btn>
+          <Btn primary onClick={() => setShowCreate(true)}><Plus size={14} /> Create membership plan</Btn>
+        </div>
       </div>
 
-      {linkNotice && (
-        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.tealL, borderRadius: '6px', fontSize: '12.5px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, wordBreak: 'break-all' }}>{linkNotice}</div>
+      {loading && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>Loading…</Card>}
+
+      {!loading && plans.length === 0 && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted, marginBottom: '18px' }}>No membership plans yet — create one to get started.</Card>}
+
+      {!loading && plans.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginBottom: '18px' }}>
+          {plans.map(plan => {
+            const stats = planStats(plan);
+            return (
+              <Card key={plan.id}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '16px', fontWeight: '700', color: t.ink }}>{plan.name}</span>
+                  <Pill label={`${stats.count} members`} color={t.brand} bg={t.brandL} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '24px', fontWeight: '800', color: t.ink }}>${plan.monthlyPrice}</span>
+                  <span style={{ fontSize: '12px', color: t.muted }}>/mo · ${plan.annualPrice}/yr</span>
+                </div>
+                <div style={{ fontSize: '12px', color: t.green, fontWeight: '600', marginBottom: '12px' }}>${stats.revenue.toLocaleString()}/mo revenue</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(plan.benefits || []).map((b, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', color: t.mid }}>
+                      <Check size={13} color={t.green} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <span>{b}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px', marginBottom: '18px' }}>
-        {plans.map(plan => {
-          const stats = planStats(plan);
-          return (
-            <Card key={plan.id}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span style={{ fontSize: '16px', fontWeight: '700', color: t.ink }}>{plan.name}</span>
-                <Pill label={`${stats.count} members`} color={t.brand} bg={t.brandL} />
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px', marginBottom: '4px' }}>
-                <span style={{ fontSize: '24px', fontWeight: '800', color: t.ink }}>${plan.monthlyPrice}</span>
-                <span style={{ fontSize: '12px', color: t.muted }}>/mo · ${plan.annualPrice}/yr</span>
-              </div>
-              <div style={{ fontSize: '12px', color: t.green, fontWeight: '600', marginBottom: '12px' }}>${stats.revenue.toLocaleString()}/mo revenue</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {plan.benefits.map((b, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12.5px', color: t.mid }}>
-                    <Check size={13} color={t.green} style={{ flexShrink: 0, marginTop: '2px' }} />
-                    <span>{b}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          );
-        })}
-      </div>
-
       <Card>
-        <CardTitle>Active members</CardTitle>
-        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', padding: '0 4px 8px', fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>
-          <div>Patient</div><div>Plan</div><div>Monthly</div><div>Join date</div><div>Next billing</div><div>Status</div>
-        </div>
+        <CardTitle>Members</CardTitle>
+        {!loading && members.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '16px 0' }}>No members enrolled yet.</div>}
+        {members.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 0.8fr 0.8fr', gap: '8px', padding: '0 4px 8px', fontSize: '11px', fontWeight: '600', color: t.muted, textTransform: 'uppercase', letterSpacing: '.4px' }}>
+            <div>Patient</div><div>Plan</div><div>Monthly</div><div>Joined</div><div>Status</div><div></div>
+          </div>
+        )}
         {members.map(m => {
           const plan = planById[m.planId];
+          const state = cancelState[m.id];
           return (
-            <div key={m.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 1fr 0.8fr', gap: '8px', alignItems: 'center', padding: '10px 4px', borderRadius: '6px' }}>
+            <div key={m.id} className="px-row" style={{ display: 'grid', gridTemplateColumns: '1.6fr 1.1fr 0.9fr 1fr 0.8fr 0.8fr', gap: '8px', alignItems: 'center', padding: '10px 4px', borderRadius: '6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
                 <Ava initials={initialsOf(m.patientName)} bg={t.brandL} color={t.brand} />
                 <span style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{m.patientName}</PII></span>
               </div>
-              <div style={{ fontSize: '12.5px', color: t.mid }}>{plan?.name}</div>
-              <div style={{ fontSize: '12.5px', color: t.ink2 }}>${plan?.monthlyPrice}</div>
-              <div style={{ fontSize: '12.5px', color: t.muted }}>{m.joinDate}</div>
-              <div style={{ fontSize: '12.5px', color: t.muted }}>{m.nextBilling}</div>
-              <Pill label={m.status} color={m.status === 'Active' ? t.green : t.red} bg={m.status === 'Active' ? t.greenL : t.redL} />
+              <div style={{ fontSize: '12.5px', color: t.mid }}>{plan?.name || '—'}</div>
+              <div style={{ fontSize: '12.5px', color: t.ink2 }}>{plan ? `$${plan.monthlyPrice}` : '—'}</div>
+              <div style={{ fontSize: '12.5px', color: t.muted }}>{formatPlanDate(m.createdAt)}</div>
+              <Pill label={m.status === 'active' ? 'Active' : 'Canceled'} color={m.status === 'active' ? t.green : t.red} bg={m.status === 'active' ? t.greenL : t.redL} />
+              <div>
+                {m.status === 'active' && (
+                  state === 'saving' ? (
+                    <Loader2 size={13} className="px-spin" color={t.muted} />
+                  ) : (
+                    <button onClick={() => cancelMembership(m.id)} className="px-btn" style={{ background: 'none', border: 'none', color: t.red, fontSize: '11.5px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>Cancel</button>
+                  )
+                )}
+                {state && state !== 'saving' && <div style={{ fontSize: '10.5px', color: t.red, marginTop: '2px' }}>{state}</div>}
+              </div>
             </div>
           );
         })}
@@ -4874,9 +5008,57 @@ function MembershipPlans() {
             <input key={i} value={b} onChange={e => updateBenefit(i, e.target.value)} placeholder="e.g. 2 cleanings per year" style={{ ...inputStyle, marginBottom: '8px' }} />
           ))}
           <Btn small onClick={addBenefitRow} style={{ marginBottom: '14px' }}><Plus size={12} /> Add benefit</Btn>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Btn onClick={generateLink}><CreditCard size={13} /> Generate Stripe payment link</Btn>
-            <Btn primary onClick={createPlan}>Create plan</Btn>
+          {createError && <div style={{ marginBottom: '12px', fontSize: '11.5px', color: t.red }}>{createError}</div>}
+          <Btn primary onClick={createPlan} disabled={creating}>{creating ? <Loader2 size={13} className="px-spin" /> : null} {creating ? 'Creating…' : 'Create plan'}</Btn>
+        </Modal>
+      )}
+
+      {showEnroll && (
+        <Modal title="Enroll patient" onClose={() => { setShowEnroll(false); resetEnrollLinkState(); }}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Patient</label>
+            <select value={enrollForm.contactId} onChange={e => { setEnrollForm(f => ({ ...f, contactId: e.target.value })); resetEnrollLinkState(); }} style={inputStyle}>
+              <option value="">Select a patient…</option>
+              {contactList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Plan</label>
+            <select value={enrollForm.planId} onChange={e => { setEnrollForm(f => ({ ...f, planId: e.target.value })); resetEnrollLinkState(); }} style={inputStyle}>
+              <option value="">Select a plan…</option>
+              {plans.map(p => <option key={p.id} value={p.id}>{p.name} — ${p.monthlyPrice}/mo</option>)}
+            </select>
+          </div>
+          {enrollError && <div style={{ marginBottom: '12px', fontSize: '11.5px', color: t.red }}>{enrollError}</div>}
+          <Btn primary onClick={enrollMember} disabled={enrolling} style={{ marginBottom: '14px' }}>
+            {enrolling ? <Loader2 size={13} className="px-spin" /> : <UserPlus size={13} />} {enrolling ? 'Enrolling…' : 'Enroll patient'}
+          </Btn>
+
+          <div style={{ paddingTop: '14px', borderTop: `1px solid ${t.border2}` }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: t.mid, marginBottom: '8px' }}>Collect first payment (optional)</div>
+            <Btn onClick={generateEnrollLink} disabled={linkGenerating}>
+              {linkGenerating ? <Loader2 size={13} className="px-spin" /> : <CreditCard size={13} />} {linkGenerating ? 'Generating…' : 'Generate Stripe payment link'}
+            </Btn>
+            {!isStripeConfigured && (
+              <div style={{ marginTop: '10px', fontSize: '11.5px', color: t.amber }}>Firebase isn't connected yet — add REACT_APP_FIREBASE_* to your .env.local.</div>
+            )}
+            {linkError && <div style={{ marginTop: '10px', fontSize: '11.5px', color: t.red }}>{linkError}</div>}
+            {linkUrl && (
+              <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '6px', border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input readOnly value={linkUrl} onFocus={e => e.target.select()} style={{ flex: 1, padding: '7px 10px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12px', fontFamily: 'inherit', background: t.bgCard, color: t.ink2, minWidth: 0 }} />
+                  <Btn small onClick={handleCopy}>{copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy'}</Btn>
+                </div>
+                {isGhlConfigured && (
+                  <div style={{ marginTop: '8px' }}>
+                    <Btn small primary onClick={handleSendSms} disabled={smsSending || smsSent} style={{ width: '100%', justifyContent: 'center' }}>
+                      {smsSending ? <Loader2 size={13} className="px-spin" /> : <Send size={13} />} {smsSent ? 'Sent via SMS' : 'Send via SMS'}
+                    </Btn>
+                    {smsError && <div style={{ marginTop: '6px', fontSize: '11px', color: t.red }}>{smsError}</div>}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </Modal>
       )}
