@@ -3921,6 +3921,7 @@ function Waitlist({ contacts }) {
   const [addForm, setAddForm] = useState({ contactId: '', service: 'Cleaning', pref: '', notes: '' });
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const contactList = contacts || [];
   const colorMap = { brand: t.brand, amber: t.amber, green: t.green, purple: t.purple, teal: t.teal };
   const bgMap = { brandL: t.brandL, amberL: t.amberL, greenL: t.greenL, purpleL: t.purpleL, tealL: t.tealL };
@@ -3934,7 +3935,7 @@ function Waitlist({ contacts }) {
     const unsub = onSnapshot(q, snap => {
       setList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, () => setLoading(false));
+    }, err => { console.error('waitlistEntries listener failed:', err); setLoadError(err.message || 'Could not load the waitlist.'); setLoading(false); });
     return unsub;
   }, []);
 
@@ -3996,6 +3997,7 @@ function Waitlist({ contacts }) {
             <CardTitle>Current waitlist</CardTitle>
             <Btn small primary onClick={() => setShowAdd(true)}><Plus size={12} /> Add to waitlist</Btn>
           </div>
+          {loadError && <div style={{ marginBottom: '10px', padding: '10px 12px', background: t.redL, borderRadius: '6px', fontSize: '12px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{loadError}</div>}
           {loading && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '16px 0' }}>Loading…</div>}
           {!loading && list.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '16px 0' }}>No one on the waitlist right now.</div>}
           {!loading && list.map((p, i) => {
@@ -4531,6 +4533,7 @@ function TreatmentPlans({ contacts }) {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
   const [sendState, setSendState] = useState({}); // plan id -> 'sending' | 'sent' | error string
+  const [loadError, setLoadError] = useState('');
   const contactList = contacts || [];
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
@@ -4542,7 +4545,7 @@ function TreatmentPlans({ contacts }) {
     const unsub = onSnapshot(q, snap => {
       setPlans(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, () => setLoading(false));
+    }, err => { console.error('patientTreatmentPlans listener failed:', err); setLoadError(err.message || 'Could not load treatment plans.'); setLoading(false); });
     return unsub;
   }, []);
 
@@ -4641,6 +4644,10 @@ function TreatmentPlans({ contacts }) {
         </div>
         <Btn primary onClick={() => setShowCreate(true)}><Plus size={14} /> Create treatment plan</Btn>
       </div>
+
+      {loadError && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.redL, borderRadius: '6px', fontSize: '12.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{loadError}</div>
+      )}
 
       {loading && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>Loading…</Card>}
 
@@ -4754,6 +4761,7 @@ function MembershipPlans({ contacts }) {
   const [linkGenerating, setLinkGenerating] = useState(false);
   const [linkError, setLinkError] = useState('');
   const [cancelState, setCancelState] = useState({}); // member id -> 'saving' | error string
+  const [loadError, setLoadError] = useState('');
   const contactList = contacts || [];
 
   const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
@@ -4764,11 +4772,11 @@ function MembershipPlans({ contacts }) {
     const uid = auth.currentUser.uid;
     const unsubPlans = onSnapshot(query(collection(db, 'membershipPlans'), where('practiceId', '==', uid), orderBy('createdAt', 'asc')), snap => {
       setPlans(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, () => {});
+    }, err => { console.error('membershipPlans listener failed:', err); setLoadError(err.message || 'Could not load membership plans.'); });
     const unsubMembers = onSnapshot(query(collection(db, 'membershipEnrollments'), where('practiceId', '==', uid), orderBy('createdAt', 'desc')), snap => {
       setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, () => setLoading(false));
+    }, err => { console.error('membershipEnrollments listener failed:', err); setLoadError(err.message || 'Could not load members.'); setLoading(false); });
     return () => { unsubPlans(); unsubMembers(); };
   }, []);
 
@@ -4916,6 +4924,10 @@ function MembershipPlans({ contacts }) {
           <Btn primary onClick={() => setShowCreate(true)}><Plus size={14} /> Create membership plan</Btn>
         </div>
       </div>
+
+      {loadError && (
+        <div style={{ marginBottom: '14px', padding: '10px 14px', background: t.redL, borderRadius: '6px', fontSize: '12.5px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{loadError}</div>
+      )}
 
       {loading && <Card style={{ textAlign: 'center', padding: '32px', color: t.muted }}>Loading…</Card>}
 
