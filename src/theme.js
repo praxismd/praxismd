@@ -70,9 +70,9 @@ export const dark = {
   greenL: '#052E16',
   amber: '#F59E0B',
   amberL: '#2D1B00',
-  red: '#EF4444',
+  red: '#F15757', // WCAG AA (4.5:1) against bgRow — the original #EF4444 only cleared 4.23:1
   redL: '#2D0A0A',
-  purple: '#8B5CF6',
+  purple: '#9C74F7', // WCAG AA (4.5:1) against bgRow — the original #8B5CF6 only cleared 3.76:1
   purpleL: '#1E0A3C',
   teal: '#22D3EE',
   tealL: '#0A1F2D',
@@ -148,7 +148,9 @@ export function getTheme(mode, brandHex) {
   const base = mode === 'dark' ? dark : light;
   const hex = /^#[0-9A-Fa-f]{6}$/.test(brandHex || '') ? brandHex : DEFAULT_BRAND;
   if (mode === 'dark') {
-    return { ...base, brand: mix(hex, '#FFFFFF', 0.2), brandL: mix(hex, '#000000', 0.78) };
+    // 0.25 (not 0.2) so the default brand color clears WCAG AA (4.5:1) text
+    // contrast against bgRow, the darkest background it's regularly read on.
+    return { ...base, brand: mix(hex, '#FFFFFF', 0.25), brandL: mix(hex, '#000000', 0.78) };
   }
   return { ...base, brand: hex, brandL: mix(hex, '#FFFFFF', 0.88) };
 }

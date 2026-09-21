@@ -264,6 +264,7 @@ function GlobalSearchModal({ open, onClose, contacts, campaigns, query, setQuery
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search patients, campaigns..."
+            aria-label="Search patients, campaigns, or tabs"
             style={{ flex: 1, border: 'none', outline: 'none', fontSize: '15px', fontFamily: 'inherit', background: 'transparent', color: t.ink2 }}
           />
           <span style={{ fontSize: '10.5px', fontWeight: '600', color: t.muted, border: `1px solid ${t.border}`, borderRadius: '6px', padding: '2px 6px', flexShrink: 0 }}>Esc</span>
@@ -972,7 +973,7 @@ function App() {
                     )}
                   </div>
                   {notifications.map((n, i) => (
-                    <div key={n.id} className="px-row" onClick={() => openNotif(n)} style={{ display: 'flex', gap: '10px', padding: '11px 14px', borderBottom: `1px solid ${t.border2}`, cursor: 'pointer', background: n.read ? 'transparent' : t.bgRow }}>
+                    <div key={n.id} className="px-row" onClick={() => openNotif(n)} {...clickableDivProps(() => openNotif(n))} style={{ display: 'flex', gap: '10px', padding: '11px 14px', borderBottom: `1px solid ${t.border2}`, cursor: 'pointer', background: n.read ? 'transparent' : t.bgRow }}>
                       <div style={{ width: '30px', height: '30px', borderRadius: '9px', background: n.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <n.Icon size={14} color={n.color} />
                       </div>
@@ -1729,6 +1730,7 @@ function Inbox({ contacts }) {
               <input
                 value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search conversations…"
+                aria-label="Search conversations"
                 style={{ width: '100%', padding: '9px 12px 9px 32px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
               />
             </div>
@@ -1772,6 +1774,7 @@ function Inbox({ contacts }) {
                 <div
                   key={c.id}
                   onClick={() => selectConversation(c)}
+                  {...clickableDivProps(() => selectConversation(c))}
                   className="px-row"
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px', cursor: 'pointer', borderBottom: `1px solid ${t.rowBorder}`, background: isSelected ? t.rowHover : 'transparent' }}
                 >
@@ -1826,7 +1829,7 @@ function Inbox({ contacts }) {
             <>
               <div style={{ padding: '14px 18px', borderBottom: `1px solid ${t.border2}`, display: 'flex', alignItems: 'center', gap: '12px' }}>
                 {isMobileView && (
-                  <button type="button" onClick={() => setSelectedId(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', display: 'flex' }}>
+                  <button type="button" onClick={() => setSelectedId(null)} aria-label="Back to conversation list" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', display: 'flex' }}>
                     <ArrowLeft size={18} color={t.ink2} />
                   </button>
                 )}
@@ -1900,7 +1903,7 @@ function Inbox({ contacts }) {
                       <div style={{ fontSize: '12px', fontWeight: '500', color: t.ink2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pendingAttachment.name}</div>
                       <div style={{ fontSize: '10.5px', color: t.muted }}>{formatFileSize(pendingAttachment.size)}</div>
                     </div>
-                    <button type="button" onClick={() => setPendingAttachment(null)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', display: 'flex', color: t.muted, flexShrink: 0 }}>
+                    <button type="button" onClick={() => setPendingAttachment(null)} aria-label="Remove attachment" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '4px', display: 'flex', color: t.muted, flexShrink: 0 }}>
                       <X size={14} />
                     </button>
                   </div>
@@ -1930,6 +1933,7 @@ function Inbox({ contacts }) {
                     value={draft} onChange={e => setDraft(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleSend(); }}
                     placeholder="Type a reply…"
+                    aria-label="Type a reply"
                     style={{ flex: 1, padding: '10px 13px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, minWidth: 0 }}
                   />
                   <Btn small primary onClick={handleSend} disabled={sending || (!draft.trim() && !pendingAttachment)}>
@@ -1945,7 +1949,7 @@ function Inbox({ contacts }) {
       {lightboxSrc && (
         <div onClick={() => setLightboxSrc(null)} role="dialog" aria-modal="true" aria-label="Image preview" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', zIndex: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '30px', cursor: 'zoom-out' }}>
           <img src={lightboxSrc} alt="" style={{ maxWidth: '90vw', maxHeight: '90vh', borderRadius: '6px', boxShadow: '0 20px 60px rgba(0,0,0,.5)' }} />
-          <button type="button" onClick={() => setLightboxSrc(null)} style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,.15)', borderRadius: '6px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <button type="button" onClick={() => setLightboxSrc(null)} aria-label="Close image preview" style={{ position: 'absolute', top: '20px', right: '20px', border: 'none', background: 'rgba(255,255,255,.15)', borderRadius: '6px', width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
             <X size={18} color="white" />
           </button>
         </div>
@@ -2054,38 +2058,38 @@ function Campaigns({ ghlCampaigns, loading: campaignsLoading, error: campaignsEr
         <Card className="px-expand" style={{ marginBottom: '14px' }}>
           <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>New campaign</div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Campaign name</label>
-            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Spring cleaning push" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <label htmlFor="camp-name" style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Campaign name</label>
+            <input id="camp-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Spring cleaning push" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
-              <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <label htmlFor="camp-type" style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
+              <select id="camp-type" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_TYPES.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Audience</label>
-              <select value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <label htmlFor="camp-audience" style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Audience</label>
+              <select id="camp-audience" value={form.audience} onChange={e => setForm(f => ({ ...f, audience: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_AUDIENCES.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Touches</label>
-              <select value={form.touches} onChange={e => setForm(f => ({ ...f, touches: Number(e.target.value) }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <label htmlFor="camp-touches" style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Touches</label>
+              <select id="camp-touches" value={form.touches} onChange={e => setForm(f => ({ ...f, touches: Number(e.target.value) }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_TOUCHES.map(o => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Channel</label>
-              <select value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+              <label htmlFor="camp-channel" style={{ fontSize: '11px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Channel</label>
+              <select id="camp-channel" value={form.channel} onChange={e => setForm(f => ({ ...f, channel: e.target.value }))} style={{ width: '100%', padding: '9px 8px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
                 {CAMPAIGN_CHANNELS.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
           </div>
           <div style={{ marginBottom: '14px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>First message ({form.message.length}/160)</label>
-            <textarea value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value.slice(0, 160) }))} rows={3} placeholder="Hi {'{'}first_name{'}'}, ..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box' }} />
+            <label htmlFor="camp-message" style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>First message ({form.message.length}/160)</label>
+            <textarea id="camp-message" value={form.message} onChange={e => setForm(f => ({ ...f, message: e.target.value.slice(0, 160) }))} rows={3} placeholder="Hi {'{'}first_name{'}'}, ..." style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, resize: 'vertical', boxSizing: 'border-box' }} />
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Btn primary onClick={createCampaign}>Create campaign</Btn>
@@ -2444,37 +2448,37 @@ function PatientInsuranceEditor({ ghlContactId }) {
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-        <div><label style={labelStyle}>Payer</label><input value={form.payer} onChange={e => setForm(f => ({ ...f, payer: e.target.value }))} placeholder="Delta Dental" style={fieldStyle} /></div>
-        <div><label style={labelStyle}>Plan</label><input value={form.plan} onChange={e => setForm(f => ({ ...f, plan: e.target.value }))} placeholder="PPO Plus Premier" style={fieldStyle} /></div>
+        <div><label htmlFor="elig-payer" style={labelStyle}>Payer</label><input id="elig-payer" value={form.payer} onChange={e => setForm(f => ({ ...f, payer: e.target.value }))} placeholder="Delta Dental" style={fieldStyle} /></div>
+        <div><label htmlFor="elig-plan" style={labelStyle}>Plan</label><input id="elig-plan" value={form.plan} onChange={e => setForm(f => ({ ...f, plan: e.target.value }))} placeholder="PPO Plus Premier" style={fieldStyle} /></div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-        <div><label style={labelStyle}>Member ID</label><input value={form.memberId} onChange={e => setForm(f => ({ ...f, memberId: e.target.value }))} style={fieldStyle} /></div>
-        <div><label style={labelStyle}>Group #</label><input value={form.group} onChange={e => setForm(f => ({ ...f, group: e.target.value }))} style={fieldStyle} /></div>
+        <div><label htmlFor="elig-member-id" style={labelStyle}>Member ID</label><input id="elig-member-id" value={form.memberId} onChange={e => setForm(f => ({ ...f, memberId: e.target.value }))} style={fieldStyle} /></div>
+        <div><label htmlFor="elig-group" style={labelStyle}>Group #</label><input id="elig-group" value={form.group} onChange={e => setForm(f => ({ ...f, group: e.target.value }))} style={fieldStyle} /></div>
       </div>
       <div style={{ marginBottom: '8px' }}>
-        <label style={labelStyle}>Effective date</label>
-        <input value={form.effective} onChange={e => setForm(f => ({ ...f, effective: e.target.value }))} placeholder="Jan 1, 2026" style={fieldStyle} />
+        <label htmlFor="elig-effective" style={labelStyle}>Effective date</label>
+        <input id="elig-effective" value={form.effective} onChange={e => setForm(f => ({ ...f, effective: e.target.value }))} placeholder="Jan 1, 2026" style={fieldStyle} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-        <div><label style={labelStyle}>Deductible used / total ($)</label>
+        <div><label htmlFor="elig-deductible-used" style={labelStyle}>Deductible used / total ($)</label>
           <div style={{ display: 'flex', gap: '6px' }}>
-            <input value={form.deductibleUsed} onChange={e => setForm(f => ({ ...f, deductibleUsed: e.target.value }))} style={fieldStyle} />
-            <input value={form.deductibleTotal} onChange={e => setForm(f => ({ ...f, deductibleTotal: e.target.value }))} style={fieldStyle} />
+            <input id="elig-deductible-used" value={form.deductibleUsed} onChange={e => setForm(f => ({ ...f, deductibleUsed: e.target.value }))} style={fieldStyle} />
+            <input aria-label="Deductible total ($)" value={form.deductibleTotal} onChange={e => setForm(f => ({ ...f, deductibleTotal: e.target.value }))} style={fieldStyle} />
           </div>
         </div>
-        <div><label style={labelStyle}>Annual max used / total ($)</label>
+        <div><label htmlFor="elig-annualmax-used" style={labelStyle}>Annual max used / total ($)</label>
           <div style={{ display: 'flex', gap: '6px' }}>
-            <input value={form.annualMaxUsed} onChange={e => setForm(f => ({ ...f, annualMaxUsed: e.target.value }))} style={fieldStyle} />
-            <input value={form.annualMaxTotal} onChange={e => setForm(f => ({ ...f, annualMaxTotal: e.target.value }))} style={fieldStyle} />
+            <input id="elig-annualmax-used" value={form.annualMaxUsed} onChange={e => setForm(f => ({ ...f, annualMaxUsed: e.target.value }))} style={fieldStyle} />
+            <input aria-label="Annual max total ($)" value={form.annualMaxTotal} onChange={e => setForm(f => ({ ...f, annualMaxTotal: e.target.value }))} style={fieldStyle} />
           </div>
         </div>
       </div>
       <div style={{ marginBottom: '10px' }}>
-        <label style={labelStyle}>Coverage % (preventive / basic / major)</label>
+        <label htmlFor="elig-coverage-preventive" style={labelStyle}>Coverage % (preventive / basic / major)</label>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <input value={form.preventivePct} onChange={e => setForm(f => ({ ...f, preventivePct: e.target.value }))} style={fieldStyle} />
-          <input value={form.basicPct} onChange={e => setForm(f => ({ ...f, basicPct: e.target.value }))} style={fieldStyle} />
-          <input value={form.majorPct} onChange={e => setForm(f => ({ ...f, majorPct: e.target.value }))} style={fieldStyle} />
+          <input id="elig-coverage-preventive" value={form.preventivePct} onChange={e => setForm(f => ({ ...f, preventivePct: e.target.value }))} style={fieldStyle} />
+          <input aria-label="Basic coverage %" value={form.basicPct} onChange={e => setForm(f => ({ ...f, basicPct: e.target.value }))} style={fieldStyle} />
+          <input aria-label="Major coverage %" value={form.majorPct} onChange={e => setForm(f => ({ ...f, majorPct: e.target.value }))} style={fieldStyle} />
         </div>
       </div>
       {saveError && (
@@ -2561,12 +2565,12 @@ function PatientPrescriptionsEditor({ ghlContactId }) {
       {showForm ? (
         <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${t.border2}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-            <div><label style={labelStyle}>Drug name</label><input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Amoxicillin 500mg" style={fieldStyle} /></div>
-            <div><label style={labelStyle}>Dosage</label><input value={form.dosage} onChange={e => setForm(f => ({ ...f, dosage: e.target.value }))} placeholder="1 capsule 3x daily" style={fieldStyle} /></div>
+            <div><label htmlFor="rx-drug-name" style={labelStyle}>Drug name</label><input id="rx-drug-name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Amoxicillin 500mg" style={fieldStyle} /></div>
+            <div><label htmlFor="rx-dosage" style={labelStyle}>Dosage</label><input id="rx-dosage" value={form.dosage} onChange={e => setForm(f => ({ ...f, dosage: e.target.value }))} placeholder="1 capsule 3x daily" style={fieldStyle} /></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-            <div><label style={labelStyle}>Prescriber</label><input value={form.prescriber} onChange={e => setForm(f => ({ ...f, prescriber: e.target.value }))} style={fieldStyle} /></div>
-            <div><label style={labelStyle}>Refills</label><input value={form.refillsRemaining} onChange={e => setForm(f => ({ ...f, refillsRemaining: e.target.value }))} style={fieldStyle} /></div>
+            <div><label htmlFor="rx-prescriber" style={labelStyle}>Prescriber</label><input id="rx-prescriber" value={form.prescriber} onChange={e => setForm(f => ({ ...f, prescriber: e.target.value }))} style={fieldStyle} /></div>
+            <div><label htmlFor="rx-refills" style={labelStyle}>Refills</label><input id="rx-refills" value={form.refillsRemaining} onChange={e => setForm(f => ({ ...f, refillsRemaining: e.target.value }))} style={fieldStyle} /></div>
           </div>
           {saveError && (
             <div style={{ marginBottom: '10px', padding: '8px 10px', background: t.redL, borderRadius: '6px', fontSize: '11.5px', color: t.red }}>{saveError}</div>
@@ -2688,6 +2692,8 @@ function PatientChartEditor({ ghlContactId }) {
               onClick={() => setSelectedTooth(isSelected ? null : n)}
               className="px-btn"
               title={`Tooth #${n} — ${opt.label}`}
+              aria-label={`Tooth #${n} — ${opt.label}`}
+              aria-pressed={isSelected}
               style={{
                 width: '18px', height: '20px', borderRadius: '5px', fontSize: '8px', fontWeight: '700',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontFamily: 'inherit', padding: 0,
@@ -2739,16 +2745,16 @@ function PatientChartEditor({ ghlContactId }) {
       {showForm ? (
         <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${t.border2}` }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-            <div><label style={labelStyle}>Procedure</label><input value={form.procedure} onChange={e => setForm(f => ({ ...f, procedure: e.target.value }))} placeholder="Crown placed" style={fieldStyle} /></div>
-            <div><label style={labelStyle}>Date</label><input value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} placeholder="Mar 15, 2024" style={fieldStyle} /></div>
+            <div><label htmlFor="chart-procedure" style={labelStyle}>Procedure</label><input id="chart-procedure" value={form.procedure} onChange={e => setForm(f => ({ ...f, procedure: e.target.value }))} placeholder="Crown placed" style={fieldStyle} /></div>
+            <div><label htmlFor="chart-date" style={labelStyle}>Date</label><input id="chart-date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} placeholder="Mar 15, 2024" style={fieldStyle} /></div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-            <div><label style={labelStyle}>Provider</label><input value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} style={fieldStyle} /></div>
-            <div><label style={labelStyle}>Teeth (comma-separated #)</label><input value={form.teeth} onChange={e => setForm(f => ({ ...f, teeth: e.target.value }))} placeholder="3, 14" style={fieldStyle} /></div>
+            <div><label htmlFor="chart-provider" style={labelStyle}>Provider</label><input id="chart-provider" value={form.provider} onChange={e => setForm(f => ({ ...f, provider: e.target.value }))} style={fieldStyle} /></div>
+            <div><label htmlFor="chart-teeth" style={labelStyle}>Teeth (comma-separated #)</label><input id="chart-teeth" value={form.teeth} onChange={e => setForm(f => ({ ...f, teeth: e.target.value }))} placeholder="3, 14" style={fieldStyle} /></div>
           </div>
           <div style={{ marginBottom: '10px' }}>
-            <label style={labelStyle}>Notes</label>
-            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...fieldStyle, resize: 'vertical' }} />
+            <label htmlFor="chart-notes" style={labelStyle}>Notes</label>
+            <textarea id="chart-notes" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} style={{ ...fieldStyle, resize: 'vertical' }} />
           </div>
           {saveError && (
             <div style={{ marginBottom: '10px', padding: '8px 10px', background: t.redL, borderRadius: '6px', fontSize: '11.5px', color: t.red }}>{saveError}</div>
@@ -2905,6 +2911,7 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
             placeholder="Search patients by name, email, or phone..."
             value={query}
             onChange={e => onQueryChange(e.target.value)}
+            aria-label="Search patients by name, email, or phone"
             style={{ width: '100%', padding: '9px 14px 9px 36px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
           />
         </div>
@@ -2921,9 +2928,9 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
         <Card className="px-expand" style={{ marginBottom: '14px' }}>
           <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>Add a patient</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full name" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
-            <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
-            <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Phone" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Full name" aria-label="Full name" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="Email" aria-label="Email" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <input value={newPhone} onChange={e => setNewPhone(e.target.value)} placeholder="Phone" aria-label="Phone" style={{ padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           {addError && (
             <div style={{ marginBottom: '12px', padding: '8px 12px', background: t.redL, borderRadius: '6px', fontSize: '12px', color: t.red, border: `1px solid ${withAlpha(t.accentRed, .15)}` }}>{addError}</div>
@@ -3005,13 +3012,18 @@ function Patients({ query, onQueryChange, contacts, loading, error, onRetry, onA
                   ].map((h, i) => (
                     <th
                       key={i}
-                      onClick={h.key ? () => toggleSort(h.key) : undefined}
-                      style={{ textAlign: 'left', padding: '9px 13px', color: t.muted, fontWeight: '600', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${t.rowBorder}`, cursor: h.key ? 'pointer' : 'default', userSelect: 'none', whiteSpace: 'nowrap' }}
+                      scope="col"
+                      aria-sort={h.key && sortKey === h.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+                      style={{ textAlign: 'left', padding: 0, color: t.muted, fontWeight: '600', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: `1px solid ${t.rowBorder}`, whiteSpace: 'nowrap' }}
                     >
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        {h.label}
-                        {h.key && sortKey === h.key && (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
-                      </span>
+                      {h.key ? (
+                        <button type="button" onClick={() => toggleSort(h.key)} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', width: '100%', padding: '9px 13px', border: 'none', background: 'transparent', color: 'inherit', font: 'inherit', textTransform: 'inherit', letterSpacing: 'inherit', cursor: 'pointer' }}>
+                          {h.label}
+                          {sortKey === h.key && (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
+                        </button>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '9px 13px' }}>{h.label}</span>
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -3237,19 +3249,19 @@ function Payments({ contacts }) {
         <Card>
           <CardTitle>Send payment request</CardTitle>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Patient</label>
-            <select value={selectedContactId} onChange={e => handleContactChange(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+            <label htmlFor="pay-patient" style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Patient</label>
+            <select id="pay-patient" value={selectedContactId} onChange={e => handleContactChange(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
               <option value="">Select a patient…</option>
               {contactList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Amount</label>
-            <input value={amount} onChange={e => setAmount(e.target.value)} placeholder="$0.00" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
+            <label htmlFor="pay-amount" style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Amount</label>
+            <input id="pay-amount" value={amount} onChange={e => setAmount(e.target.value)} placeholder="$0.00" style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }} />
           </div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
-            <select value={reqType} onChange={e => setReqType(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
+            <label htmlFor="pay-type" style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Type</label>
+            <select id="pay-type" value={reqType} onChange={e => setReqType(e.target.value)} style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}>
               <option>Co-pay collection</option><option>Balance due</option><option>Deposit for procedure</option><option>Payment plan setup</option>
             </select>
           </div>
@@ -3269,7 +3281,7 @@ function Payments({ contacts }) {
             <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '6px', border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>
               <div style={{ fontSize: '11.5px', color: t.green, fontWeight: '600', marginBottom: '6px' }}>Payment link created.</div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <input readOnly value={linkUrl} onFocus={e => e.target.select()} style={{ flex: 1, padding: '7px 10px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12px', fontFamily: 'inherit', background: t.bgCard, color: t.ink2, minWidth: 0 }} />
+                <input readOnly aria-label="Payment link" value={linkUrl} onFocus={e => e.target.select()} style={{ flex: 1, padding: '7px 10px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12px', fontFamily: 'inherit', background: t.bgCard, color: t.ink2, minWidth: 0 }} />
                 <Btn small onClick={handleCopy}>{copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy'}</Btn>
               </div>
               {isGhlConfigured && (
@@ -3379,7 +3391,7 @@ function AIFrontDesk() {
         <Card>
           <CardTitle>Recent call log</CardTitle>
           {CALL_LOG.map(c => (
-            <div key={c.id} className="px-row" onClick={() => setSelectedCall(c)} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '6px', marginBottom: '7px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}>
+            <div key={c.id} className="px-row" onClick={() => setSelectedCall(c)} {...clickableDivProps(() => setSelectedCall(c))} style={{ display: 'flex', gap: '10px', padding: '10px 12px', background: t.bgRow, borderRadius: '6px', marginBottom: '7px', border: `1px solid ${t.border2}`, cursor: 'pointer' }}>
               <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: colorMap[c.color], marginTop: '5px', flexShrink: 0 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{c.caller}</PII> · {c.duration} · {c.topic}</div>
@@ -3396,7 +3408,7 @@ function AIFrontDesk() {
           </CardTitle>
           <RowItem style={{ justifyContent: 'space-between' }}>
             <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>AI voice name</div><div style={{ fontSize: '11.5px', color: t.muted }}>What callers hear when AI picks up</div></div>
-            <input value={voiceName} onChange={e => setVoiceName(e.target.value)} style={{ width: '90px', padding: '6px 9px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, textAlign: 'right' }} />
+            <input value={voiceName} onChange={e => setVoiceName(e.target.value)} aria-label="AI voice name" style={{ width: '90px', padding: '6px 9px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '12.5px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, textAlign: 'right' }} />
           </RowItem>
           {VOICE_SETTINGS_META.map(item => (
             <RowItem key={item.key} style={{ justifyContent: 'space-between' }}>
@@ -3951,7 +3963,7 @@ function Documents({ contacts }) {
 
       <div style={{ position: 'relative', marginBottom: '12px', maxWidth: '360px' }}>
         <Search size={14} color={t.muted} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)' }} />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or sender…" style={{ ...inputStyle, padding: '9px 12px 9px 32px' }} />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or sender…" aria-label="Search documents by name or sender" style={{ ...inputStyle, padding: '9px 12px 9px 32px' }} />
       </div>
 
       <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
@@ -3990,18 +4002,19 @@ function Documents({ contacts }) {
           {uploadProgress === null ? (
             <>
               <div style={{ marginBottom: '12px' }}>
-                <label style={labelStyle}>Document name</label>
-                <input value={uploadForm.name} onChange={e => setUploadForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Lab Results — Bridge Fit" style={inputStyle} />
+                <label htmlFor="doc-upload-name" style={labelStyle}>Document name</label>
+                <input id="doc-upload-name" value={uploadForm.name} onChange={e => setUploadForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Lab Results — Bridge Fit" style={inputStyle} />
               </div>
               <div style={{ marginBottom: '12px' }}>
-                <label style={labelStyle}>Category</label>
-                <select value={uploadForm.category} onChange={e => setUploadForm(f => ({ ...f, category: e.target.value }))} style={inputStyle}>
+                <label htmlFor="doc-upload-category" style={labelStyle}>Category</label>
+                <select id="doc-upload-category" value={uploadForm.category} onChange={e => setUploadForm(f => ({ ...f, category: e.target.value }))} style={inputStyle}>
                   {DOCUMENT_CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div style={{ marginBottom: '12px' }}>
-                <label style={labelStyle}>Recipient patient</label>
+                <label htmlFor="doc-upload-recipient" style={labelStyle}>Recipient patient</label>
                 <input
+                  id="doc-upload-recipient"
                   value={uploadForm.recipient}
                   onChange={e => setUploadForm(f => ({ ...f, recipient: e.target.value }))}
                   placeholder="Search patients…"
@@ -4013,8 +4026,8 @@ function Documents({ contacts }) {
                 </datalist>
               </div>
               <div style={{ marginBottom: '18px' }}>
-                <label style={labelStyle}>File</label>
-                <input type="file" style={inputStyle} />
+                <label htmlFor="doc-upload-file" style={labelStyle}>File</label>
+                <input id="doc-upload-file" type="file" style={inputStyle} />
               </div>
               <Btn primary onClick={handleUpload}>Upload</Btn>
             </>
@@ -4139,17 +4152,21 @@ function Waitlist({ contacts }) {
               <div key={p.id} style={{ borderBottom: `1px solid ${t.border2}` }}>
                 <div
                   onClick={() => setExpandedId(isExpanded ? null : p.id)}
+                  {...clickableDivProps(() => setExpandedId(isExpanded ? null : p.id))}
+                  aria-expanded={isExpanded}
                   style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 0', cursor: 'pointer' }}
                 >
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flexShrink: 0 }}>
                     <button
                       onClick={e => { e.stopPropagation(); move(i, -1); }}
                       disabled={i === 0}
+                      aria-label="Move up"
                       style={{ width: '18px', height: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: i === 0 ? t.border : t.muted, cursor: i === 0 ? 'default' : 'pointer', padding: 0 }}
                     ><ArrowUp size={12} /></button>
                     <button
                       onClick={e => { e.stopPropagation(); move(i, 1); }}
                       disabled={i === list.length - 1}
+                      aria-label="Move down"
                       style={{ width: '18px', height: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: i === list.length - 1 ? t.border : t.muted, cursor: i === list.length - 1 ? 'default' : 'pointer', padding: 0 }}
                     ><ArrowDown size={12} /></button>
                   </div>
@@ -4186,25 +4203,25 @@ function Waitlist({ contacts }) {
       {showAdd && (
         <Modal title="Add to waitlist" onClose={() => setShowAdd(false)}>
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Patient</label>
-            <select value={addForm.contactId} onChange={e => setAddForm(f => ({ ...f, contactId: e.target.value }))} style={inputStyle}>
+            <label htmlFor="waitlist-patient" style={labelStyle}>Patient</label>
+            <select id="waitlist-patient" value={addForm.contactId} onChange={e => setAddForm(f => ({ ...f, contactId: e.target.value }))} style={inputStyle}>
               <option value="">Select a patient…</option>
               {contactList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Service</label>
-            <select value={addForm.service} onChange={e => setAddForm(f => ({ ...f, service: e.target.value }))} style={inputStyle}>
+            <label htmlFor="waitlist-service" style={labelStyle}>Service</label>
+            <select id="waitlist-service" value={addForm.service} onChange={e => setAddForm(f => ({ ...f, service: e.target.value }))} style={inputStyle}>
               <option>Cleaning</option><option>Exam</option><option>Whitening</option><option>Filling</option><option>Crown fitting</option><option>Consultation</option>
             </select>
           </div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Availability preference</label>
-            <input value={addForm.pref} onChange={e => setAddForm(f => ({ ...f, pref: e.target.value }))} placeholder="e.g. Mornings preferred" style={inputStyle} />
+            <label htmlFor="waitlist-pref" style={labelStyle}>Availability preference</label>
+            <input id="waitlist-pref" value={addForm.pref} onChange={e => setAddForm(f => ({ ...f, pref: e.target.value }))} placeholder="e.g. Mornings preferred" style={inputStyle} />
           </div>
           <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Notes</label>
-            <input value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" style={inputStyle} />
+            <label htmlFor="waitlist-notes" style={labelStyle}>Notes</label>
+            <input id="waitlist-notes" value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" style={inputStyle} />
           </div>
           {addError && <div style={{ marginBottom: '12px', fontSize: '11.5px', color: t.red }}>{addError}</div>}
           <Btn primary onClick={addToWaitlist} disabled={adding}>{adding ? <Loader2 size={13} className="px-spin" /> : null} {adding ? 'Adding…' : 'Add to waitlist'}</Btn>
@@ -4360,6 +4377,9 @@ function Calendar() {
               <div
                 key={i}
                 onClick={() => { setSelectedKey(dayKey); setShowAddForm(false); }}
+                {...clickableDivProps(() => { setSelectedKey(dayKey); setShowAddForm(false); })}
+                aria-pressed={isSelected}
+                aria-label={`${d}${isToday ? ', today' : ''}${has ? `, ${has} appointment${has > 1 ? 's' : ''}` : ''}`}
                 className="px-btn px-cal-day"
                 style={{
                   borderRadius: '6px', padding: '8px 6px', textAlign: 'center', cursor: 'pointer', minHeight: '54px',
@@ -4422,12 +4442,12 @@ function Calendar() {
             </div>
           ) : showAddForm ? (
             <div style={{ background: t.bgRow, border: `1px solid ${t.border2}`, borderRadius: '6px', padding: '12px', marginTop: '8px' }}>
-              <input value={newPatient} onChange={e => setNewPatient(e.target.value)} placeholder="Patient name" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, marginBottom: '8px', boxSizing: 'border-box' }} />
+              <input value={newPatient} onChange={e => setNewPatient(e.target.value)} placeholder="Patient name" aria-label="Patient name" style={{ width: '100%', padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, marginBottom: '8px', boxSizing: 'border-box' }} />
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-                <select value={newTime} onChange={e => setNewTime(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
+                <select value={newTime} onChange={e => setNewTime(e.target.value)} aria-label="Appointment time" style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
                   {CAL_TIME_POOL.map(time => <option key={time} value={time}>{time}</option>)}
                 </select>
-                <select value={newType} onChange={e => setNewType(e.target.value)} style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
+                <select value={newType} onChange={e => setNewType(e.target.value)} aria-label="Appointment type" style={{ padding: '8px 10px', border: `1px solid ${t.border}`, borderRadius: '8px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2 }}>
                   {CAL_TYPE_POOL.map(([type]) => <option key={type} value={type}>{type}</option>)}
                 </select>
               </div>
@@ -4709,19 +4729,19 @@ function AppointmentRequests() {
           ) : (
             <>
               <div style={{ marginBottom: '12px' }}>
-                <label style={labelStyle}>Calendar</label>
+                <label htmlFor="confirm-calendar" style={labelStyle}>Calendar</label>
                 {calendarsLoading ? (
                   <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>Loading…</div>
                 ) : (
-                  <select value={confirmCalendarId} onChange={e => setConfirmCalendarId(e.target.value)} style={inputStyle}>
+                  <select id="confirm-calendar" value={confirmCalendarId} onChange={e => setConfirmCalendarId(e.target.value)} style={inputStyle}>
                     <option value="">Select a calendar…</option>
                     {calendars.map(c => <option key={c.id} value={c.id}>{c.name || c.id}</option>)}
                   </select>
                 )}
               </div>
               <div style={{ marginBottom: '12px' }}>
-                <label style={labelStyle}>Date</label>
-                <input type="date" value={confirmDate} onChange={e => setConfirmDate(e.target.value)} style={inputStyle} />
+                <label htmlFor="confirm-date" style={labelStyle}>Date</label>
+                <input id="confirm-date" type="date" value={confirmDate} onChange={e => setConfirmDate(e.target.value)} style={inputStyle} />
               </div>
               <div style={{ marginBottom: '18px' }}>
                 <label style={labelStyle}>Open times</label>
@@ -4926,7 +4946,7 @@ function TreatmentPlans({ contacts }) {
         const total = p.procedures.length;
         return (
           <Card key={p.id} className="px-card" style={{ marginBottom: '12px' }}>
-            <div onClick={() => setExpandedId(isExpanded ? null : p.id)} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+            <div onClick={() => setExpandedId(isExpanded ? null : p.id)} {...clickableDivProps(() => setExpandedId(isExpanded ? null : p.id))} aria-expanded={isExpanded} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
               <Ava initials={initialsOf(p.patientName)} bg={t.brandL} color={t.brand} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
@@ -4972,21 +4992,21 @@ function TreatmentPlans({ contacts }) {
       {showCreate && (
         <Modal title="Create treatment plan" onClose={() => setShowCreate(false)}>
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Patient</label>
-            <select value={createForm.contactId} onChange={e => setCreateForm(f => ({ ...f, contactId: e.target.value }))} style={inputStyle}>
+            <label htmlFor="tx-plan-patient" style={labelStyle}>Patient</label>
+            <select id="tx-plan-patient" value={createForm.contactId} onChange={e => setCreateForm(f => ({ ...f, contactId: e.target.value }))} style={inputStyle}>
               <option value="">Select a patient…</option>
               {contactList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Plan name</label>
-            <input value={createForm.planName} onChange={e => setCreateForm(f => ({ ...f, planName: e.target.value }))} placeholder="e.g. Crown & Root Canal" style={inputStyle} />
+            <label htmlFor="tx-plan-name" style={labelStyle}>Plan name</label>
+            <input id="tx-plan-name" value={createForm.planName} onChange={e => setCreateForm(f => ({ ...f, planName: e.target.value }))} placeholder="e.g. Crown & Root Canal" style={inputStyle} />
           </div>
           <label style={labelStyle}>Procedures</label>
           {createForm.procedures.map((pr, i) => (
             <div key={i} style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <input value={pr.code} onChange={e => updateProcedureRow(i, 'code', e.target.value)} placeholder="Code / name (e.g. D2740 Crown)" style={{ ...inputStyle, flex: 2 }} />
-              <input value={pr.cost} onChange={e => updateProcedureRow(i, 'cost', e.target.value)} placeholder="Cost" type="number" style={{ ...inputStyle, flex: 1 }} />
+              <input value={pr.code} onChange={e => updateProcedureRow(i, 'code', e.target.value)} placeholder="Code / name (e.g. D2740 Crown)" aria-label="Procedure code or name" style={{ ...inputStyle, flex: 2 }} />
+              <input value={pr.cost} onChange={e => updateProcedureRow(i, 'cost', e.target.value)} placeholder="Cost" type="number" aria-label="Procedure cost" style={{ ...inputStyle, flex: 1 }} />
             </div>
           ))}
           <Btn small onClick={addProcedureRow} style={{ marginBottom: '18px' }}><Plus size={12} /> Add procedure</Btn>
@@ -5301,23 +5321,23 @@ function MembershipPlans({ contacts }) {
       {showCreate && (
         <Modal title="Create membership plan" onClose={() => setShowCreate(false)}>
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Plan name</label>
-            <input value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Family Plan" style={inputStyle} />
+            <label htmlFor="mem-plan-name" style={labelStyle}>Plan name</label>
+            <input id="mem-plan-name" value={createForm.name} onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. Family Plan" style={inputStyle} />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '6px' }}>
             <div>
-              <label style={labelStyle}>Monthly price</label>
-              <input value={createForm.monthlyPrice} onChange={e => setCreateForm(f => ({ ...f, monthlyPrice: e.target.value }))} type="number" placeholder="39" style={inputStyle} />
+              <label htmlFor="mem-plan-monthly" style={labelStyle}>Monthly price</label>
+              <input id="mem-plan-monthly" value={createForm.monthlyPrice} onChange={e => setCreateForm(f => ({ ...f, monthlyPrice: e.target.value }))} type="number" placeholder="39" style={inputStyle} />
             </div>
             <div>
-              <label style={labelStyle}>Annual price</label>
-              <input value={createForm.annualPrice} onChange={e => setCreateForm(f => ({ ...f, annualPrice: e.target.value }))} type="number" placeholder="399" style={inputStyle} />
+              <label htmlFor="mem-plan-annual" style={labelStyle}>Annual price</label>
+              <input id="mem-plan-annual" value={createForm.annualPrice} onChange={e => setCreateForm(f => ({ ...f, annualPrice: e.target.value }))} type="number" placeholder="399" style={inputStyle} />
             </div>
           </div>
           {annualSavings > 0 && <div style={{ fontSize: '11.5px', color: t.green, marginBottom: '12px' }}>Patients save ${annualSavings}/year paying annually.</div>}
           <label style={labelStyle}>Benefits</label>
           {createForm.benefits.map((b, i) => (
-            <input key={i} value={b} onChange={e => updateBenefit(i, e.target.value)} placeholder="e.g. 2 cleanings per year" style={{ ...inputStyle, marginBottom: '8px' }} />
+            <input key={i} value={b} onChange={e => updateBenefit(i, e.target.value)} placeholder="e.g. 2 cleanings per year" aria-label={`Benefit ${i + 1}`} style={{ ...inputStyle, marginBottom: '8px' }} />
           ))}
           <Btn small onClick={addBenefitRow} style={{ marginBottom: '14px' }}><Plus size={12} /> Add benefit</Btn>
           {createError && <div style={{ marginBottom: '12px', fontSize: '11.5px', color: t.red }}>{createError}</div>}
@@ -5328,15 +5348,15 @@ function MembershipPlans({ contacts }) {
       {showEnroll && (
         <Modal title="Enroll patient" onClose={() => { setShowEnroll(false); resetEnrollLinkState(); }}>
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Patient</label>
-            <select value={enrollForm.contactId} onChange={e => { setEnrollForm(f => ({ ...f, contactId: e.target.value })); resetEnrollLinkState(); }} style={inputStyle}>
+            <label htmlFor="mem-enroll-patient" style={labelStyle}>Patient</label>
+            <select id="mem-enroll-patient" value={enrollForm.contactId} onChange={e => { setEnrollForm(f => ({ ...f, contactId: e.target.value })); resetEnrollLinkState(); }} style={inputStyle}>
               <option value="">Select a patient…</option>
               {contactList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div style={{ marginBottom: '14px' }}>
-            <label style={labelStyle}>Plan</label>
-            <select value={enrollForm.planId} onChange={e => { setEnrollForm(f => ({ ...f, planId: e.target.value })); resetEnrollLinkState(); }} style={inputStyle}>
+            <label htmlFor="mem-enroll-plan" style={labelStyle}>Plan</label>
+            <select id="mem-enroll-plan" value={enrollForm.planId} onChange={e => { setEnrollForm(f => ({ ...f, planId: e.target.value })); resetEnrollLinkState(); }} style={inputStyle}>
               <option value="">Select a plan…</option>
               {plans.map(p => <option key={p.id} value={p.id}>{p.name} — ${p.monthlyPrice}/mo</option>)}
             </select>
@@ -5358,7 +5378,7 @@ function MembershipPlans({ contacts }) {
             {linkUrl && (
               <div style={{ marginTop: '12px', padding: '10px 12px', background: t.greenL, borderRadius: '6px', border: `1px solid ${withAlpha(t.accentGreen, .15)}` }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <input readOnly value={linkUrl} onFocus={e => e.target.select()} style={{ flex: 1, padding: '7px 10px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12px', fontFamily: 'inherit', background: t.bgCard, color: t.ink2, minWidth: 0 }} />
+                  <input readOnly aria-label="Enrollment link" value={linkUrl} onFocus={e => e.target.select()} style={{ flex: 1, padding: '7px 10px', border: `1px solid ${t.border}`, borderRadius: '5px', fontSize: '12px', fontFamily: 'inherit', background: t.bgCard, color: t.ink2, minWidth: 0 }} />
                   <Btn small onClick={handleCopy}>{copied ? <Check size={13} /> : <Copy size={13} />} {copied ? 'Copied' : 'Copy'}</Btn>
                 </div>
                 {isGhlConfigured && (
@@ -5778,8 +5798,8 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           <CardTitle>Practice details</CardTitle>
           {[['Practice name', 'Bright Smiles Dental'], ['Phone number', '(813) 555-0142'], ['Email', 'hello@brightsmiles.com'], ['Address', '4210 W Bay Ave, Tampa FL 33616'], ['NPI number', '1234567890']].map(([label, val], i) => (
             <div key={i} style={{ marginBottom: '13px' }}>
-              <label style={labelStyle}>{label}</label>
-              <input defaultValue={val} style={{ ...inputStyle, background: t.bgRow }} />
+              <label htmlFor={`settings-practice-${i}`} style={labelStyle}>{label}</label>
+              <input id={`settings-practice-${i}`} defaultValue={val} style={{ ...inputStyle, background: t.bgRow }} />
             </div>
           ))}
           <Btn primary onClick={saveChanges}>{saved ? <Check size={14} /> : null}{saved ? 'Saved' : 'Save changes'}</Btn>
@@ -5827,12 +5847,14 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
             value={customHex}
             onChange={e => setCustomHex(e.target.value)}
             placeholder="#2563EB"
+            aria-label="Custom brand color hex code"
             style={{ ...inputStyle, maxWidth: '120px' }}
           />
           <input
             type="color"
             value={/^#[0-9A-Fa-f]{6}$/.test(customHex) ? customHex : '#2563EB'}
             onChange={e => setCustomHex(e.target.value)}
+            aria-label="Custom brand color picker"
             style={{ width: '36px', height: '36px', border: `1px solid ${t.border}`, borderRadius: '8px', padding: '2px', background: t.bgCard, cursor: 'pointer' }}
           />
           <Btn small primary onClick={() => /^#[0-9A-Fa-f]{6}$/.test(customHex) && onBrandColorChange && onBrandColorChange(customHex)}>Apply</Btn>
@@ -5910,13 +5932,13 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           {requestDoctors.map(d => (
             <RowItem key={d} style={{ justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', color: t.ink2 }}>{d}</span>
-              <button onClick={() => setRequestDoctors(list => list.filter(x => x !== d))} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+              <button onClick={() => setRequestDoctors(list => list.filter(x => x !== d))} aria-label={`Remove ${d}`} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
                 <X size={14} />
               </button>
             </RowItem>
           ))}
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <input value={newDoctor} onChange={e => setNewDoctor(e.target.value)} placeholder="Add a doctor…" style={{ ...inputStyle, flex: 1 }} />
+            <input value={newDoctor} onChange={e => setNewDoctor(e.target.value)} placeholder="Add a doctor…" aria-label="Add a doctor" style={{ ...inputStyle, flex: 1 }} />
             <Btn small onClick={() => { if (newDoctor.trim()) { setRequestDoctors(list => [...list, newDoctor.trim()]); setNewDoctor(''); } }}><Plus size={13} /> Add</Btn>
           </div>
         </Card>
@@ -5926,13 +5948,13 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           {requestApptTypes.map(a => (
             <RowItem key={a} style={{ justifyContent: 'space-between' }}>
               <span style={{ fontSize: '13px', color: t.ink2 }}>{a}</span>
-              <button onClick={() => setRequestApptTypes(list => list.filter(x => x !== a))} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
+              <button onClick={() => setRequestApptTypes(list => list.filter(x => x !== a))} aria-label={`Remove ${a}`} style={{ width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', background: 'transparent', color: t.muted, cursor: 'pointer', borderRadius: '8px' }}>
                 <X size={14} />
               </button>
             </RowItem>
           ))}
           <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-            <input value={newApptType} onChange={e => setNewApptType(e.target.value)} placeholder="Add an appointment type…" style={{ ...inputStyle, flex: 1 }} />
+            <input value={newApptType} onChange={e => setNewApptType(e.target.value)} placeholder="Add an appointment type…" aria-label="Add an appointment type" style={{ ...inputStyle, flex: 1 }} />
             <Btn small onClick={() => { if (newApptType.trim()) { setRequestApptTypes(list => [...list, newApptType.trim()]); setNewApptType(''); } }}><Plus size={13} /> Add</Btn>
           </div>
         </Card>
@@ -5946,9 +5968,9 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
             <ToggleSwitch checked={hrs.open} onChange={() => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], open: !bh[day].open } }))} />
             {hrs.open ? (
               <>
-                <input type="time" value={hrs.from} onChange={e => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], from: e.target.value } }))} style={{ ...inputStyle, width: '120px' }} />
+                <input type="time" value={hrs.from} onChange={e => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], from: e.target.value } }))} aria-label={`${day} opening time`} style={{ ...inputStyle, width: '120px' }} />
                 <span style={{ fontSize: '12px', color: t.muted }}>to</span>
-                <input type="time" value={hrs.to} onChange={e => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], to: e.target.value } }))} style={{ ...inputStyle, width: '120px' }} />
+                <input type="time" value={hrs.to} onChange={e => setBusinessHours(bh => ({ ...bh, [day]: { ...bh[day], to: e.target.value } }))} aria-label={`${day} closing time`} style={{ ...inputStyle, width: '120px' }} />
               </>
             ) : (
               <span style={{ fontSize: '12.5px', color: t.muted }}>Closed</span>
@@ -5983,8 +6005,8 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
               <div>
-                <label style={labelStyle}>Send time</label>
-                <input type="time" value={briefingTime} onChange={e => setBriefingTime(e.target.value)} style={inputStyle} />
+                <label htmlFor="briefing-send-time" style={labelStyle}>Send time</label>
+                <input id="briefing-send-time" type="time" value={briefingTime} onChange={e => setBriefingTime(e.target.value)} style={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Delivery method</label>
@@ -6114,16 +6136,16 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
       {showInviteModal && (
         <Modal title="Invite staff member" onClose={() => setShowInviteModal(false)}>
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Full name</label>
-            <input value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))} placeholder="Jordan Blake" style={inputStyle} />
+            <label htmlFor="staff-invite-name" style={labelStyle}>Full name</label>
+            <input id="staff-invite-name" value={inviteForm.name} onChange={e => setInviteForm(f => ({ ...f, name: e.target.value }))} placeholder="Jordan Blake" style={inputStyle} />
           </div>
           <div style={{ marginBottom: '12px' }}>
-            <label style={labelStyle}>Email address</label>
-            <input value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="jordan@brightsmiles.com" style={inputStyle} />
+            <label htmlFor="staff-invite-email" style={labelStyle}>Email address</label>
+            <input id="staff-invite-email" value={inviteForm.email} onChange={e => setInviteForm(f => ({ ...f, email: e.target.value }))} placeholder="jordan@brightsmiles.com" style={inputStyle} />
           </div>
           <div style={{ marginBottom: '18px' }}>
-            <label style={labelStyle}>Role</label>
-            <select value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))} style={inputStyle}>
+            <label htmlFor="staff-invite-role" style={labelStyle}>Role</label>
+            <select id="staff-invite-role" value={inviteForm.role} onChange={e => setInviteForm(f => ({ ...f, role: e.target.value }))} style={inputStyle}>
               {EDITABLE_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
@@ -6137,8 +6159,8 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
       {editRoleStaff && (
         <Modal title={`Edit role — ${editRoleStaff.name}`} onClose={() => setEditRoleStaff(null)}>
           <div style={{ marginBottom: '18px' }}>
-            <label style={labelStyle}>Role</label>
-            <select value={editRoleValue} onChange={e => setEditRoleValue(e.target.value)} style={inputStyle}>
+            <label htmlFor="staff-edit-role" style={labelStyle}>Role</label>
+            <select id="staff-edit-role" value={editRoleValue} onChange={e => setEditRoleValue(e.target.value)} style={inputStyle}>
               {EDITABLE_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
@@ -6179,6 +6201,8 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                 <div
                   key={key}
                   onClick={() => setWizardMethod(key)}
+                  {...clickableDivProps(() => setWizardMethod(key))}
+                  aria-pressed={wizardMethod === key}
                   className="px-row"
                   style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '13px', borderRadius: '6px', marginBottom: '10px', cursor: 'pointer', border: `2px solid ${wizardMethod === key ? t.brand : t.border2}`, background: wizardMethod === key ? t.brandL : t.bgRow }}
                 >
@@ -6216,8 +6240,8 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           {wizardStep === 2 && wizardMethod === 'sms' && (
             <>
               <div style={{ marginBottom: '18px' }}>
-                <label style={labelStyle}>Phone number</label>
-                <input value={wizardPhone} onChange={e => setWizardPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
+                <label htmlFor="staff-wizard-phone" style={labelStyle}>Phone number</label>
+                <input id="staff-wizard-phone" value={wizardPhone} onChange={e => setWizardPhone(e.target.value)} placeholder="(813) 555-0142" style={inputStyle} />
               </div>
               <Btn primary onClick={wizardNext} disabled={!wizardPhone.trim()} style={{ width: '100%', justifyContent: 'center' }}>Send code</Btn>
             </>
@@ -6234,6 +6258,7 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
                   onChange={e => { setWizardCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setWizardCodeError(''); }}
                   placeholder="000000"
                   inputMode="numeric"
+                  aria-label="6-digit verification code"
                   style={{ ...inputStyle, textAlign: 'center', fontSize: '22px', letterSpacing: '8px', fontFamily: 'monospace' }}
                 />
               </div>
@@ -6349,13 +6374,14 @@ function ActivityLog() {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Search by user or action…"
+                aria-label="Search by user or action"
                 style={{ width: '100%', padding: '8px 12px 8px 32px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12.5px', color: t.ink2, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }}
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ padding: '7px 9px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
+              <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} aria-label="Filter from date" style={{ padding: '7px 9px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
               <span style={{ fontSize: '12px', color: t.muted }}>to</span>
-              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ padding: '7px 9px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
+              <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} aria-label="Filter to date" style={{ padding: '7px 9px', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgRow, fontSize: '12px', color: t.ink2, outline: 'none', fontFamily: 'inherit' }} />
             </div>
             <Btn small onClick={exportCsv}><Download size={13} /> Export CSV</Btn>
           </div>
