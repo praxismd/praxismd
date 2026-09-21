@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Check, X, ArrowRight, RotateCcw, Bot, ClipboardList, Receipt, Shield,
@@ -16,7 +16,7 @@ export const C = {
   ink: '#0F172A',
   ink2: '#1E293B',
   mid: '#475569',
-  muted: '#94A3B8',
+  muted: '#64748B', // WCAG AA (4.5:1+) against bg/bgAlt — the original #94A3B8 only cleared 2.6:1
   border: '#E2E8F0',
   brand: '#2563EB',
   brandDark: '#1D4ED8',
@@ -176,9 +176,37 @@ function Reveal({ children, style }) {
 }
 
 // ─── DEMO MODAL ────────────────────────────────────────────
+function useDialogA11y(onClose, open) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const previouslyFocused = document.activeElement;
+    const container = ref.current;
+    const focusable = container?.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    (focusable?.[0] || container)?.focus();
+    function onKeyDown(e) {
+      if (e.key === 'Escape') { onClose(); return; }
+      if (e.key !== 'Tab' || !focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  return ref;
+}
+
 function DemoModal({ open, onClose }) {
   const [form, setForm] = useState({ name: '', practice: '', email: '', phone: '' });
   const [submitted, setSubmitted] = useState(false);
+  const dialogRef = useDialogA11y(onClose, open);
+  const titleId = useId();
 
   if (!open) return null;
 
@@ -205,10 +233,15 @@ function DemoModal({ open, onClose }) {
       style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.55)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         onClick={e => e.stopPropagation()}
         style={{ background: C.bg, borderRadius: '18px', padding: '32px', maxWidth: '440px', width: '100%', boxShadow: '0 30px 70px rgba(15,23,42,.3)', position: 'relative' }}
       >
-        <button type="button" onClick={handleClose} style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px', display: 'flex' }}>
+        <button type="button" onClick={handleClose} aria-label="Close" style={{ position: 'absolute', top: '16px', right: '16px', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px', display: 'flex' }}>
           <X size={18} color={C.muted} />
         </button>
         {submitted ? (
@@ -216,20 +249,20 @@ function DemoModal({ open, onClose }) {
             <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: C.greenL, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
               <Check size={24} color={C.green} />
             </div>
-            <div style={{ fontSize: '18px', fontWeight: '700', color: C.ink, marginBottom: '8px' }}>Thanks — we’ll be in touch!</div>
+            <div id={titleId} style={{ fontSize: '18px', fontWeight: '700', color: C.ink, marginBottom: '8px' }}>Thanks — we’ll be in touch!</div>
             <div style={{ fontSize: '13.5px', color: C.mid, lineHeight: 1.6 }}>
               Someone from our team will reach out within one business day to schedule your walkthrough.
             </div>
           </div>
         ) : (
           <>
-            <div style={{ fontSize: '20px', fontWeight: '700', color: C.ink, marginBottom: '6px' }}>Book a demo</div>
+            <div id={titleId} style={{ fontSize: '20px', fontWeight: '700', color: C.ink, marginBottom: '6px' }}>Book a demo</div>
             <div style={{ fontSize: '13.5px', color: C.mid, marginBottom: '22px' }}>See PraxisMD on a 20-minute walkthrough with our team.</div>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <input required value={form.name} onChange={handleChange('name')} placeholder="Your name" style={inputStyle} />
-              <input required value={form.practice} onChange={handleChange('practice')} placeholder="Practice name" style={inputStyle} />
-              <input required type="email" value={form.email} onChange={handleChange('email')} placeholder="Email address" style={inputStyle} />
-              <input required type="tel" value={form.phone} onChange={handleChange('phone')} placeholder="Phone number" style={inputStyle} />
+              <input required aria-label="Your name" value={form.name} onChange={handleChange('name')} placeholder="Your name" style={inputStyle} />
+              <input required aria-label="Practice name" value={form.practice} onChange={handleChange('practice')} placeholder="Practice name" style={inputStyle} />
+              <input required aria-label="Email address" type="email" value={form.email} onChange={handleChange('email')} placeholder="Email address" style={inputStyle} />
+              <input required aria-label="Phone number" type="tel" value={form.phone} onChange={handleChange('phone')} placeholder="Phone number" style={inputStyle} />
               <button type="submit" className="px-btn" style={{ marginTop: '6px', padding: '13px', borderRadius: '10px', border: 'none', background: C.brand, color: 'white', fontSize: '14.5px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
                 Request my demo
               </button>
@@ -257,7 +290,7 @@ function NavBar({ onOpenDemo }) {
   }
 
   return (
-    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100 }}>
+    <header style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100 }}>
       <div style={{ height: '3px', background: C.trim }} />
       <div style={{ background: withAlpha('#FFFFFF', .92), backdropFilter: 'blur(8px)', borderBottom: `1px solid ${C.trim}` }}>
       <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '14px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px' }}>
@@ -266,11 +299,11 @@ function NavBar({ onOpenDemo }) {
           <span style={{ fontSize: '18px', fontWeight: '700', color: C.ink }}>PraxisMD</span>
         </div>
 
-        <div className="px-nav-links" style={{ display: 'flex', alignItems: 'center', gap: '28px', fontSize: '13.5px', fontWeight: '500', color: C.mid }}>
+        <nav aria-label="Main" className="px-nav-links" style={{ display: 'flex', alignItems: 'center', gap: '28px', fontSize: '13.5px', fontWeight: '500', color: C.mid }}>
           {links.map(([label, id]) => (
             <button key={id} type="button" onClick={go(id)} style={{ color: 'inherit', background: 'transparent', border: 'none', padding: 0, fontFamily: 'inherit', fontSize: 'inherit', fontWeight: 'inherit', cursor: 'pointer' }}>{label}</button>
           ))}
-        </div>
+        </nav>
 
         <div className="px-nav-links" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <Link to="/login" style={{ color: C.mid, textDecoration: 'none', fontSize: '13.5px', fontWeight: '500', whiteSpace: 'nowrap' }}>Sign in</Link>
@@ -283,6 +316,8 @@ function NavBar({ onOpenDemo }) {
           type="button"
           className="px-nav-hamburger"
           onClick={() => setMobileOpen(o => !o)}
+          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={mobileOpen}
           style={{ display: 'none', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
         >
           {mobileOpen ? <X size={22} color={C.ink} /> : <Menu size={22} color={C.ink} />}
@@ -290,7 +325,7 @@ function NavBar({ onOpenDemo }) {
       </div>
 
       {mobileOpen && (
-        <div className="px-nav-hamburger" style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '10px 26px 18px', borderTop: `1px solid ${C.border}` }}>
+        <nav aria-label="Mobile" className="px-nav-hamburger" style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '10px 26px 18px', borderTop: `1px solid ${C.border}` }}>
           {links.map(([label, id]) => (
             <button key={id} type="button" onClick={go(id)} style={{ textAlign: 'left', padding: '11px 4px', border: 'none', background: 'transparent', fontSize: '14.5px', fontWeight: '500', color: C.ink2, cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>
           ))}
@@ -298,10 +333,10 @@ function NavBar({ onOpenDemo }) {
           <button type="button" onClick={() => { setMobileOpen(false); onOpenDemo(); }} className="px-btn" style={{ marginTop: '8px', padding: '12px', borderRadius: '10px', border: 'none', background: C.brand, color: 'white', fontSize: '14px', fontWeight: '700', fontFamily: 'inherit', cursor: 'pointer' }}>
             Book a demo
           </button>
-        </div>
+        </nav>
       )}
       </div>
-    </div>
+    </header>
   );
 }
 
@@ -331,7 +366,7 @@ function HeroMockup() {
   ];
 
   return (
-    <div style={{ marginTop: '56px', maxWidth: '920px', marginLeft: 'auto', marginRight: 'auto' }}>
+    <div aria-hidden="true" style={{ marginTop: '56px', maxWidth: '920px', marginLeft: 'auto', marginRight: 'auto' }}>
       <div style={{ background: '#1E293B', borderRadius: '14px 14px 0 0', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: '10px' }}>
         <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
           <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
@@ -432,11 +467,33 @@ function Landing() {
           .px-features-grid { grid-template-columns: 1fr !important; }
           .px-footer-grid { grid-template-columns: 1fr !important; }
         }
+        a:focus-visible, button:focus-visible, [tabindex]:focus-visible,
+        input:focus-visible, select:focus-visible, textarea:focus-visible {
+          outline: 2px solid ${C.brand};
+          outline-offset: 2px;
+        }
+        .px-skip-link {
+          position: absolute; top: -999px; left: 12px; z-index: 1000;
+          background: ${C.brand}; color: white; padding: 10px 16px; border-radius: 6px;
+          font-size: 13px; font-weight: 600; text-decoration: none;
+        }
+        .px-skip-link:focus { top: 12px; }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.001ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.001ms !important;
+          }
+          html { scroll-behavior: auto; }
+        }
       `}</style>
+
+      <a href="#main-content" className="px-skip-link">Skip to main content</a>
 
       <NavBar onOpenDemo={openDemo} />
       <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
 
+      <main id="main-content">
       {/* HERO */}
       <div style={{ position: 'relative', overflow: 'hidden' }}>
         <div style={{
@@ -648,8 +705,10 @@ function Landing() {
         </Reveal>
       </div>
 
+      </main>
+
       {/* FOOTER */}
-      <div id="contact" style={{ background: C.bgAlt, borderTop: `1px solid ${C.border}`, padding: '60px 26px 44px' }}>
+      <footer id="contact" style={{ background: C.bgAlt, borderTop: `1px solid ${C.border}`, padding: '60px 26px 44px' }}>
         <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
           <div className="px-footer-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(4, 1fr)', gap: '32px' }}>
             <div>
@@ -675,15 +734,15 @@ function Landing() {
             ))}
           </div>
         </div>
-      </div>
-      <div style={{ background: C.trim, padding: '16px 26px' }}>
-        <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-          <div style={{ fontSize: '12px', color: withAlpha('#FFFFFF', .6) }}>© 2026 PraxisMD. All content on this page is for demonstration purposes.</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: withAlpha('#FFFFFF', .75), fontWeight: '600' }}>
-            <Shield size={13} color="#4ADE80" /> HIPAA Compliant · SOC 2 Type II
+        <div style={{ background: C.trim, margin: '44px -26px -44px', padding: '16px 26px' }}>
+          <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ fontSize: '12px', color: withAlpha('#FFFFFF', .6) }}>© 2026 PraxisMD. All content on this page is for demonstration purposes.</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: withAlpha('#FFFFFF', .75), fontWeight: '600' }}>
+              <Shield size={13} color="#4ADE80" /> HIPAA Compliant · SOC 2 Type II
+            </div>
           </div>
         </div>
-      </div>
+      </footer>
     </div>
   );
 }

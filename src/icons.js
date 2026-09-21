@@ -13,6 +13,7 @@ function makeIcon(biName, { fillable = false, filledName } = {}) {
         className={`bi bi-${cls}${className ? ` ${className}` : ''}`}
         onClick={onClick}
         title={title}
+        aria-hidden={title ? undefined : 'true'}
         style={{
           fontSize: size,
           lineHeight: 1,
