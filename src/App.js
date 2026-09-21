@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { signOut, onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, getAppointments, getCalendars, getCampaigns, sendMessage, createContact, isGhlConfigured } from './api/ghl';
@@ -1001,7 +1001,7 @@ function App() {
           {gate('portal', <Portal userRole={userRole} />)}
           {gate('documents', <Documents contacts={contacts} userRole={userRole} />)}
           {gate('treatmentplans', <TreatmentPlans contacts={contacts} userRole={userRole} />)}
-          {gate('waitlist', <Waitlist userRole={userRole} />)}
+          {gate('waitlist', <Waitlist contacts={contacts} userRole={userRole} />)}
           {gate('calendar', <Calendar userRole={userRole} />)}
           {gate('appointmentrequests', <AppointmentRequests userRole={userRole} />)}
         </div>
@@ -3904,45 +3904,106 @@ function Documents({ contacts }) {
 }
 
 // ─── WAITLIST ──────────────────────────────────────────────
-const WAITLIST_SEED = [
-  { id: 'w1', ini: 'MC', bg: 'brandL', c: 'brand', name: 'Maria Chen', service: 'Cleaning', pref: 'Any time this week', phone: '(555) 201-4482', waitingSince: 'Sep 9', notes: 'Prefers Dr. Alvarez. Flexible on days.' },
-  { id: 'w2', ini: 'DW', bg: 'amberL', c: 'amber', name: 'David Wong', service: 'Cleaning', pref: 'Mornings preferred', phone: '(555) 774-1190', waitingSince: 'Sep 10', notes: 'Cannot do Fridays. Works near the office.' },
-  { id: 'w3', ini: 'SK', bg: 'greenL', c: 'green', name: 'Sam Kim', service: 'Exam', pref: 'Afternoons only', phone: '(555) 330-8827', waitingSince: 'Sep 11', notes: 'New patient intake still needs to be finished.' },
-  { id: 'w4', ini: 'PP', bg: 'purpleL', c: 'purple', name: 'Priya Patel', service: 'Whitening', pref: 'Weekends preferred', phone: '(555) 662-0093', waitingSince: 'Sep 12', notes: 'Asked to be notified by text only.' },
-];
+const WAITLIST_AVA_PALETTE = ['brand', 'amber', 'green', 'purple', 'teal'];
 
-function Waitlist() {
+// Staff-managed waitlist (waitlistEntries/{id}, staff-written and scoped by
+// practiceId — this is internal front-desk data, never read by the Patient
+// Portal, so it uses a plain staff-only rule rather than the dual-read
+// pattern used by patient-facing collections). Manual reordering swaps a
+// numeric `position` field between the two affected docs in one atomic
+// batch, so a drag/reorder can never leave two entries with the same slot.
+function Waitlist({ contacts }) {
   const t = useTheme();
-  const [list, setList] = useState(WAITLIST_SEED);
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
-  const colorMap = { brand: t.brand, amber: t.amber, green: t.green, purple: t.purple };
-  const bgMap = { brandL: t.brandL, amberL: t.amberL, greenL: t.greenL, purpleL: t.purpleL };
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({ contactId: '', service: 'Cleaning', pref: '', notes: '' });
+  const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');
+  const contactList = contacts || [];
+  const colorMap = { brand: t.brand, amber: t.amber, green: t.green, purple: t.purple, teal: t.teal };
+  const bgMap = { brandL: t.brandL, amberL: t.amberL, greenL: t.greenL, purpleL: t.purpleL, tealL: t.tealL };
 
-  function move(index, dir) {
-    setList(l => {
-      const next = l.slice();
-      const target = index + dir;
-      if (target < 0 || target >= next.length) return l;
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
-    });
+  const inputStyle = { width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '6px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' };
+  const labelStyle = { fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' };
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth.currentUser) { setLoading(false); return; }
+    const q = query(collection(db, 'waitlistEntries'), where('practiceId', '==', auth.currentUser.uid), orderBy('position', 'asc'));
+    const unsub = onSnapshot(q, snap => {
+      setList(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
+    return unsub;
+  }, []);
+
+  async function move(index, dir) {
+    const target = index + dir;
+    if (target < 0 || target >= list.length) return;
+    const a = list[index], b = list[target];
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'waitlistEntries', a.id), { position: b.position });
+    batch.update(doc(db, 'waitlistEntries', b.id), { position: a.position });
+    await batch.commit();
+  }
+
+  async function addToWaitlist() {
+    const contact = contactList.find(c => c.id === addForm.contactId);
+    if (!contact) {
+      setAddError('Select a patient to continue.');
+      return;
+    }
+    setAdding(true);
+    setAddError('');
+    try {
+      const maxPosition = list.reduce((max, p) => Math.max(max, p.position || 0), 0);
+      await addDoc(collection(db, 'waitlistEntries'), {
+        practiceId: auth.currentUser.uid,
+        ghlContactId: contact.id,
+        name: contact.name,
+        phone: contact.phone,
+        service: addForm.service,
+        pref: addForm.pref.trim() || 'Any time',
+        notes: addForm.notes.trim(),
+        position: maxPosition + 1,
+        createdAt: serverTimestamp(),
+      });
+      setShowAdd(false);
+      setAddForm({ contactId: '', service: 'Cleaning', pref: '', notes: '' });
+    } catch (err) {
+      setAddError(err.message || 'Could not add to the waitlist.');
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function removeFromWaitlist(id) {
+    setExpandedId(cur => (cur === id ? null : cur));
+    await deleteDoc(doc(db, 'waitlistEntries', id));
   }
 
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '10px', marginBottom: '16px' }}>
         <StatCard label="On waitlist" value={String(list.length)} color={t.teal} accent={t.accentTeal} sub="Waiting for open slots" />
-        <StatCard label="Slots filled this week" value="5" color={t.green} accent={t.accentGreen} sub="Auto-filled · no manual work" />
-        <StatCard label="Avg fill time" value="8 min" color={t.brand} accent={t.accentBlue} sub="From cancellation to fill" />
+        <StatCard label="Slots filled this week" value="—" color={t.green} accent={t.accentGreen} sub="Auto-fill tracking coming soon" />
+        <StatCard label="Avg fill time" value="—" color={t.brand} accent={t.accentBlue} sub="From cancellation to fill" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', alignItems: 'start' }}>
         <Card>
-          <CardTitle>Current waitlist</CardTitle>
-          {list.map((p, i) => {
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+            <CardTitle>Current waitlist</CardTitle>
+            <Btn small primary onClick={() => setShowAdd(true)}><Plus size={12} /> Add to waitlist</Btn>
+          </div>
+          {loading && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '16px 0' }}>Loading…</div>}
+          {!loading && list.length === 0 && <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '16px 0' }}>No one on the waitlist right now.</div>}
+          {!loading && list.map((p, i) => {
             const isExpanded = expandedId === p.id;
             const pillLabel = i === 0 ? 'Next up' : `#${i + 1}`;
             const pillColor = i === 0 ? t.brand : t.muted;
             const pillBg = i === 0 ? t.brandL : t.bgRow;
+            const paletteKey = WAITLIST_AVA_PALETTE[i % WAITLIST_AVA_PALETTE.length];
             return (
               <div key={p.id} style={{ borderBottom: `1px solid ${t.border2}` }}>
                 <div
@@ -3962,7 +4023,7 @@ function Waitlist() {
                     ><ArrowDown size={12} /></button>
                   </div>
                   <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: t.brandL, color: t.brand, fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</div>
-                  <Ava initials={p.ini} bg={bgMap[p.bg]} color={colorMap[p.c]} />
+                  <Ava initials={initialsOf(p.name)} bg={bgMap[`${paletteKey}L`]} color={colorMap[paletteKey]} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}><PII>{p.name}</PII></div>
                     <div style={{ fontSize: '11.5px', color: t.muted }}>{p.service} · {p.pref}</div>
@@ -3973,28 +4034,51 @@ function Waitlist() {
                 {isExpanded && (
                   <div className="px-expand" style={{ padding: '0 0 14px 60px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                     <DetailRow label="Phone" value={<PII>{p.phone}</PII>} />
-                    <DetailRow label="Waiting since" value={p.waitingSince} />
-                    <div style={{ gridColumn: '1 / -1' }}><DetailRow label="Notes" value={p.notes} /></div>
+                    <DetailRow label="Waiting since" value={formatPlanDate(p.createdAt)} />
+                    <div style={{ gridColumn: '1 / -1' }}><DetailRow label="Notes" value={p.notes || '—'} /></div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <Btn small onClick={() => removeFromWaitlist(p.id)} style={{ color: t.red, borderColor: t.red }}>Remove from waitlist</Btn>
+                    </div>
                   </div>
                 )}
               </div>
             );
           })}
-          <div style={{ marginTop: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '6px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> When a slot opens PraxisMD auto-texts the next patient. First to reply gets the spot.</div>
+          <div style={{ marginTop: '10px', padding: '10px 12px', background: t.tealL, borderRadius: '6px', fontSize: '12px', color: t.teal, border: `1px solid ${withAlpha(t.teal, .15)}`, display: 'flex', alignItems: 'center', gap: '7px' }}><Zap size={13} /> Reorder patients as slots open, then text them from the Patients tab. Automatic slot-fill texting is coming soon.</div>
         </Card>
         <Card>
           <CardTitle>Recent auto-fills</CardTitle>
-          {[['Today 2:30pm — filled in 4 min', 'Maria Chen accepted · David Wong declined'],
-            ['Yesterday 10am — filled in 11 min', 'Sam Kim accepted the slot'],
-            ['Sep 11 4pm — filled in 6 min', 'Priya Patel accepted the slot'],
-          ].map(([title, sub], i) => (
-            <RowItem key={i} style={{ justifyContent: 'space-between' }}>
-              <div><div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{title}</div><div style={{ fontSize: '11.5px', color: t.muted }}><PII>{sub}</PII></div></div>
-              <Pill label="Filled" color={t.green} bg={t.greenL} />
-            </RowItem>
-          ))}
+          <div style={{ fontSize: '12.5px', color: t.muted, textAlign: 'center', padding: '16px 0' }}>Automatic slot-fill tracking is coming soon — for now, text waitlisted patients directly when a slot opens.</div>
         </Card>
       </div>
+
+      {showAdd && (
+        <Modal title="Add to waitlist" onClose={() => setShowAdd(false)}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Patient</label>
+            <select value={addForm.contactId} onChange={e => setAddForm(f => ({ ...f, contactId: e.target.value }))} style={inputStyle}>
+              <option value="">Select a patient…</option>
+              {contactList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Service</label>
+            <select value={addForm.service} onChange={e => setAddForm(f => ({ ...f, service: e.target.value }))} style={inputStyle}>
+              <option>Cleaning</option><option>Exam</option><option>Whitening</option><option>Filling</option><option>Crown fitting</option><option>Consultation</option>
+            </select>
+          </div>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={labelStyle}>Availability preference</label>
+            <input value={addForm.pref} onChange={e => setAddForm(f => ({ ...f, pref: e.target.value }))} placeholder="e.g. Mornings preferred" style={inputStyle} />
+          </div>
+          <div style={{ marginBottom: '14px' }}>
+            <label style={labelStyle}>Notes</label>
+            <input value={addForm.notes} onChange={e => setAddForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional" style={inputStyle} />
+          </div>
+          {addError && <div style={{ marginBottom: '12px', fontSize: '11.5px', color: t.red }}>{addError}</div>}
+          <Btn primary onClick={addToWaitlist} disabled={adding}>{adding ? <Loader2 size={13} className="px-spin" /> : null} {adding ? 'Adding…' : 'Add to waitlist'}</Btn>
+        </Modal>
+      )}
     </div>
   );
 }
