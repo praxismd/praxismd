@@ -4,6 +4,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, addDoc, collection, serverTimestamp, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { signPatientDocument, requestPrescriptionRefill, respondToTreatmentPlan } from './api/patients';
+import { getCalendars, getFreeSlots, isGhlConfigured } from './api/ghl';
 import { light, withAlpha } from './theme';
 import {
   CalendarClock, MessageSquare, User, LogOut, Loader2, AlertTriangle,
@@ -236,29 +237,106 @@ function useInsurance(profile) {
   return { record, loading };
 }
 
+// Formats one free-slot ISO timestamp (as returned by GHL's free-slots
+// endpoint) into a short local time label, e.g. "10:00 AM".
+function formatSlotTime(iso) {
+  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+function todayIsoDate() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function OverviewTab({ setNotice, profile, onOpenMessages }) {
   const { balance: billingBalance } = useBillingRecords(profile);
   const { history: chartHistory } = useChart(profile);
   const lastVisit = chartHistory[0];
   const [showForm, setShowForm] = useState(false);
-  const [reqWhen, setReqWhen] = useState('');
+  const [reqWhen, setReqWhen] = useState(''); // fallback free-text, only used if GHL isn't connected
   const [reqReason, setReqReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [justRequested, setJustRequested] = useState(false);
+  const [calendars, setCalendars] = useState([]);
+  const [calendarsLoading, setCalendarsLoading] = useState(false);
+  const [calendarsError, setCalendarsError] = useState('');
+  const [selectedCalendarId, setSelectedCalendarId] = useState('');
+  const [selectedDate, setSelectedDate] = useState(todayIsoDate());
+  const [slots, setSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState('');
+
+  // Load the practice's real bookable calendars the moment the request form
+  // opens, so the patient picks from actual appointment types/providers
+  // instead of typing a free-text preference.
+  useEffect(() => {
+    if (!showForm || !isGhlConfigured) return;
+    let cancelled = false;
+    setCalendarsLoading(true);
+    setCalendarsError('');
+    getCalendars().then(cals => {
+      if (cancelled) return;
+      setCalendars(cals);
+      setCalendarsLoading(false);
+      if (cals.length > 0) setSelectedCalendarId(c => c || cals[0].id);
+    }).catch(err => {
+      if (cancelled) return;
+      setCalendarsError(err.message || 'Could not load appointment types.');
+      setCalendarsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [showForm]);
+
+  // Real open slots for the chosen calendar + day, straight from GHL — not
+  // a guess, an actual bookable time on the practice's live calendar.
+  useEffect(() => {
+    setSelectedSlot('');
+    if (!selectedCalendarId || !selectedDate) { setSlots([]); return; }
+    let cancelled = false;
+    setSlotsLoading(true);
+    setSlotsError('');
+    const dayStart = new Date(`${selectedDate}T00:00:00`).getTime();
+    const dayEnd = new Date(`${selectedDate}T23:59:59`).getTime();
+    getFreeSlots(selectedCalendarId, { startDate: dayStart, endDate: dayEnd }).then(data => {
+      if (cancelled) return;
+      const flat = Object.values(data || {}).flatMap(v => v?.slots || []).sort();
+      setSlots(flat);
+      setSlotsLoading(false);
+    }).catch(err => {
+      if (cancelled) return;
+      setSlotsError(err.message || 'Could not load open times.');
+      setSlotsLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [selectedCalendarId, selectedDate]);
 
   async function submitRequest() {
-    if (!reqWhen.trim()) {
+    const usingRealPicker = isGhlConfigured && calendars.length > 0;
+    if (usingRealPicker && !selectedSlot) {
+      setNotice('Pick an open time to continue.');
+      return;
+    }
+    if (!usingRealPicker && !reqWhen.trim()) {
       setNotice("Let us know when you'd like to come in.");
       return;
     }
     setSubmitting(true);
     try {
       const user = auth.currentUser;
+      const chosenCalendar = calendars.find(c => c.id === selectedCalendarId);
       await addDoc(collection(db, 'appointmentRequests'), {
         patientUid: user.uid,
         patientName: profile?.name || user.email,
         patientPhone: profile?.phone || '',
-        preferredWhen: reqWhen.trim(),
+        ghlContactId: profile?.ghlContactId || null,
+        practiceId: profile?.practiceId || null,
+        calendarId: usingRealPicker ? selectedCalendarId : null,
+        calendarName: usingRealPicker ? (chosenCalendar?.name || '') : '',
+        requestedSlot: usingRealPicker ? selectedSlot : null,
+        preferredWhen: usingRealPicker
+          ? `${new Date(selectedSlot).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${formatSlotTime(selectedSlot)}`
+          : reqWhen.trim(),
         reason: reqReason.trim(),
         status: 'pending',
         createdAt: serverTimestamp(),
@@ -268,6 +346,7 @@ function OverviewTab({ setNotice, profile, onOpenMessages }) {
       setShowForm(false);
       setReqWhen('');
       setReqReason('');
+      setSelectedSlot('');
     } catch (err) {
       setNotice(`Could not send request (${err.code || err.message || 'unknown error'}).`);
     } finally {
@@ -319,13 +398,70 @@ function OverviewTab({ setNotice, profile, onOpenMessages }) {
       {showForm && (
         <div className="px-expand" style={cardStyle}>
           <div style={{ fontSize: '13.5px', fontWeight: '600', color: t.ink2, marginBottom: '12px' }}>Request an appointment</div>
-          <div style={{ marginBottom: '12px' }}>
-            <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>When works for you?</label>
-            <input
-              value={reqWhen} onChange={e => setReqWhen(e.target.value)} placeholder="e.g. Next Tuesday afternoon"
-              style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
-            />
-          </div>
+
+          {isGhlConfigured && !calendarsError ? (
+            <>
+              <div style={{ marginBottom: '12px' }}>
+                <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Appointment type</label>
+                {calendarsLoading ? (
+                  <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>Loading…</div>
+                ) : calendars.length === 0 ? (
+                  <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>Your practice hasn't set up online booking yet.</div>
+                ) : (
+                  <select
+                    value={selectedCalendarId} onChange={e => setSelectedCalendarId(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2 }}
+                  >
+                    {calendars.map(c => <option key={c.id} value={c.id}>{c.name || c.id}</option>)}
+                  </select>
+                )}
+              </div>
+              {calendars.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Day</label>
+                  <input
+                    type="date" value={selectedDate} min={todayIsoDate()} onChange={e => setSelectedDate(e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
+                  />
+                </div>
+              )}
+              {calendars.length > 0 && (
+                <div style={{ marginBottom: '12px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Open times</label>
+                  {slotsLoading ? (
+                    <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>Loading…</div>
+                  ) : slotsError ? (
+                    <div style={{ fontSize: '12px', color: t.red }}>{slotsError}</div>
+                  ) : slots.length === 0 ? (
+                    <div style={{ fontSize: '12.5px', color: t.muted, padding: '9px 0' }}>No open times this day — try another date.</div>
+                  ) : (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {slots.map(iso => (
+                        <button
+                          key={iso} type="button" onClick={() => setSelectedSlot(iso)} className="px-btn"
+                          style={{
+                            padding: '7px 12px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', fontFamily: 'inherit',
+                            border: selectedSlot === iso ? 'none' : `1px solid ${t.border}`,
+                            background: selectedSlot === iso ? t.brand : t.bgCard,
+                            color: selectedSlot === iso ? 'white' : t.mid,
+                          }}
+                        >{formatSlotTime(iso)}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ marginBottom: '12px' }}>
+              <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>When works for you?</label>
+              <input
+                value={reqWhen} onChange={e => setReqWhen(e.target.value)} placeholder="e.g. Next Tuesday afternoon"
+                style={{ width: '100%', padding: '9px 12px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgRow, color: t.ink2, boxSizing: 'border-box' }}
+              />
+            </div>
+          )}
+
           <div style={{ marginBottom: '14px' }}>
             <label style={{ fontSize: '12px', fontWeight: '500', color: t.mid, marginBottom: '5px', display: 'block' }}>Reason for visit</label>
             <input

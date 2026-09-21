@@ -44,12 +44,20 @@ const APP_BASE_URL = 'https://praxismd.github.io/praxismd';
 const MAX_PAYMENT_LINK_AMOUNT = 50000; // dollars — sanity cap, not a real business limit
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // patient invite links expire after 7 days
 
+// A route either matches an exact `pathname`, or a `test(pathname)` regexp
+// for routes with a path parameter (e.g. a calendar id) that can't be
+// allowlisted as a fixed string. `version` overrides GHL_API_VERSION for
+// that specific call — GHL's Calendars endpoints (confirmed against GHL's
+// own OpenAPI spec) require the older 2021-04-15 version header, not the
+// 2021-07-28 the rest of this app already uses successfully.
 const ALLOWED_GHL_ROUTES = [
   { method: 'GET', pathname: '/contacts/' },
   { method: 'POST', pathname: '/contacts/' },
   { method: 'GET', pathname: '/conversations/search' },
   { method: 'GET', pathname: '/calendars/' },
   { method: 'GET', pathname: '/calendars/events' },
+  { method: 'GET', test: /^\/calendars\/[^/]+\/free-slots$/, version: '2021-04-15' },
+  { method: 'POST', pathname: '/calendars/events/appointments', version: '2021-04-15' },
   { method: 'GET', pathname: '/campaigns/' },
   { method: 'POST', pathname: '/conversations/messages' },
 ];
@@ -179,8 +187,11 @@ exports.ghlProxy = onCall({ secrets: [ghlApiKey] }, async (request) => {
     throw new HttpsError('invalid-argument', 'Malformed path.');
   }
 
-  const allowed = ALLOWED_GHL_ROUTES.some(r => r.method === reqMethod && r.pathname === url.pathname);
-  if (!allowed) {
+  const matchedRoute = ALLOWED_GHL_ROUTES.find(r => {
+    if (r.method !== reqMethod) return false;
+    return r.pathname ? r.pathname === url.pathname : r.test.test(url.pathname);
+  });
+  if (!matchedRoute) {
     throw new HttpsError('permission-denied', 'That GoHighLevel endpoint is not permitted from this app.');
   }
 
@@ -200,7 +211,7 @@ exports.ghlProxy = onCall({ secrets: [ghlApiKey] }, async (request) => {
       method: reqMethod,
       headers: {
         Authorization: `Bearer ${ghlApiKey.value()}`,
-        Version: GHL_API_VERSION,
+        Version: matchedRoute.version || GHL_API_VERSION,
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },

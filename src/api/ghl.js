@@ -57,6 +57,39 @@ export async function getAppointments({ startTime, endTime, calendarId } = {}) {
   return data.events || [];
 }
 
+// Returns open booking slots for one calendar, keyed by date (YYYY-MM-DD) ->
+// { slots: [isoString, ...] }. GHL caps the range at 31 days per request.
+// No locationId param here — GHL's free-slots endpoint doesn't take one
+// (the API key itself is already scoped to a single location).
+export async function getFreeSlots(calendarId, { startDate, endDate, timezone } = {}) {
+  if (!calendarId) return {};
+  const now = Date.now();
+  const start = startDate || now;
+  const end = endDate || start + 13 * 24 * 60 * 60 * 1000; // default: next 14 days
+  const tz = timezone ? `&timezone=${encodeURIComponent(timezone)}` : '';
+  const data = await ghlRequest(`/calendars/${calendarId}/free-slots?startDate=${start}&endDate=${end}${tz}`);
+  return data || {};
+}
+
+// Books a real appointment on a GHL calendar. endTime is left to GHL's own
+// calendar-configured duration when omitted — matches how the free-slots
+// endpoint only ever returns start times, not a start/end pair to choose
+// from.
+export async function createAppointment({ calendarId, contactId, startTime, title }) {
+  if (!calendarId || !contactId || !startTime) throw new Error('createAppointment requires calendarId, contactId, and startTime.');
+  return ghlRequest('/calendars/events/appointments', {
+    method: 'POST',
+    body: {
+      calendarId,
+      locationId: LOCATION_ID,
+      contactId,
+      startTime,
+      title: title || 'Appointment',
+      appointmentStatus: 'confirmed',
+    },
+  });
+}
+
 export async function getCampaigns() {
   const data = await ghlRequest(`/campaigns/?locationId=${LOCATION_ID}`);
   return data.campaigns || [];
