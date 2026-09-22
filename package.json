@@ -2,7 +2,7 @@
   "name": "praxismd",
   "version": "0.1.0",
   "private": true,
-  "homepage": "https://praxismd.github.io/praxismd",
+  "homepage": ".",
   "dependencies": {
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^6.9.1",
