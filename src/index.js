@@ -9,6 +9,8 @@ import Onboarding from './Onboarding';
 import PatientPortal from './PatientPortal';
 import Terms from './Terms';
 import Privacy from './Privacy';
+import BAA from './BAA';
+import Security from './Security';
 import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
@@ -23,6 +25,8 @@ root.render(
         <Route path="/dashboard" element={<App />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/baa" element={<BAA />} />
+        <Route path="/security" element={<Security />} />
       </Routes>
     </HashRouter>
   </React.StrictMode>
