@@ -136,10 +136,23 @@ const PRICING_PLANS = [
 ];
 
 const FOOTER_COLUMNS = [
-  { title: 'Product', links: ['Features', 'Pricing', 'Why us'] },
-  { title: 'Company', links: ['About', 'Careers', 'Blog'] },
-  { title: 'Resources', links: ['Help center', 'API docs', 'System status', 'Case studies'] },
-  { title: 'Legal', links: [{ label: 'Privacy policy', to: '/privacy' }, { label: 'Terms of service', to: '/terms' }, 'BAA', 'Security'] },
+  {
+    title: 'Product',
+    links: [
+      { label: 'Features', scrollTo: 'features' },
+      { label: 'Pricing', scrollTo: 'pricing' },
+      { label: 'Why us', scrollTo: 'why' },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Privacy policy', to: '/privacy' },
+      { label: 'Terms of service', to: '/terms' },
+      { label: 'BAA', to: '/baa' },
+      { label: 'Security', to: '/security' },
+    ],
+  },
 ];
 
 // ─── SCROLL-REVEAL WRAPPER ─────────────────────────────────
@@ -717,7 +730,7 @@ function Landing() {
       {/* FOOTER */}
       <footer id="contact" style={{ background: C.bgAlt, borderTop: `1px solid ${C.border}`, padding: '60px 26px 44px' }}>
         <div style={{ maxWidth: '1080px', margin: '0 auto' }}>
-          <div className="px-footer-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr repeat(4, 1fr)', gap: '32px' }}>
+          <div className="px-footer-grid" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '32px' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '9px', marginBottom: '12px' }}>
                 <div style={{ width: '28px', height: '28px', borderRadius: '7px', background: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '12px' }}>Px</div>
@@ -732,9 +745,9 @@ function Landing() {
                 <div style={{ fontSize: '12px', fontWeight: '700', color: C.ink, textTransform: 'uppercase', letterSpacing: '.4px', marginBottom: '14px' }}>{col.title}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {col.links.map((link, j) => (
-                    typeof link === 'object'
+                    link.to
                       ? <Link key={j} to={link.to} className="px-footer-link" style={{ fontSize: '13px', color: C.mid, textDecoration: 'none' }}>{link.label}</Link>
-                      : <span key={j} className="px-footer-link" style={{ fontSize: '13px', color: C.mid, cursor: 'pointer' }}>{link}</span>
+                      : <button key={j} type="button" onClick={scrollToId(link.scrollTo)} className="px-footer-link" style={{ fontSize: '13px', color: C.mid, cursor: 'pointer', background: 'transparent', border: 'none', padding: 0, textAlign: 'left', fontFamily: 'inherit' }}>{link.label}</button>
                   ))}
                 </div>
               </div>
