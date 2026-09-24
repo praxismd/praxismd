@@ -442,7 +442,18 @@ function HeroMockup() {
 // ─── MAIN ──────────────────────────────────────────────────
 function Landing() {
   const [demoOpen, setDemoOpen] = useState(false);
-  const openDemo = () => setDemoOpen(true);
+  const openDemo = () => {
+    // Prefer the GHL chat widget so demo leads land straight in the CRM
+    // with its own compliant consent flow, instead of the local form
+    // below duplicating that data collection. Falls back to the local
+    // modal if the widget script hasn't loaded (or its API changes).
+    const widget = window.leadConnector?.chatWidget;
+    if (widget && typeof widget.openWidget === 'function') {
+      widget.openWidget();
+      return;
+    }
+    setDemoOpen(true);
+  };
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', background: C.bg, color: C.ink2, minHeight: '100vh' }}>
