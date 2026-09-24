@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Check, X, ArrowRight, RotateCcw, Bot, ClipboardList, Receipt, Shield,
+  Check, X, RotateCcw, Bot, ClipboardList, Receipt, Shield,
   Smile, CreditCard, Contact, Sparkles, Star, Menu, TrendingDown, TrendingUp,
   PhoneOff, FileWarning, Megaphone, Activity, Stethoscope, ShieldCheck,
   LayoutDashboard, InboxIcon, Users,
@@ -136,7 +136,7 @@ const PRICING_PLANS = [
 ];
 
 const FOOTER_COLUMNS = [
-  { title: 'Product', links: ['Features', 'Pricing', 'Why us', 'Book a demo'] },
+  { title: 'Product', links: ['Features', 'Pricing', 'Why us'] },
   { title: 'Company', links: ['About', 'Careers', 'Blog'] },
   { title: 'Resources', links: ['Help center', 'API docs', 'System status', 'Case studies'] },
   { title: 'Legal', links: [{ label: 'Privacy policy', to: '/privacy' }, { label: 'Terms of service', to: '/terms' }, 'BAA', 'Security'] },
@@ -289,7 +289,7 @@ function DemoModal({ open, onClose }) {
 }
 
 // ─── NAVBAR ────────────────────────────────────────────────
-function NavBar({ onOpenDemo }) {
+function NavBar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const links = [
@@ -320,9 +320,6 @@ function NavBar({ onOpenDemo }) {
 
         <div className="px-nav-links" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <Link to="/login" style={{ color: C.mid, textDecoration: 'none', fontSize: '13.5px', fontWeight: '500', whiteSpace: 'nowrap' }}>Sign in</Link>
-          <button type="button" onClick={onOpenDemo} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '10px', border: 'none', background: C.brand, color: 'white', fontSize: '13.5px', fontWeight: '600', fontFamily: 'inherit', whiteSpace: 'nowrap', cursor: 'pointer' }}>
-            Book a demo
-          </button>
         </div>
 
         <button
@@ -343,9 +340,6 @@ function NavBar({ onOpenDemo }) {
             <button key={id} type="button" onClick={go(id)} style={{ textAlign: 'left', padding: '11px 4px', border: 'none', background: 'transparent', fontSize: '14.5px', fontWeight: '500', color: C.ink2, cursor: 'pointer', fontFamily: 'inherit' }}>{label}</button>
           ))}
           <Link to="/login" onClick={() => setMobileOpen(false)} style={{ padding: '11px 4px', color: C.mid, textDecoration: 'none', fontSize: '14.5px', fontWeight: '500' }}>Sign in</Link>
-          <button type="button" onClick={() => { setMobileOpen(false); onOpenDemo(); }} className="px-btn" style={{ marginTop: '8px', padding: '12px', borderRadius: '10px', border: 'none', background: C.brand, color: 'white', fontSize: '14px', fontWeight: '700', fontFamily: 'inherit', cursor: 'pointer' }}>
-            Book a demo
-          </button>
         </nav>
       )}
       </div>
@@ -514,7 +508,7 @@ function Landing() {
 
       <a href="#main-content" className="px-skip-link">Skip to main content</a>
 
-      <NavBar onOpenDemo={openDemo} />
+      <NavBar />
       <DemoModal open={demoOpen} onClose={() => setDemoOpen(false)} />
 
       <main id="main-content">
@@ -538,9 +532,6 @@ function Landing() {
           so your team spends less time chasing patients and paperwork, and more time in the chair.
         </p>
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button type="button" onClick={openDemo} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', border: 'none', background: C.brand, color: 'white', fontSize: '15px', fontWeight: '600', fontFamily: 'inherit', cursor: 'pointer' }}>
-            Book a demo <ArrowRight size={16} />
-          </button>
           <button type="button" onClick={scrollToId('solution')} className="px-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '13px 24px', borderRadius: '12px', border: `1px solid ${C.border}`, background: C.bg, color: C.ink2, fontSize: '15px', fontWeight: '600', fontFamily: 'inherit', cursor: 'pointer' }}>
             See how it works
           </button>
