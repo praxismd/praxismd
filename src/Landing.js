@@ -137,7 +137,7 @@ const PRICING_PLANS = [
 
 const FOOTER_COLUMNS = [
   { title: 'Product', links: ['Features', 'Pricing', 'Why us', 'Book a demo'] },
-  { title: 'Company', links: ['About', 'Careers', 'Blog', 'Contact'] },
+  { title: 'Company', links: ['About', 'Careers', 'Blog'] },
   { title: 'Resources', links: ['Help center', 'API docs', 'System status', 'Case studies'] },
   { title: 'Legal', links: [{ label: 'Privacy policy', to: '/privacy' }, { label: 'Terms of service', to: '/terms' }, 'BAA', 'Security'] },
 ];
@@ -296,7 +296,6 @@ function NavBar({ onOpenDemo }) {
     ['Features', 'features'],
     ['Pricing', 'pricing'],
     ['Why us', 'why'],
-    ['Contact', 'contact'],
   ];
 
   function go(id) {
