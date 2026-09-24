@@ -262,9 +262,6 @@ function DemoModal({ open, onClose }) {
               <input required aria-label="Your name" value={form.name} onChange={handleChange('name')} placeholder="Your name" style={inputStyle} />
               <input required aria-label="Practice name" value={form.practice} onChange={handleChange('practice')} placeholder="Practice name" style={inputStyle} />
               <input required aria-label="Email address" type="email" value={form.email} onChange={handleChange('email')} placeholder="Email address" style={inputStyle} />
-              <div style={{ fontSize: '11.5px', color: C.muted, lineHeight: 1.5 }}>
-                Have a phone number to share? Use the chat widget in the corner — it keeps your consent and contact info in one place.
-              </div>
               <button type="submit" className="px-btn" style={{ marginTop: '6px', padding: '13px', borderRadius: '10px', border: 'none', background: C.brand, color: 'white', fontSize: '14.5px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
                 Request my demo
               </button>
@@ -423,18 +420,7 @@ function HeroMockup() {
 // ─── MAIN ──────────────────────────────────────────────────
 function Landing() {
   const [demoOpen, setDemoOpen] = useState(false);
-  const openDemo = () => {
-    // Prefer the GHL chat widget so demo leads land straight in the CRM
-    // with its own compliant consent flow, instead of the local form
-    // below duplicating that data collection. Falls back to the local
-    // modal if the widget script hasn't loaded (or its API changes).
-    const widget = window.leadConnector?.chatWidget;
-    if (widget && typeof widget.openWidget === 'function') {
-      widget.openWidget();
-      return;
-    }
-    setDemoOpen(true);
-  };
+  const openDemo = () => setDemoOpen(true);
 
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', background: C.bg, color: C.ink2, minHeight: '100vh' }}>

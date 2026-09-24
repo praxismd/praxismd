@@ -40,7 +40,11 @@
 
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
+
+      The GHL chat widget loader is intentionally NOT included here. It
+      was removed sitewide — GHL's A2P compliance review rejects any
+      page where a form and the chat widget both collect phone/SMS
+      info, and this app has phone fields on /login and /onboarding.
     -->
-    <script src="https://widgets.leadconnectorhq.com/loader.js" data-resources-url="https://widgets.leadconnectorhq.com/chat-widget/loader.js" data-widget-id="6ab4d42d08a179ce38b069c7" data-source="WEB_USER"></script>
   </body>
 </html>
