@@ -16,7 +16,7 @@ import {
   X, ArrowUp, ArrowDown, Check, Activity, UserPlus, Trash2, Lock, Pencil,
   Paperclip, ImageIcon, ArrowLeft, Eye, Palette, ArrowRight, FileArchive, FileText,
   CalendarPlus, BadgeCheck, Award, Flag, MessageCircle, Camera, EyeOff, Monitor, Smartphone,
-  QrCode, Copy, ShieldCheck, KeyRound,
+  QrCode, Copy, ShieldCheck, KeyRound, LifeBuoy,
 } from './icons';
 
 export const ThemeContext = createContext(light);
@@ -455,6 +455,7 @@ function App() {
   const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && window.localStorage.getItem('praxismd-sidebar-collapsed') === '1');
   const [sidebarHover, setSidebarHover] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [notifReadIds, setNotifReadIds] = useState([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [patientQuery, setPatientQuery] = useState('');
@@ -989,6 +990,10 @@ function App() {
               )}
             </div>
 
+            <button onClick={() => setSupportOpen(true)} title="Support" style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '6px', border: `1px solid ${t.border}`, background: t.bgCard, cursor: 'pointer', color: t.mid, flexShrink: 0 }}>
+              <LifeBuoy size={16} />
+            </button>
+
             <button onClick={() => setActiveTab('campaigns')} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 15px', borderRadius: '6px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
               <Plus size={14} /> New campaign
             </button>
@@ -1066,6 +1071,7 @@ function App() {
         setQuery={setPatientQuery}
         setActiveTab={setActiveTab}
       />
+      {supportOpen && <SupportCenter onClose={() => setSupportOpen(false)} />}
       {idleWarningOpen && (
         <Modal title="Still there?" onClose={staySignedIn}>
           <div style={{ fontSize: '13px', color: t.mid, lineHeight: '1.6', marginBottom: '16px' }}>
@@ -1366,6 +1372,151 @@ function Modal({ title, onClose, children }) {
         <div style={{ padding: '16px 20px' }}>{children}</div>
       </div>
     </>
+  );
+}
+
+// Two audiences share the supportTickets collection: this practice's own
+// requests to PraxisMD (type: 'practice', scoped by fromUid) and patients'
+// requests to this practice (type: 'patient', scoped by practiceId — same
+// field appointmentRequests and patientMessages already use for the same
+// purpose).
+function SupportCenter({ onClose }) {
+  const t = useTheme();
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [ownTickets, setOwnTickets] = useState([]);
+  const [ownLoading, setOwnLoading] = useState(true);
+  const [patientTickets, setPatientTickets] = useState([]);
+  const [patientLoading, setPatientLoading] = useState(true);
+  const [resolvingId, setResolvingId] = useState(null);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth.currentUser) { setOwnLoading(false); setPatientLoading(false); return; }
+    const uid = auth.currentUser.uid;
+
+    const ownQ = query(collection(db, 'supportTickets'), where('fromUid', '==', uid), where('type', '==', 'practice'), orderBy('createdAt', 'desc'));
+    const unsubOwn = onSnapshot(ownQ, snap => {
+      setOwnTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setOwnLoading(false);
+    }, () => setOwnLoading(false));
+
+    const patientQ = query(collection(db, 'supportTickets'), where('practiceId', '==', uid), where('type', '==', 'patient'), orderBy('createdAt', 'desc'));
+    const unsubPatient = onSnapshot(patientQ, snap => {
+      setPatientTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setPatientLoading(false);
+    }, () => setPatientLoading(false));
+
+    return () => { unsubOwn(); unsubPatient(); };
+  }, []);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!subject.trim() || !message.trim()) return;
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const user = auth.currentUser;
+      await addDoc(collection(db, 'supportTickets'), {
+        type: 'practice',
+        fromUid: user.uid,
+        fromName: user.displayName || user.email,
+        fromEmail: user.email,
+        practiceId: user.uid,
+        subject: subject.trim(),
+        message: message.trim(),
+        status: 'open',
+        createdAt: serverTimestamp(),
+      });
+      setSubject('');
+      setMessage('');
+    } catch (err) {
+      setSubmitError(err.message || 'Could not send your request.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function resolvePatientTicket(id) {
+    setResolvingId(id);
+    try {
+      await updateDoc(doc(db, 'supportTickets', id), { status: 'resolved' });
+    } catch {
+      // best-effort — the ticket stays open and staff can retry
+    } finally {
+      setResolvingId(null);
+    }
+  }
+
+  const inputStyle = { padding: '10px 14px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box', width: '100%' };
+  const statusBadge = status => (
+    <span style={{
+      fontSize: '10.5px', fontWeight: '700', padding: '3px 9px', borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '.3px', flexShrink: 0,
+      background: status === 'resolved' ? t.greenL : t.amberL, color: status === 'resolved' ? t.green : t.amber,
+    }}>{status === 'resolved' ? 'Resolved' : 'Open'}</span>
+  );
+
+  return (
+    <SlidePanel title="Support" subtitle="Requests to PraxisMD, and requests from your patients" onClose={onClose}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+        <LifeBuoy size={16} color={t.teal} />
+        <div style={{ fontSize: '13.5px', fontWeight: '700', color: t.ink }}>Contact PraxisMD</div>
+      </div>
+
+      {submitError && <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.red, .2)}`, borderRadius: '8px', padding: '9px 12px', fontSize: '12px', marginBottom: '10px' }}>{submitError}</div>}
+
+      <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px' }}>
+        <input required aria-label="Subject" value={subject} onChange={e => setSubject(e.target.value)} placeholder="What do you need help with?" style={inputStyle} />
+        <textarea required aria-label="Message" value={message} onChange={e => setMessage(e.target.value)} placeholder="Details…" rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+        <button
+          type="submit" disabled={submitting} className="px-btn"
+          style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '8px', border: 'none', background: t.brand, color: 'white', fontSize: '12.5px', fontWeight: '600', cursor: submitting ? 'default' : 'pointer', opacity: submitting ? .7 : 1, fontFamily: 'inherit' }}
+        >{submitting ? <Loader2 size={13} className="px-spin" /> : <LifeBuoy size={13} />} Send to PraxisMD</button>
+      </form>
+
+      {!ownLoading && ownTickets.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '22px' }}>
+          {ownTickets.map(tk => (
+            <div key={tk.id} style={{ padding: '10px 12px', borderRadius: '8px', background: t.bgRow, border: `1px solid ${t.border}` }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '3px' }}>
+                <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2 }}>{tk.subject}</div>
+                {statusBadge(tk.status)}
+              </div>
+              <div style={{ fontSize: '11.5px', color: t.mid, lineHeight: 1.4 }}>{tk.message}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: '16px' }}>
+        <div style={{ fontSize: '13.5px', fontWeight: '700', color: t.ink, marginBottom: '10px' }}>Patient support requests</div>
+        {patientLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: t.muted, fontSize: '12px' }}><Loader2 size={14} className="px-spin" /> Loading…</div>
+        ) : patientTickets.length === 0 ? (
+          <div style={{ color: t.muted, fontSize: '12px' }}>No patient support requests.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {patientTickets.map(tk => (
+              <div key={tk.id} style={{ padding: '10px 12px', borderRadius: '8px', background: t.bgRow, border: `1px solid ${t.border}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '3px' }}>
+                  <div style={{ fontSize: '12.5px', fontWeight: '600', color: t.ink2 }}>{tk.subject}</div>
+                  {statusBadge(tk.status)}
+                </div>
+                <div style={{ fontSize: '11.5px', color: t.mid, lineHeight: 1.4, marginBottom: '6px' }}>{tk.message}</div>
+                <div style={{ fontSize: '11px', color: t.muted, marginBottom: tk.status === 'resolved' ? 0 : '6px' }}><PII>{tk.fromName}</PII></div>
+                {tk.status !== 'resolved' && (
+                  <button
+                    onClick={() => resolvePatientTicket(tk.id)} disabled={resolvingId === tk.id}
+                    style={{ border: 'none', background: 'transparent', color: t.brand, fontSize: '11.5px', fontWeight: '600', cursor: resolvingId === tk.id ? 'default' : 'pointer', padding: 0, fontFamily: 'inherit' }}
+                  >{resolvingId === tk.id ? 'Marking resolved…' : 'Mark resolved'}</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </SlidePanel>
   );
 }
 

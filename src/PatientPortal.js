@@ -9,7 +9,7 @@ import { light, withAlpha } from './theme';
 import {
   CalendarClock, MessageSquare, User, LogOut, Loader2, AlertTriangle,
   Stethoscope, Receipt, CreditCard, Download, Info, Home, Shield, FileText, CheckCircle2, PenLine,
-  PillIcon, Users, Plus, RotateCcw, ClipboardList, X,
+  PillIcon, Users, Plus, RotateCcw, ClipboardList, X, LifeBuoy,
 } from './icons';
 
 const t = light;
@@ -39,6 +39,7 @@ const TABS = [
   { key: 'billing', label: 'Billing', Icon: CreditCard },
   { key: 'family', label: 'Family', Icon: Users },
   { key: 'messages', label: 'Messages', Icon: MessageSquare },
+  { key: 'support', label: 'Support', Icon: LifeBuoy },
 ];
 
 function PortalBtn({ children, onClick, primary, disabled }) {
@@ -1251,6 +1252,115 @@ function MessagesTab({ profile }) {
   );
 }
 
+function SupportTab({ profile }) {
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) { setLoading(false); return; }
+    const user = auth.currentUser;
+    if (!user) { setLoading(false); return; }
+    const q = query(collection(db, 'supportTickets'), where('fromUid', '==', user.uid), where('type', '==', 'patient'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, snap => {
+      setTickets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, err => { setError(err.message); setLoading(false); });
+    return unsub;
+  }, []);
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!subject.trim() || !message.trim()) return;
+    setSubmitting(true);
+    setError('');
+    try {
+      const user = auth.currentUser;
+      await addDoc(collection(db, 'supportTickets'), {
+        type: 'patient',
+        fromUid: user.uid,
+        fromName: profile?.name || user.email,
+        fromEmail: user.email,
+        practiceId: profile?.practiceId || null,
+        subject: subject.trim(),
+        message: message.trim(),
+        status: 'open',
+        createdAt: serverTimestamp(),
+      });
+      setSubject('');
+      setMessage('');
+      setNotice('Sent — your practice will get back to you soon.');
+      setTimeout(() => setNotice(''), 4000);
+    } catch (err) {
+      setError(err.message || 'Could not send your request.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+      <div style={cardStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
+          <LifeBuoy size={17} color={t.teal} />
+          <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2 }}>Get help</div>
+        </div>
+        <div style={{ fontSize: '12.5px', color: t.muted, marginBottom: '14px' }}>
+          Need help with your account, billing, or the portal itself? Send a request and your practice will follow up.
+        </div>
+
+        {error && <div style={{ background: t.redL, color: t.red, border: `1px solid ${withAlpha(t.red, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '12px' }}>{error}</div>}
+        {notice && <div style={{ background: t.greenL, color: t.green, border: `1px solid ${withAlpha(t.green, .2)}`, borderRadius: '10px', padding: '10px 12px', fontSize: '12.5px', marginBottom: '12px' }}>{notice}</div>}
+
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <input
+            required aria-label="Subject" value={subject} onChange={e => setSubject(e.target.value)}
+            placeholder="What's this about?"
+            style={{ padding: '10px 14px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box' }}
+          />
+          <textarea
+            required aria-label="Message" value={message} onChange={e => setMessage(e.target.value)}
+            placeholder="Describe what you need help with…" rows={4}
+            style={{ padding: '10px 14px', border: `1px solid ${t.border}`, borderRadius: '10px', fontSize: '13px', fontFamily: 'inherit', outline: 'none', background: t.bgCard, color: t.ink2, boxSizing: 'border-box', resize: 'vertical' }}
+          />
+          <button
+            type="submit" disabled={submitting} className="px-btn"
+            style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', borderRadius: '10px', border: 'none', background: t.brand, color: 'white', fontSize: '13px', fontWeight: '600', cursor: submitting ? 'default' : 'pointer', opacity: submitting ? .7 : 1, fontFamily: 'inherit' }}
+          >{submitting ? <Loader2 size={14} className="px-spin" /> : <LifeBuoy size={14} />} Send request</button>
+        </form>
+      </div>
+
+      <div style={cardStyle}>
+        <div style={{ fontSize: '14px', fontWeight: '600', color: t.ink2, marginBottom: '14px' }}>Your requests</div>
+        {loading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: t.muted, fontSize: '12.5px' }}><Loader2 size={16} className="px-spin" /> Loading…</div>
+        ) : tickets.length === 0 ? (
+          <div style={{ color: t.muted, fontSize: '12.5px' }}>No requests yet.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {tickets.map(tk => (
+              <div key={tk.id} style={{ padding: '12px 14px', borderRadius: '10px', background: t.bgRow, border: `1px solid ${t.border}` }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink2 }}>{tk.subject}</div>
+                  <span style={{
+                    fontSize: '10.5px', fontWeight: '700', padding: '3px 9px', borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '.3px',
+                    background: tk.status === 'resolved' ? t.greenL : t.amberL, color: tk.status === 'resolved' ? t.green : t.amber,
+                  }}>{tk.status === 'resolved' ? 'Resolved' : 'Open'}</span>
+                </div>
+                <div style={{ fontSize: '12.5px', color: t.mid, lineHeight: 1.5 }}>{tk.message}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PatientPortal() {
   const navigate = useNavigate();
   const [authChecked, setAuthChecked] = useState(false);
@@ -1435,6 +1545,7 @@ function PatientPortal() {
         {tab === 'billing' && <BillingTab setNotice={setNotice} profile={profile} />}
         {tab === 'family' && <FamilyTab setNotice={setNotice} profile={profile} />}
         {tab === 'messages' && <MessagesTab profile={profile} />}
+        {tab === 'support' && <SupportTab profile={profile} />}
 
         {tab === 'overview' && (
           <div style={{ ...cardStyle, marginTop: '16px' }}>

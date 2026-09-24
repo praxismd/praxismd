@@ -112,3 +112,4 @@ export const Info = makeIcon('info-circle');
 export const Home = makeIcon('house');
 export const PenLine = makeIcon('pencil-square');
 export const PillIcon = makeIcon('capsule');
+export const LifeBuoy = makeIcon('life-preserver');
