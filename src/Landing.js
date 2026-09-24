@@ -203,7 +203,7 @@ function useDialogA11y(onClose, open) {
 }
 
 function DemoModal({ open, onClose }) {
-  const [form, setForm] = useState({ name: '', practice: '', email: '', phone: '', smsConsent: false });
+  const [form, setForm] = useState({ name: '', practice: '', email: '' });
   const [submitted, setSubmitted] = useState(false);
   const dialogRef = useDialogA11y(onClose, open);
   const titleId = useId();
@@ -211,7 +211,7 @@ function DemoModal({ open, onClose }) {
   if (!open) return null;
 
   function handleChange(field) {
-    return (e) => setForm(f => ({ ...f, [field]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
+    return (e) => setForm(f => ({ ...f, [field]: e.target.value }));
   }
 
   function handleSubmit(e) {
@@ -223,7 +223,7 @@ function DemoModal({ open, onClose }) {
     onClose();
     setTimeout(() => {
       setSubmitted(false);
-      setForm({ name: '', practice: '', email: '', phone: '', smsConsent: false });
+      setForm({ name: '', practice: '', email: '' });
     }, 250);
   }
 
@@ -262,21 +262,9 @@ function DemoModal({ open, onClose }) {
               <input required aria-label="Your name" value={form.name} onChange={handleChange('name')} placeholder="Your name" style={inputStyle} />
               <input required aria-label="Practice name" value={form.practice} onChange={handleChange('practice')} placeholder="Practice name" style={inputStyle} />
               <input required aria-label="Email address" type="email" value={form.email} onChange={handleChange('email')} placeholder="Email address" style={inputStyle} />
-              <input required aria-label="Phone number" type="tel" value={form.phone} onChange={handleChange('phone')} placeholder="Phone number" style={inputStyle} />
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '12px', lineHeight: 1.5, color: C.mid, cursor: 'pointer' }}>
-                <input
-                  required
-                  type="checkbox"
-                  checked={form.smsConsent}
-                  onChange={handleChange('smsConsent')}
-                  style={{ marginTop: '2px', flexShrink: 0 }}
-                />
-                <span>
-                  I agree to receive calls and text messages from PraxisMD about my demo request, including by automated means, at the phone number provided. Message and data rates may apply, message frequency varies. Reply STOP to opt out at any time. See our{' '}
-                  <a href="#/terms" style={{ color: C.brand }}>Terms</a> and{' '}
-                  <a href="#/privacy" style={{ color: C.brand }}>Privacy Policy</a>.
-                </span>
-              </label>
+              <div style={{ fontSize: '11.5px', color: C.muted, lineHeight: 1.5 }}>
+                Have a phone number to share? Use the chat widget in the corner — it keeps your consent and contact info in one place.
+              </div>
               <button type="submit" className="px-btn" style={{ marginTop: '6px', padding: '13px', borderRadius: '10px', border: 'none', background: C.brand, color: 'white', fontSize: '14.5px', fontWeight: '700', cursor: 'pointer', fontFamily: 'inherit' }}>
                 Request my demo
               </button>
