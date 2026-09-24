@@ -422,6 +422,24 @@ function Landing() {
   const [demoOpen, setDemoOpen] = useState(false);
   const openDemo = () => setDemoOpen(true);
 
+  // Loads the GHL chat widget only while the landing page is mounted, so it
+  // never appears on /login or /onboarding — both have phone number fields,
+  // and GHL's A2P compliance review rejects any page where the widget and a
+  // form both collect phone/SMS info. This page's own demo form doesn't
+  // collect a phone number for the same reason.
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://widgets.leadconnectorhq.com/loader.js';
+    script.setAttribute('data-resources-url', 'https://widgets.leadconnectorhq.com/chat-widget/loader.js');
+    script.setAttribute('data-widget-id', '6ab4d42d08a179ce38b069c7');
+    script.setAttribute('data-source', 'WEB_USER');
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+      document.querySelectorAll('#chat-widget-container, [id^="chat-widget"]').forEach(el => el.remove());
+    };
+  }, []);
+
   return (
     <div style={{ fontFamily: 'Inter, sans-serif', background: C.bg, color: C.ink2, minHeight: '100vh' }}>
       <style>{`
