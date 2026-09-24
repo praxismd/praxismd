@@ -743,7 +743,7 @@ function Landing() {
         </div>
         <div style={{ background: C.trim, margin: '44px -26px -44px', padding: '16px 26px' }}>
           <div style={{ maxWidth: '1080px', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-            <div style={{ fontSize: '12px', color: withAlpha('#FFFFFF', .6) }}>© 2026 PraxisMD. All content on this page is for demonstration purposes.</div>
+            <div style={{ fontSize: '12px', color: withAlpha('#FFFFFF', .6) }}>© 2026 PraxisMD, a product of Vatent LLC. All content on this page is for demonstration purposes.</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: withAlpha('#FFFFFF', .75), fontWeight: '600' }}>
               <Shield size={13} color="#4ADE80" /> HIPAA Compliant · SOC 2 Type II
             </div>
