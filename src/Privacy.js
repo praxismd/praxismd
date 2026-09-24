@@ -11,9 +11,10 @@ export default function Privacy() {
     <LegalLayout title="Privacy Policy" updated="September 2026">
       <Section title="1. Overview">
         <p style={p}>
-          This Privacy Policy explains what information PraxisMD ("we", "us") collects through our software (the "Service"),
-          how we use it, and who we share it with. It applies to the dental and medical practices that use PraxisMD
-          ("Customers") and, where noted, to the patients of those practices.
+          This Privacy Policy explains what information PraxisMD, operated by Vatent LLC ("we", "us"), collects
+          through our software (the "Service"), how we use it, and who we share it with. It applies to the dental
+          and medical practices that use PraxisMD ("Customers") and, where noted, to the patients of those
+          practices.
         </p>
         <p style={p}>
           Where a Customer's use of the Service involves patient health information, PraxisMD acts as a <span style={strong}>Business

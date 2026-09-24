@@ -13,9 +13,10 @@ export default function Terms() {
     <LegalLayout title="Terms of Service" updated="September 2026">
       <Section title="1. Agreement to Terms">
         <p style={p}>
-          These Terms of Service ("Terms") govern access to and use of PraxisMD (the "Service"), provided to dental and
-          medical practices ("Customer," "you"). By creating an account or using the Service, you agree to these Terms
-          on behalf of yourself and, if applicable, your practice.
+          These Terms of Service ("Terms") govern access to and use of PraxisMD (the "Service"), operated by
+          Vatent LLC ("Vatent," "we," "us"), provided to dental and medical practices ("Customer," "you"). By
+          creating an account or using the Service, you agree to these Terms on behalf of yourself and, if
+          applicable, your practice.
         </p>
       </Section>
 
