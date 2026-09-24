@@ -302,9 +302,8 @@ function NavBar() {
 
   return (
     <header style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100 }}>
-      <div style={{ height: '3px', background: C.trim }} />
       <div style={{ background: withAlpha('#FFFFFF', .92), backdropFilter: 'blur(8px)', borderBottom: `1px solid ${C.trim}` }}>
-      <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '14px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '20px' }}>
+      <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '14px 26px', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div style={{ width: '30px', height: '30px', borderRadius: '8px', background: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: '700', fontSize: '13px' }}>Px</div>
           <span style={{ fontSize: '18px', fontWeight: '700', color: C.ink }}>PraxisMD</span>
@@ -316,20 +315,22 @@ function NavBar() {
           ))}
         </nav>
 
-        <div className="px-nav-links" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <Link to="/login" style={{ color: C.mid, textDecoration: 'none', fontSize: '13.5px', fontWeight: '500', whiteSpace: 'nowrap' }}>Sign in</Link>
-        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'end', gap: '16px' }}>
+          <div className="px-nav-links" style={{ display: 'flex', alignItems: 'center' }}>
+            <Link to="/login" style={{ color: C.mid, textDecoration: 'none', fontSize: '13.5px', fontWeight: '500', whiteSpace: 'nowrap' }}>Sign in</Link>
+          </div>
 
-        <button
-          type="button"
-          className="px-nav-hamburger"
-          onClick={() => setMobileOpen(o => !o)}
-          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-          aria-expanded={mobileOpen}
-          style={{ display: 'none', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
-        >
-          {mobileOpen ? <X size={22} color={C.ink} /> : <Menu size={22} color={C.ink} />}
-        </button>
+          <button
+            type="button"
+            className="px-nav-hamburger"
+            onClick={() => setMobileOpen(o => !o)}
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileOpen}
+            style={{ display: 'none', border: 'none', background: 'transparent', cursor: 'pointer', padding: '6px' }}
+          >
+            {mobileOpen ? <X size={22} color={C.ink} /> : <Menu size={22} color={C.ink} />}
+          </button>
+        </div>
       </div>
 
       {mobileOpen && (
