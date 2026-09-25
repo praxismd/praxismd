@@ -37,9 +37,8 @@ const GHL_API_VERSION = '2021-07-28';
 // — not a secret, just pinned here too so a caller can't point this proxy
 // at a different sub-account by passing a different locationId.
 const GHL_LOCATION_ID = 'MJIYE0wyUSwdoXjflQns';
-// Matches the HashRouter's public URL (see .github/workflows/deploy-pages.yml
-// / GitHub Pages) — where a patient invite link points.
-const APP_BASE_URL = 'https://praxismd.github.io/praxismd';
+// The real production domain — where a patient invite link points.
+const APP_BASE_URL = 'https://praxismd.health';
 
 const MAX_PAYMENT_LINK_AMOUNT = 50000; // dollars — sanity cap, not a real business limit
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // patient invite links expire after 7 days
