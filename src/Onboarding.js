@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from './firebase';
+import { createSubscription, STRIPE_PLAN_PRICE_IDS } from './api/stripe';
 import { light, withAlpha } from './theme';
 import {
   Building2, Plug, Phone, PartyPopper, Check, ArrowLeft, ArrowRight,
@@ -16,6 +17,14 @@ const STEPS = [
   { key: 'software', label: 'Software', Icon: Plug },
   { key: 'phone', label: 'Phone', Icon: Phone },
   { key: 'done', label: 'Done', Icon: PartyPopper },
+];
+
+// Matches Landing.js's PRICING_PLANS tier names/prices — Pro stays greyed
+// out and unselectable there too, since it isn't a real plan yet.
+const PLAN_OPTIONS = [
+  { key: 'starter', label: 'Starter', price: '$299/mo' },
+  { key: 'growth', label: 'Growth', price: '$499/mo' },
+  { key: 'pro', label: 'Pro', price: '$999/mo', comingSoon: true },
 ];
 
 const PM_INSTRUCTIONS = {
@@ -125,6 +134,8 @@ function Onboarding() {
   const [openPhoneNumber, setOpenPhoneNumber] = useState('');
   const [phoneConnected, setPhoneConnected] = useState(false);
 
+  const [selectedPlan, setSelectedPlan] = useState('starter');
+
   useEffect(() => {
     if (!isFirebaseConfigured) { setAuthChecked(true); return; }
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -145,6 +156,7 @@ function Onboarding() {
           setPmConnected(Boolean(data.pmConnected));
           setOpenPhoneNumber(data.openPhoneNumber || '');
           setPhoneConnected(Boolean(data.phoneConnected));
+          if (data.plan && PLAN_OPTIONS.some(p => p.key === data.plan)) setSelectedPlan(data.plan);
           if (data.onboardingComplete) {
             navigate('/dashboard');
             return;
@@ -197,8 +209,18 @@ function Onboarding() {
   }
 
   async function handleFinish() {
-    const ok = await saveStep({ onboardingComplete: true, completedAt: serverTimestamp() });
-    if (ok) navigate('/dashboard');
+    const ok = await saveStep({ onboardingComplete: true, completedAt: serverTimestamp(), plan: selectedPlan });
+    if (ok) {
+      // Best-effort — the Stripe price IDs are placeholders until real ones
+      // exist in the dashboard, so this is expected to fail for now. It
+      // should never block a practice from reaching their dashboard.
+      try {
+        await createSubscription(uid, STRIPE_PLAN_PRICE_IDS[selectedPlan], auth.currentUser?.email || '');
+      } catch (err) {
+        console.error('createSubscription failed during onboarding:', err);
+      }
+      navigate('/dashboard');
+    }
   }
 
   if (!isFirebaseConfigured) {
@@ -336,6 +358,33 @@ function Onboarding() {
 
           {step === 4 && (
             <StepShell title="You're all set!" subtitle="Here's what we've configured for your practice.">
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: t.ink2, marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '.4px' }}>Choose your plan</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+                  {PLAN_OPTIONS.map(plan => {
+                    const selected = selectedPlan === plan.key;
+                    return (
+                      <button
+                        key={plan.key}
+                        type="button"
+                        disabled={plan.comingSoon}
+                        onClick={() => setSelectedPlan(plan.key)}
+                        className="px-btn"
+                        style={{
+                          textAlign: 'left', padding: '12px 13px', borderRadius: '10px',
+                          border: selected ? `2px solid ${t.brand}` : `1px solid ${t.border}`,
+                          background: plan.comingSoon ? t.bgRow : selected ? t.brandL : t.bgCard,
+                          opacity: plan.comingSoon ? .6 : 1,
+                          cursor: plan.comingSoon ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        <div style={{ fontSize: '13px', fontWeight: '600', color: t.ink }}>{plan.label}</div>
+                        <div style={{ fontSize: '11.5px', color: t.muted, marginTop: '2px' }}>{plan.comingSoon ? 'Coming soon' : plan.price}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '22px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '12px 14px', background: t.greenL, border: `1px solid ${withAlpha(t.accentGreen, .15)}`, borderRadius: '10px' }}>
                   <CheckCircle2 size={17} color={t.green} style={{ flexShrink: 0 }} />
