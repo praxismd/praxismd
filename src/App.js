@@ -5,7 +5,7 @@ import { collection, query, where, orderBy, onSnapshot, doc, getDoc, setDoc, upd
 import { light, withAlpha, getTheme, BRAND_PRESETS, DEFAULT_BRAND } from './theme';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { getContacts, getConversations, getAppointments, getCalendars, getFreeSlots, createAppointment, getCampaigns, sendMessage, createContact, isGhlConfigured } from './api/ghl';
-import { createPaymentLink, isStripeConfigured } from './api/stripe';
+import { createPaymentLink, isStripeConfigured, getSubscriptionStatus, cancelSubscription } from './api/stripe';
 import { createPatientInvite } from './api/patients';
 import {
   LayoutDashboard, InboxIcon, Megaphone, RotateCcw, CalendarIcon,
@@ -5826,6 +5826,34 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
   const [backupCopied, setBackupCopied] = useState(false);
   const [twoFANotice, setTwoFANotice] = useState('');
 
+  const [billingStatus, setBillingStatus] = useState(null);
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [billingError, setBillingError] = useState('');
+  const [cancelingPlan, setCancelingPlan] = useState(false);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured || !isStripeConfigured || !auth.currentUser) { setBillingLoading(false); return; }
+    let cancelled = false;
+    getSubscriptionStatus(auth.currentUser.uid)
+      .then(data => { if (!cancelled) setBillingStatus(data); })
+      .catch(err => { if (!cancelled) setBillingError(err.message || 'Could not load subscription status.'); })
+      .finally(() => { if (!cancelled) setBillingLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  async function handleCancelPlan() {
+    setCancelingPlan(true);
+    setBillingError('');
+    try {
+      const res = await cancelSubscription(auth.currentUser.uid);
+      setBillingStatus(prev => ({ ...prev, status: res.status, currentPeriodEnd: res.currentPeriodEnd }));
+    } catch (err) {
+      setBillingError(err.message || 'Could not cancel — try again.');
+    } finally {
+      setCancelingPlan(false);
+    }
+  }
+
   function generateBackupCodes() {
     const seg = () => Math.random().toString(36).slice(2, 6).toUpperCase();
     return Array.from({ length: 8 }, () => `${seg()}-${seg()}`);
@@ -5968,6 +5996,38 @@ function Settings({ userRole, rolePermissions, onUpdatePermissions, onRoleChange
           )}
         </Card>
       </div>
+
+      <Card style={{ marginBottom: '14px' }}>
+        <CardTitle>Billing</CardTitle>
+        {!isStripeConfigured ? (
+          <div style={{ fontSize: '12.5px', color: t.muted }}>Firebase isn't connected yet — billing needs a signed-in practice.</div>
+        ) : billingLoading ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px', color: t.muted }}><Loader2 size={14} className="px-spin" /> Loading subscription…</div>
+        ) : billingError ? (
+          <div style={{ fontSize: '12.5px', color: t.red }}>{billingError}</div>
+        ) : !billingStatus ? (
+          <div style={{ fontSize: '12.5px', color: t.muted }}>No active subscription yet.</div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 13px', borderRadius: '6px', marginBottom: '12px', border: `1px solid ${t.border2}`, background: t.bgRow }}>
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: '500', color: t.ink2 }}>{billingStatus.planName || 'Plan'} — ${billingStatus.amount}/mo</div>
+                <div style={{ fontSize: '11.5px', color: t.muted }}>
+                  {billingStatus.status === 'canceling' ? 'Cancels' : 'Next billing date'}: {billingStatus.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd * 1000).toLocaleDateString() : '—'}
+                </div>
+              </div>
+              <Pill
+                label={billingStatus.status === 'active' ? 'Active' : billingStatus.status === 'canceling' ? 'Canceling' : billingStatus.status === 'past_due' ? 'Past due' : billingStatus.status}
+                color={billingStatus.status === 'active' ? t.green : billingStatus.status === 'past_due' ? t.red : t.amber}
+                bg={billingStatus.status === 'active' ? t.greenL : billingStatus.status === 'past_due' ? t.redL : t.amberL}
+              />
+            </div>
+            {billingStatus.status !== 'canceling' && (
+              <Btn danger small onClick={handleCancelPlan} disabled={cancelingPlan}>{cancelingPlan ? 'Canceling…' : 'Cancel plan'}</Btn>
+            )}
+          </div>
+        )}
+      </Card>
 
       <Card style={{ marginBottom: '14px' }}>
         <CardTitle>Appearance</CardTitle>

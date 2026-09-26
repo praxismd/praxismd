@@ -24,6 +24,7 @@ const { defineSecret } = require('firebase-functions/params');
 const { randomBytes } = require('crypto');
 const admin = require('firebase-admin');
 const Stripe = require('stripe');
+const sgMail = require('@sendgrid/mail');
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -42,6 +43,22 @@ const APP_BASE_URL = 'https://praxismd.health';
 
 const MAX_PAYMENT_LINK_AMOUNT = 50000; // dollars — sanity cap, not a real business limit
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // patient invite links expire after 7 days
+
+// Stripe subscription price IDs, one per plan tier (see Landing.js's
+// PRICING_PLANS for the matching tier names/prices). These are placeholders
+// — swap them for the real price_... ids once the plans are created in the
+// Stripe dashboard; nothing else here needs to change when that happens.
+const STRIPE_STARTER_PRICE_ID = 'price_placeholder_starter';
+const STRIPE_GROWTH_PRICE_ID = 'price_placeholder_growth';
+const STRIPE_PRO_PRICE_ID = 'price_placeholder_pro';
+// A server-side allowlist, same reasoning as ALLOWED_GHL_ROUTES below —
+// never trust a client-supplied Stripe price id blindly, and this doubles
+// as the lookup for the plan name/amount to store alongside a subscription.
+const STRIPE_PRICE_ID_TO_PLAN = {
+  [STRIPE_STARTER_PRICE_ID]: { name: 'Starter', amount: 299 },
+  [STRIPE_GROWTH_PRICE_ID]: { name: 'Growth', amount: 499 },
+  [STRIPE_PRO_PRICE_ID]: { name: 'Pro', amount: 999 },
+};
 
 // A route either matches an exact `pathname`, or a `test(pathname)` regexp
 // for routes with a path parameter (e.g. a calendar id) that can't be
@@ -129,6 +146,294 @@ exports.createPaymentLink = onCall({ secrets: [stripeSecretKey] }, async (reques
   }
 });
 
+// Starts (or re-subscribes to) a practice's PraxisMD plan subscription.
+// Creates a Stripe customer for the practice the first time this is called
+// (never a patient's), then a subscription for the chosen plan. Uses
+// payment_behavior: 'default_incomplete' so the subscription is created
+// immediately but stays "incomplete" until the returned clientSecret is
+// confirmed client-side — this function only sets up the subscription, it
+// doesn't collect a payment method itself.
+exports.createSubscription = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to start a subscription.');
+  }
+
+  const { practiceId, priceId, email } = request.data || {};
+  if (!practiceId || typeof practiceId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A practiceId is required.');
+  }
+  if (practiceId !== request.auth.uid) {
+    throw new HttpsError('permission-denied', "You can only manage your own practice's subscription.");
+  }
+  const plan = STRIPE_PRICE_ID_TO_PLAN[priceId];
+  if (!plan) {
+    throw new HttpsError('invalid-argument', 'Unknown plan.');
+  }
+
+  const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2024-06-20' });
+  const practiceRef = db.collection('practices').doc(practiceId);
+
+  try {
+    const practiceSnap = await practiceRef.get();
+    let stripeCustomerId = practiceSnap.data()?.stripeCustomerId;
+
+    if (!stripeCustomerId) {
+      // Same rule as createPaymentLink — nothing about a patient ever
+      // reaches Stripe. This customer represents the practice itself, so
+      // its own billing email is fine to include.
+      const customer = await stripe.customers.create({
+        email: email || undefined,
+        metadata: { practiceId },
+      });
+      stripeCustomerId = customer.id;
+    }
+
+    const subscription = await stripe.subscriptions.create({
+      customer: stripeCustomerId,
+      items: [{ price: priceId }],
+      payment_behavior: 'default_incomplete',
+      payment_settings: { save_default_payment_method: 'on_subscription' },
+      expand: ['latest_invoice.payment_intent'],
+      metadata: { practiceId },
+    });
+
+    await practiceRef.set({
+      stripeCustomerId,
+      stripeSubscriptionId: subscription.id,
+      subscriptionStatus: subscription.status,
+      subscriptionPlan: plan.name,
+      subscriptionPriceId: priceId,
+      subscriptionUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return {
+      subscriptionId: subscription.id,
+      status: subscription.status,
+      clientSecret: subscription.latest_invoice?.payment_intent?.client_secret || null,
+    };
+  } catch (err) {
+    throw new HttpsError('internal', err.message || 'Stripe request failed.');
+  }
+});
+
+// Cancels a practice's subscription at the end of the current billing
+// period rather than immediately — they keep access (and get billed once
+// more, for the period already in progress) until then.
+exports.cancelSubscription = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to cancel a subscription.');
+  }
+  const { practiceId } = request.data || {};
+  if (!practiceId || practiceId !== request.auth.uid) {
+    throw new HttpsError('permission-denied', "You can only manage your own practice's subscription.");
+  }
+
+  const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2024-06-20' });
+  const practiceRef = db.collection('practices').doc(practiceId);
+
+  try {
+    const practiceSnap = await practiceRef.get();
+    const subscriptionId = practiceSnap.data()?.stripeSubscriptionId;
+    if (!subscriptionId) {
+      throw new HttpsError('failed-precondition', 'No active subscription to cancel.');
+    }
+
+    const subscription = await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
+
+    await practiceRef.set({
+      subscriptionStatus: 'canceling',
+      subscriptionUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return { status: 'canceling', currentPeriodEnd: subscription.current_period_end };
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    throw new HttpsError('internal', err.message || 'Stripe request failed.');
+  }
+});
+
+// Live subscription status, read straight from Stripe (not just whatever
+// was last written to Firestore) so it reflects e.g. a payment that failed
+// or succeeded moments ago, before any webhook has landed.
+exports.getSubscriptionStatus = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to view subscription status.');
+  }
+  const { practiceId } = request.data || {};
+  if (!practiceId || practiceId !== request.auth.uid) {
+    throw new HttpsError('permission-denied', "You can only view your own practice's subscription.");
+  }
+
+  const practiceSnap = await db.collection('practices').doc(practiceId).get();
+  const subscriptionId = practiceSnap.data()?.stripeSubscriptionId;
+  if (!subscriptionId) {
+    return { status: 'none', planName: null, amount: null, currentPeriodEnd: null };
+  }
+
+  const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2024-06-20' });
+  try {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const price = subscription.items.data[0]?.price;
+    return {
+      status: subscription.status,
+      planName: STRIPE_PRICE_ID_TO_PLAN[price?.id]?.name || practiceSnap.data()?.subscriptionPlan || null,
+      amount: price?.unit_amount != null ? price.unit_amount / 100 : null,
+      currentPeriodEnd: subscription.current_period_end,
+    };
+  } catch (err) {
+    throw new HttpsError('internal', err.message || 'Stripe request failed.');
+  }
+});
+
+// A patient-specific installment plan — a fixed number of monthly charges
+// that total a treatment cost, rather than an open-ended subscription. Like
+// createPaymentLink, this never sends a patient's name or any identifying
+// detail to Stripe; the Stripe customer/product carry only the opaque
+// patientId, and Firestore (not Stripe) is what maps that back to a real
+// person on the practice's own side.
+exports.createPaymentPlan = onCall({ secrets: [stripeSecretKey] }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'You must be signed in to create a payment plan.');
+  }
+  const { patientId, practiceId, totalAmount, months } = request.data || {};
+  if (!patientId || typeof patientId !== 'string') {
+    throw new HttpsError('invalid-argument', 'A patientId is required.');
+  }
+  if (!practiceId || practiceId !== request.auth.uid) {
+    throw new HttpsError('permission-denied', 'You can only create payment plans for your own practice.');
+  }
+  const parsedTotal = Number(totalAmount);
+  const parsedMonths = Number(months);
+  if (!parsedTotal || parsedTotal <= 0) {
+    throw new HttpsError('invalid-argument', 'A positive totalAmount is required.');
+  }
+  if (parsedTotal > MAX_PAYMENT_LINK_AMOUNT) {
+    throw new HttpsError('invalid-argument', `Amount can't exceed $${MAX_PAYMENT_LINK_AMOUNT.toLocaleString()}.`);
+  }
+  if (!Number.isInteger(parsedMonths) || parsedMonths < 2 || parsedMonths > 24) {
+    throw new HttpsError('invalid-argument', 'months must be a whole number between 2 and 24.');
+  }
+
+  const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2024-06-20' });
+  const amountPerCycle = Math.round((parsedTotal / parsedMonths) * 100) / 100;
+
+  try {
+    const customer = await stripe.customers.create({
+      metadata: { practiceId, patientId },
+    });
+
+    const price = await stripe.prices.create({
+      currency: 'usd',
+      unit_amount: Math.round(amountPerCycle * 100),
+      recurring: { interval: 'month' },
+      product_data: { name: `Payment plan — ${parsedMonths} months` },
+    });
+
+    // A subscription with a fixed end date, rather than open-ended — it
+    // bills monthly and then stops itself once the total is paid off.
+    const cancelAt = new Date();
+    cancelAt.setMonth(cancelAt.getMonth() + parsedMonths);
+
+    const subscription = await stripe.subscriptions.create({
+      customer: customer.id,
+      items: [{ price: price.id }],
+      cancel_at: Math.floor(cancelAt.getTime() / 1000),
+      payment_behavior: 'default_incomplete',
+      expand: ['latest_invoice.payment_intent'],
+      metadata: { practiceId, patientId },
+    });
+
+    await db.collection('practices').doc(practiceId).collection('paymentPlans').doc(patientId).set({
+      patientId,
+      practiceId,
+      totalAmount: parsedTotal,
+      months: parsedMonths,
+      amountPerCycle,
+      stripeCustomerId: customer.id,
+      stripeSubscriptionId: subscription.id,
+      status: subscription.status,
+      createdBy: request.auth.uid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      subscriptionId: subscription.id,
+      status: subscription.status,
+      clientSecret: subscription.latest_invoice?.payment_intent?.client_secret || null,
+    };
+  } catch (err) {
+    throw new HttpsError('internal', err.message || 'Stripe request failed.');
+  }
+});
+
+// Called from stripeWebhook (below) on payment_intent.payment_failed. Marks
+// whichever Firestore record the failing subscription belongs to — the
+// practice's own plan, or one patient's payment plan — as past_due, logs it
+// for the activity log, and best-effort emails the practice owner. Never
+// throws: a failed notification is not worth Stripe retrying the whole
+// webhook delivery over.
+async function handleFailedPayment(event, stripe) {
+  const paymentIntent = event.data.object;
+  const invoiceId = paymentIntent.invoice;
+  if (!invoiceId) return; // not a subscription payment — nothing to update
+
+  const invoice = await stripe.invoices.retrieve(invoiceId);
+  const subscriptionId = invoice.subscription;
+  if (!subscriptionId) return;
+
+  let practiceRef = null;
+  let logContext = {};
+
+  const ownSnap = await db.collection('practices').where('stripeSubscriptionId', '==', subscriptionId).limit(1).get();
+  if (!ownSnap.empty) {
+    practiceRef = ownSnap.docs[0].ref;
+    await practiceRef.set({ subscriptionStatus: 'past_due' }, { merge: true });
+    logContext = { kind: 'subscription', practiceId: practiceRef.id };
+  } else {
+    const planSnap = await db.collectionGroup('paymentPlans').where('stripeSubscriptionId', '==', subscriptionId).limit(1).get();
+    if (!planSnap.empty) {
+      const planDoc = planSnap.docs[0];
+      await planDoc.ref.set({ status: 'past_due' }, { merge: true });
+      practiceRef = planDoc.ref.parent.parent;
+      logContext = { kind: 'paymentPlan', practiceId: practiceRef?.id, patientId: planDoc.id };
+    }
+  }
+
+  if (!practiceRef) return; // subscription not tied to anything we track
+
+  await db.collection('activityLog').add({
+    type: 'payment_failed',
+    ...logContext,
+    stripeSubscriptionId: subscriptionId,
+    amount: paymentIntent.amount != null ? paymentIntent.amount / 100 : null,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  try {
+    // Deliberately a plain env var, not a defineSecret() bound into this
+    // function — this keeps the email step truly optional. `firebase
+    // deploy --non-interactive` (see .github/workflows/deploy-functions.yml)
+    // hard-fails the whole deploy if a bound secret doesn't exist yet in
+    // Secret Manager, so requiring one here would risk breaking every
+    // other function's auto-deploy over a nice-to-have notification. To
+    // actually enable this, set SENDGRID_API_KEY via Secret Manager or a
+    // functions/.env.praxismd file and read it the same way.
+    const key = process.env.SENDGRID_API_KEY;
+    if (!key) return; // not configured — logging above still happened
+    const authUser = await admin.auth().getUser(practiceRef.id);
+    if (!authUser.email) return;
+    sgMail.setApiKey(key);
+    await sgMail.send({
+      to: authUser.email,
+      from: 'billing@praxismd.health',
+      subject: 'A payment on your PraxisMD account failed',
+      text: 'A recent payment on your PraxisMD account did not go through. Please update your payment method to avoid any interruption to your service.',
+    });
+  } catch (err) {
+    console.error('Failed to send payment-failure email:', err.message);
+  }
+}
+
 // Stripe calls this directly (not through the Firebase SDK, so no
 // request.auth) whenever a payment link is paid. Verifies the request is
 // genuinely from Stripe via the webhook signing secret, then flips the
@@ -158,6 +463,14 @@ exports.stripeWebhook = onRequest({ secrets: [stripeSecretKey, stripeWebhookSecr
         batch.update(doc.ref, { status: 'paid', paidAt: admin.firestore.FieldValue.serverTimestamp() });
       });
       if (!snap.empty) await batch.commit();
+    }
+  } else if (event.type === 'payment_intent.payment_failed') {
+    try {
+      await handleFailedPayment(event, stripe);
+    } catch (err) {
+      // Never fail the webhook over this — Stripe would just retry
+      // delivery of an event we already looked at.
+      console.error('handleFailedPayment failed:', err.message);
     }
   }
 
