@@ -109,7 +109,7 @@ const PRICING_PLANS = [
     ],
   },
   {
-    name: 'Growth', price: '$499', popular: false,
+    name: 'Growth', price: '$499', popular: true,
     blurb: 'For growing practices that want more automation.',
     features: [
       'Everything in Starter',
@@ -121,7 +121,7 @@ const PRICING_PLANS = [
     ],
   },
   {
-    name: 'Pro', price: '$999', popular: true,
+    name: 'Pro', price: '$999', popular: false, comingSoon: true,
     blurb: 'For multi-provider practices that want it fully automated.',
     features: [
       'Everything in Growth',
@@ -678,14 +678,20 @@ function Landing() {
                 key={i}
                 className="px-pcard"
                 style={{
-                  background: C.bg, borderRadius: '16px', padding: '28px 24px',
+                  background: plan.comingSoon ? C.bgAlt : C.bg, borderRadius: '16px', padding: '28px 24px',
                   border: plan.popular ? `2px solid ${C.brand}` : `1px solid ${C.border}`,
                   position: 'relative', boxShadow: plan.popular ? `0 12px 30px ${withAlpha(C.brand, .12)}` : 'none',
+                  opacity: plan.comingSoon ? 0.6 : 1,
                 }}
               >
                 {plan.popular && (
                   <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 12px', borderRadius: '20px', background: C.brand, color: 'white', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>
                     <Star size={11} fill="white" /> MOST POPULAR
+                  </div>
+                )}
+                {plan.comingSoon && (
+                  <div style={{ position: 'absolute', top: '-13px', left: '50%', transform: 'translateX(-50%)', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 12px', borderRadius: '20px', background: C.muted, color: 'white', fontSize: '11px', fontWeight: '700', whiteSpace: 'nowrap' }}>
+                    COMING SOON
                   </div>
                 )}
                 <div style={{ fontSize: '15px', fontWeight: '700', color: C.ink, marginBottom: '4px' }}>{plan.name}</div>
@@ -696,23 +702,25 @@ function Landing() {
                 <div style={{ fontSize: '12.5px', color: C.mid, marginBottom: '22px', minHeight: '36px' }}>{plan.blurb}</div>
                 <button
                   type="button"
-                  onClick={openDemo}
-                  className="px-btn"
+                  onClick={plan.comingSoon ? undefined : openDemo}
+                  disabled={plan.comingSoon}
+                  className={plan.comingSoon ? '' : 'px-btn'}
                   style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%',
                     padding: '11px', borderRadius: '10px', marginBottom: '22px',
-                    fontSize: '13.5px', fontWeight: '600', fontFamily: 'inherit', cursor: 'pointer',
-                    background: plan.popular ? C.brand : C.bgAlt,
-                    color: plan.popular ? 'white' : C.ink2,
+                    fontSize: '13.5px', fontWeight: '600', fontFamily: 'inherit',
+                    cursor: plan.comingSoon ? 'not-allowed' : 'pointer',
+                    background: plan.comingSoon ? C.border : (plan.popular ? C.brand : C.bgAlt),
+                    color: plan.comingSoon ? C.muted : (plan.popular ? 'white' : C.ink2),
                     border: plan.popular ? 'none' : `1px solid ${C.border}`,
                   }}
                 >
-                  Get started
+                  {plan.comingSoon ? 'Coming soon' : 'Get started'}
                 </button>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {plan.features.map((f, j) => (
                     <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: '9px', fontSize: '13px', color: C.mid }}>
-                      <Check size={15} color={C.green} style={{ flexShrink: 0, marginTop: '2px' }} />
+                      <Check size={15} color={plan.comingSoon ? C.muted : C.green} style={{ flexShrink: 0, marginTop: '2px' }} />
                       <span>{f}</span>
                     </div>
                   ))}
